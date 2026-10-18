@@ -1,6 +1,6 @@
 # Coding with Workbridge
 
-In 0.5.0, `workspace_info.roots` lists all allowed directories. Relative paths keep using `C:\work`; use absolute paths for `C:\rift modding`. File/Git/snapshot tools and terminal cwd selection support both. See [multiple-root configuration and path rules](workspace-roots.md).
+In 0.6.0, `workspace_info.roots` lists all allowed directories. Relative paths keep using `C:\work`; use absolute paths for `C:\rift modding`. File/Git/snapshot tools and terminal cwd selection support both. See [multiple-root configuration and path rules](workspace-roots.md).
 
 ## Typical workflow
 
@@ -81,7 +81,7 @@ The cwd check rejects paths outside the workspace, protected state, and junction
 
 Windows process-tree ownership uses the existing Job Object helper in a small compiled host. Timeouts, cancellation, root-command exit, and abrupt MCP-server death terminate descendants, including descendants that keep output pipes open. A restart leaves unfinished jobs interrupted. Use the independent [WB-001 updater](updates.md) to deploy or restart Workbridge itself.
 
-Use `node scripts/configure-self-commands.mjs` to configure Workbridge's build, test, format check, startup test, and read-only RiftReader acceptance commands without replacing existing profiles.
+Use `node scripts/configure-self-commands.mjs` to configure Workbridge's build, test, format check, startup test, and generic disposable acceptance commands without replacing existing profiles.
 
 ## Git
 

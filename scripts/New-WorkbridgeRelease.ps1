@@ -33,6 +33,7 @@ try {
             @{name='startup'; args=@('run','test:startup')},
             @{name='updater'; args=@('run','test:updater')},
             @{name='format'; args=@('run','format:check')},
+            @{name='generic'; args=@('run','acceptance')},
             @{name='acceptance'; args=@('run','acceptance:release')}
         )
         foreach ($command in $commands) {

@@ -14,8 +14,9 @@ import { resultSchemas } from './schemas.js';
 import { SnapshotCache } from './snapshot-cache.js';
 import { Snapshots } from './snapshots.js';
 import { snapshotManifest } from './snapshot-manifest.js';
+import { readRoots } from './roots-config.js';
 
-const version = '0.5.0';
+const version = '0.6.0';
 const location = z
   .string()
   .max(4096)
@@ -64,24 +65,9 @@ async function main() {
         'Invalid .local/settings.json; expected {"snapshotCacheGiB":32} with capacity greater than zero and at most 1024.',
       );
   }
-  // Separate from snapshot settings so an older runtime can still start after
-  // rollback; it simply ignores the additional-roots configuration file.
-  let additionalRoots: string[] = [];
-  try {
-    const rootsFile = path.join(state, 'workspace-roots.json');
-    if ((await lstat(rootsFile)).size > 16 * 1024) throw new Error('Roots configuration too large');
-    additionalRoots = z
-      .object({ additionalRoots: z.array(z.string().min(1).max(4096)).max(16) })
-      .strict()
-      .parse(JSON.parse((await readFile(rootsFile, 'utf8')).replace(/^\uFEFF/, ''))).additionalRoots;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
-      throw new BridgeError(
-        'INVALID_CONFIG',
-        'Invalid .local/workspace-roots.json; expected {"additionalRoots":["C:/other-projects"]} with up to 16 absolute existing directory paths.',
-      );
-  }
-  const workspace = await Workspace.create(undefined, additionalRoots);
+  const roots = await readRoots(state);
+  const workspace = await Workspace.create(undefined, roots.additionalRoots);
+  workspace.configuration = { state, fingerprint: roots.fingerprint };
   workspace.protect(state);
   const changes = new Changes(workspace, path.join(state, 'changes'));
   const jobs = new Jobs(workspace, state);
@@ -235,9 +221,15 @@ async function main() {
   );
   register(
     'discover_projects',
-    'Discover immediate child projects/directories with Git indicators.',
-    { directory: location },
-    (a) => workspace.discover(a.directory),
+    'Discover directories and Git repositories/worktrees. Default is immediate children; recursive scans have depth, entry/time and pagination limits. Full paths distinguish identical names. selected describes the requested folder itself.',
+    {
+      directory: location,
+      recursive: z.boolean().default(false),
+      maxDepth: bounded(12, 4),
+      offset,
+      limit: bounded(500, 500),
+    },
+    (a) => workspace.discover(a.directory, a.recursive, a.maxDepth, a.offset, a.limit),
   );
   register(
     'list_directory',

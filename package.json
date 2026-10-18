@@ -1,6 +1,6 @@
 {
   "name": "workbridge-mcp",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Small Windows coding bridge for browser ChatGPT via Secure MCP Tunnel",
   "type": "module",
@@ -17,7 +17,9 @@
     "check": "npm test",
     "acceptance": "npm run build && node scripts/acceptance.mjs",
     "format": "prettier --write src test scripts/*.mjs package.json .prettierrc.json",
-    "format:check": "prettier --check src test scripts/*.mjs package.json .prettierrc.json"
+    "format:check": "prettier --check src test scripts/*.mjs package.json .prettierrc.json",
+    "acceptance:project": "npm run build && node scripts/acceptance-project.mjs",
+    "acceptance:snapshot": "npm run build && node scripts/snapshot-acceptance.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.3.1",

@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 // An internal worker, not a public shell API. The Windows host keeps a Job
 // Object open around this worker and all command descendants. Exit on the
@@ -9,6 +10,8 @@ const input = JSON.parse(readFileSync(0, 'utf8')) as {
   args: string[];
   resultFile: string;
   timeoutSeconds: number;
+  rootsFile?: string;
+  rootsFingerprint?: string;
 };
 let finished = false;
 function finish(exitCode: number | null, errorCode?: string, timedOut = false) {
@@ -25,6 +28,17 @@ function finish(exitCode: number | null, errorCode?: string, timedOut = false) {
 const timer = setTimeout(() => finish(null, undefined, true), input.timeoutSeconds * 1000);
 timer.unref();
 try {
+  if (input.rootsFile && input.rootsFingerprint) {
+    let raw = '<absent>';
+    try {
+      raw = readFileSync(input.rootsFile, 'utf8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    if (createHash('sha256').update(raw).digest('hex') !== input.rootsFingerprint) {
+      finish(null, 'WORKSPACE_RESTART_REQUIRED');
+    }
+  }
   const child = spawn(input.executable, input.args, {
     shell: false,
     windowsHide: true,

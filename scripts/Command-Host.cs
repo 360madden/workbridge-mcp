@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Text;
+using System.IO;
 
 // Reuse the existing Windows Job Object helper. Its last handle belongs to
 // this host: normal exit, cancellation, or loss of the MCP parent's stdin
@@ -10,10 +11,15 @@ internal static class CommandHost
 {
     private static int Main(string[] args)
     {
+        FileStream configuration = null;
         try
         {
-            if (args.Length != 2) return 126;
+            if (args.Length != 2 && args.Length != 3) return 126;
             Workbridge.ProcessLifetime.Attach();
+            if (args.Length == 3) {
+                try { configuration = File.Open(args[2], FileMode.Open, FileAccess.Read, FileShare.Read); }
+                catch (IOException) { Console.Error.WriteLine("Workspace configuration is busy; retry after its local configuration operation completes."); return 126; }
+            }
             Console.InputEncoding = new UTF8Encoding(false);
             string request = Console.In.ReadLine();
             if (request == null) return 126;
@@ -46,5 +52,6 @@ internal static class CommandHost
             Console.Error.WriteLine("Workbridge command host failed before completing its worker.");
             return 126;
         }
+        finally { if (configuration != null) configuration.Dispose(); }
     }
 }

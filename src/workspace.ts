@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readPage, fileHash } from './text.js';
 import { search } from './search.js';
+import { readRoots } from './roots-config.js';
 import { BridgeError, limits, excludedDirectories } from './core.js';
 export { BridgeError, limits, excludedDirectories, errorDetails } from './core.js';
 
@@ -19,6 +20,17 @@ function inside(root: string, target: string) {
 }
 
 export class Workspace {
+  configuration?: { state: string; fingerprint: string };
+  async ensureConfiguration() {
+    if (
+      this.configuration &&
+      (await readRoots(this.configuration.state)).fingerprint !== this.configuration.fingerprint
+    )
+      throw new BridgeError(
+        'WORKSPACE_RESTART_REQUIRED',
+        'Workspace roots changed. Restart the existing Workbridge service before accessing projects.',
+      );
+  }
   private protectedDirectories: string[] = [];
   protect(directory: string) {
     this.protectedDirectories.push(path.resolve(directory));
@@ -50,6 +62,7 @@ export class Workspace {
   }
 
   async resolve(input = '.') {
+    await this.ensureConfiguration();
     // Reject Windows alternate streams/device names, including on non-Windows test hosts.
     const absolute = path.resolve(this.root, input);
     if (this.protectedDirectories.some((dir) => inside(dir, absolute)))
@@ -120,25 +133,84 @@ export class Workspace {
     return realpath(target);
   }
 
-  async discover(directory = '.') {
+  async repositoryInfo(directory: string) {
+    const selected = await this.directory(directory);
+    let current = selected;
+    for (;;) {
+      const marker = await lstat(path.join(current, '.git')).catch(() => null);
+      if (marker && !marker.isSymbolicLink()) {
+        try {
+          const [top, gitDir, commonDir] = (
+            await this.git(
+              selected,
+              ['rev-parse', '--show-toplevel', '--absolute-git-dir', '--git-common-dir'],
+              5000,
+            )
+          )
+            .trim()
+            .split(/\r?\n/);
+          if (!top || !gitDir || !commonDir) throw new Error('Incomplete Git identity');
+          const root = await this.directory(top);
+          return {
+            kind:
+              path.relative(path.resolve(selected, gitDir), path.resolve(selected, commonDir)) === ''
+                ? 'repository'
+                : 'worktree',
+            root: this.relative(root),
+            isRoot: path.relative(root, selected) === '',
+            git: true,
+          };
+        } catch (error) {
+          return {
+            kind: 'unavailable',
+            root: null,
+            isRoot: false,
+            git: true,
+            errorCode: error instanceof BridgeError ? error.code : 'GIT_ERROR',
+          };
+        }
+      }
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      try {
+        current = await this.directory(parent);
+      } catch (error) {
+        if (error instanceof BridgeError && ['OUTSIDE_ROOT', 'PROTECTED_PATH'].includes(error.code)) break;
+        throw error;
+      }
+    }
+    return { kind: 'folder', root: null, isRoot: false, git: false };
+  }
+
+  async discover(directory = '.', recursive = false, maxDepth = 4, offset = 0, limit = 500) {
     const target = await this.directory(directory);
-    const result = await this.list(directory, false, 0, 500, '', true);
+    const result = await this.list(directory, recursive, offset, limit, '', false, maxDepth);
     const directories = result.entries.filter((x) => x.type === 'directory');
-    const projects = await Promise.all(
-      directories.map(async (entry) => {
-        const gitEntry = await lstat(path.join(path.resolve(this.root, entry.path), '.git')).catch(
-          () => null,
-        );
-        return { ...entry, git: Boolean(gitEntry && !gitEntry.isSymbolicLink()) };
-      }),
-    );
+    const projects = [];
+    const deadline = Date.now() + limits.scanMs;
+    let metadataLimited = false;
+    let nextOffset = result.nextOffset;
+    for (const entry of directories) {
+      if (Date.now() > deadline) {
+        metadataLimited = true;
+        nextOffset = offset + result.entries.indexOf(entry);
+        break;
+      }
+      const gitEntry = await lstat(path.join(path.resolve(this.root, entry.path), '.git')).catch(() => null);
+      const git = Boolean(gitEntry && !gitEntry.isSymbolicLink());
+      projects.push({ ...entry, git, ...(git ? { repository: await this.repositoryInfo(entry.path) } : {}) });
+    }
     return {
       root: this.root,
       roots: this.roots,
       directory: this.relative(target),
+      selected: await this.repositoryInfo(target),
+      recursive,
+      maxDepth: recursive ? maxDepth : 1,
       projects,
-      truncated: result.truncated,
-      nextOffset: result.nextOffset,
+      truncated: result.truncated || metadataLimited,
+      scanLimitReached: result.scanLimitReached || metadataLimited,
+      nextOffset,
     };
   }
 
@@ -149,13 +221,14 @@ export class Workspace {
     limit = 200,
     nameContains = '',
     includeGenerated = false,
+    maxDepth = Number.POSITIVE_INFINITY,
   ) {
     const target = await this.directory(directory);
     const state = { visited: 0, limited: false, skipped: 0, deadline: Date.now() + limits.scanMs };
     const entries: { path: string; type: string }[] = [];
     let matched = 0;
     let more = false;
-    for await (const entry of this.walk(target, recursive, includeGenerated, state)) {
+    for await (const entry of this.walk(target, recursive, includeGenerated, state, 0, maxDepth)) {
       if (!path.basename(entry.path).toLowerCase().includes(nameContains.toLowerCase())) continue;
       if (matched++ < offset) continue;
       if (entries.length === limit) {
@@ -179,6 +252,8 @@ export class Workspace {
     recursive: boolean,
     includeGenerated: boolean,
     state: { visited: number; limited: boolean; skipped: number; deadline: number },
+    depth = 0,
+    maxDepth = Number.POSITIVE_INFINITY,
   ): AsyncGenerator<{ path: string; type: string }> {
     // opendir avoids loading a potentially huge directory before applying the budget.
     const { opendir } = await import('node:fs/promises');
@@ -211,8 +286,8 @@ export class Workspace {
         continue;
       }
       yield { path: this.relative(absolute), type: info.isDirectory() ? 'directory' : 'file' };
-      if (recursive && info.isDirectory()) {
-        yield* this.walk(absolute, true, includeGenerated, state);
+      if (recursive && info.isDirectory() && depth + 1 < maxDepth) {
+        yield* this.walk(absolute, true, includeGenerated, state, depth + 1, maxDepth);
         if (state.limited) return;
       }
     }
@@ -245,7 +320,7 @@ export class Workspace {
     };
   }
 
-  async git(cwd: string, args: string[]) {
+  async git(cwd: string, args: string[], timeout = 15_000) {
     try {
       const { stdout } = await execute(
         'git',
@@ -264,7 +339,7 @@ export class Workspace {
           cwd,
           shell: false,
           windowsHide: true,
-          timeout: 15_000,
+          timeout,
           maxBuffer: 1024 * 1024,
           env: {
             ...Object.fromEntries(

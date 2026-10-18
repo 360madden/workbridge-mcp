@@ -91,6 +91,7 @@ Start-Sleep -Seconds 60
         if (!$probeProcess.HasExited) { Stop-Process -Id $probeProcess.Id }
         if ($probeChild -and !$probeChild.HasExited) { Stop-Process -Id $probeChild.Id }
     }
+    & (Join-Path $PSScriptRoot 'restart.test.ps1')
     Write-Output 'PASS: DPAPI roundtrip, protected ACL, corrupt/missing credentials, unattended fail-fast, duplicate launchers, process-tree cleanup, and script syntax.'
 } finally {
     $env:LOCALAPPDATA = $previousLocalAppData

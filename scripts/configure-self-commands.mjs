@@ -3,8 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
-const state = path.join(repo, '.local');
-const project = process.argv[2] ?? path.basename(repo);
+const state = path.resolve(process.env.WORKBRIDGE_STATE_DIR ?? path.join(repo, '.local'));
+const project = process.argv[2] ?? repo.split(path.sep).join('/').replace(/\/$/, '');
 const configPath = path.join(state, 'commands.json');
 let config;
 try {
@@ -13,20 +13,17 @@ try {
   if (error.code !== 'ENOENT') throw error;
   config = { projects: {} };
 }
-const command = (args, timeoutSeconds = 120) => ({ executable: process.execPath, args, timeoutSeconds });
+const runner = path.join(repo, 'scripts', 'run-package-script.mjs');
+const command = (script, timeoutSeconds = 120) => ({
+  executable: process.execPath,
+  args: [runner, script],
+  timeoutSeconds,
+});
 const profiles = {
-  build: command(['node_modules/typescript/bin/tsc']),
-  test: command(['--test', 'test/*.test.mjs']),
-  format_check: command([
-    'node_modules/prettier/bin/prettier.cjs',
-    '--check',
-    'src',
-    'test',
-    'scripts/*.mjs',
-    'package.json',
-    '.prettierrc.json',
-  ]),
-  acceptance: command(['scripts/acceptance.mjs']),
+  build: command('build'),
+  test: command('test'),
+  format_check: command('format:check'),
+  acceptance: command('acceptance'),
   startup_test: {
     executable: path.join(
       process.env.SystemRoot ?? 'C:\\Windows',
@@ -46,7 +43,16 @@ const profiles = {
 };
 config.projects ??= {};
 config.projects[project] ??= {};
-for (const [name, value] of Object.entries(profiles)) config.projects[project][name] ??= value;
+const conflicts = [];
+for (const [name, value] of Object.entries(profiles)) {
+  const existing = config.projects[project][name];
+  if (existing && JSON.stringify(existing) !== JSON.stringify(value)) conflicts.push(name);
+  config.projects[project][name] ??= value;
+}
 await mkdir(state, { recursive: true });
 await writeFile(configPath, JSON.stringify(config, null, 2) + '\n');
 console.log(`Configured ${Object.keys(profiles).join(', ')} for ${project}; existing profiles preserved.`);
+if (conflicts.length)
+  console.log(
+    `Preserved differing profiles: ${conflicts.join(', ')}. Review/migrate them explicitly or select a new profile project key; the full package lifecycle was not substituted silently.`,
+  );

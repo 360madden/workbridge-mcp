@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { readFile, mkdir, readdir } from 'node:fs/promises';
+import { readFile, mkdir, readdir, open } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { StringDecoder } from 'node:string_decoder';
@@ -9,6 +9,7 @@ import type { Workspace } from './workspace.js';
 import { BridgeError, limits } from './core.js';
 import { atomicWrite, digest, Serial } from './changes.js';
 import { executableFor } from './command-executable.js';
+import { rootsFile, rootsLock } from './roots-config.js';
 
 type Command = { executable: string; args: string[]; timeoutSeconds?: number };
 type Profiles = { projects: Record<string, Record<string, Command>> };
@@ -79,16 +80,23 @@ export class Jobs {
   async list(project: string) {
     const directory = await this.workspace.directory(project),
       relative = this.workspace.relative(directory);
-    const profiles = await this.profiles();
+    const profiles = await this.projectProfiles(directory);
     return {
       project: relative,
-      commands: Object.entries(profiles.projects[relative] ?? {}).map(([name, c]) => ({
+      commands: Object.entries(profiles).map(([name, c]) => ({
         name,
         executable: c.executable,
         args: c.args,
         timeoutSeconds: c.timeoutSeconds ?? 120,
       })),
     };
+  }
+  private async projectProfiles(directory: string) {
+    const profiles = await this.profiles();
+    const absolute = directory.split(path.sep).join('/');
+    // Existing relative profiles retain precedence; absolute keys make new
+    // installation profiles independent of the chosen primary root.
+    return { ...profiles.projects[absolute], ...profiles.projects[this.workspace.relative(directory)] };
   }
   async run(project: string, command: string, requestId: string = randomUUID()) {
     return this.start(project, command, requestId);
@@ -123,7 +131,7 @@ export class Jobs {
       }
       if (this.live.size >= 2)
         throw new BridgeError('JOB_LIMIT', 'Two command jobs are already running; wait or cancel one.');
-      const profile = terminal ?? (await this.profiles()).projects[relative]?.[command];
+      const profile = terminal ?? (await this.projectProfiles(cwd))[command];
       if (!profile)
         throw new BridgeError(
           'COMMAND_NOT_CONFIGURED',
@@ -176,12 +184,17 @@ export class Jobs {
         ),
       );
       const resultFile = this.jobFile(job.id).replace(/\.json$/, '.result.json');
+      await open(rootsLock(this.stateDirectory), 'wx')
+        .then((handle) => handle.close())
+        .catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== 'EEXIST') throw error;
+        });
       const worker = fileURLToPath(new URL('./command-worker.js', import.meta.url));
       const child = spawn(
         process.platform === 'win32'
           ? fileURLToPath(new URL('./command-host.exe', import.meta.url))
           : process.execPath,
-        process.platform === 'win32' ? [process.execPath, worker] : [worker],
+        process.platform === 'win32' ? [process.execPath, worker, rootsLock(this.stateDirectory)] : [worker],
         {
           cwd,
           env,
@@ -197,6 +210,8 @@ export class Jobs {
         args: launch.args,
         resultFile,
         timeoutSeconds: seconds,
+        rootsFile: rootsFile(this.workspace.configuration?.state ?? this.stateDirectory),
+        rootsFingerprint: this.workspace.configuration?.fingerprint,
       });
       if (process.platform === 'win32') child.stdin.write(input + '\n');
       else child.stdin.end(input);

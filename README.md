@@ -1,6 +1,6 @@
 # Workbridge MCP
 
-Inspect and edit local coding projects from **browser ChatGPT**, through OpenAI Secure MCP Tunnel. Default root: `C:\work`. Version **0.5.0** adds explicit support for additional project roots, alongside developer terminal commands, recoverable file edits, Git inspection, and saved memory-snapshot inspection. See [multiple roots](docs/workspace-roots.md) for `C:\work` plus `C:\rift modding` access.
+Inspect and edit local coding projects from **browser ChatGPT**, through OpenAI Secure MCP Tunnel. Default root: `C:\work`. Version **0.6.0** adds operator-managed roots, bounded nested repository discovery, scoped project context, and self-contained acceptance alongside developer commands, recoverable edits, Git inspection, and saved snapshots. See [multiple roots](docs/workspace-roots.md) for `C:\work` plus `C:\rift modding` access.
 
 ```text
 Browser ChatGPT → OpenAI Secure MCP Tunnel ← outbound tunnel-client
@@ -12,7 +12,7 @@ Browser ChatGPT → OpenAI Secure MCP Tunnel ← outbound tunnel-client
 
 One small TypeScript server and the official tunnel client. No Supergateway, public listener, custom HTTP layer, database, Docker, or model API integration is needed. `tunnel-client` owns the server child process. The tunnel needs its own runtime API key and account permissions; the MCP server itself needs no key.
 
-This installation is active at **0.5.0** with **33 tools** and two allowed roots: **`C:\work`** (default) and **`C:\rift modding`**. Windows sign-in startup and **Allow all actions for Workbridge** are preserved. Hosted read/write/undo and terminal checks passed in both roots; see [hosted validation evidence](docs/validation.md).
+This installation is active at **0.6.0**, with **33 tools** and two allowed roots: **`C:\work`** (default) and **`C:\rift modding`**. Windows sign-in startup and **Allow all actions for Workbridge** are preserved. WB-004 generic and hosted acceptance passed using disposable unrelated projects; both existing roots were preserved and neither real RiftReader repository was modified. See [hosted validation evidence](docs/validation.md).
 
 ## Windows setup
 
@@ -161,9 +161,9 @@ With the tunnel running:
 5. Review the warning, select **I understand and want to continue**, and **Create as a plugin**. Complete any install/connect step the UI presents.
 6. In a new browser chat, enable/select Workbridge from the available plugins/tools. Ask:
 
-   > Use Workbridge. Inspect the RiftReader project under C:\work and find the code responsible for pointer-chain resolution. Search the actual source, read the relevant function, and report file paths and line numbers.
+   > Use Workbridge. Show the configured roots, discover projects in my chosen folder, inspect its README and source, and report the relevant file paths and line numbers.
 
-Version 0.5.0 advertises **33 tools**. A representative source location is `RiftReader/scripts/rift_live_test/x64dbg_static_chain_resolve.py:268`, defining `resolve_pointer_chain`. A local test or a ready health endpoint alone does not prove browser retrieval. See [validation evidence](docs/validation.md).
+Version 0.6.0 advertises **33 tools**. A local test or a ready health endpoint alone does not prove hosted retrieval. See [validation evidence](docs/validation.md).
 
 For an existing connected plugin, prepare and apply a validated release through the independent [WB-001 updater](docs/updates.md), then open **Manage Workbridge → Refresh tools** in ChatGPT. Review the expanded write/command access before enabling it. ChatGPT's plugin permissions determine whether actions ask first. The bridge does not bypass those controls. The existing tunnel and saved key are reused.
 
@@ -172,7 +172,7 @@ For an existing connected plugin, prepare and apply a validated release through 
 | Tool | Purpose |
 | --- | --- |
 | `workspace_info` | Primary root, all allowed roots, limits, path rules |
-| `discover_projects` | Immediate child directories with Git indicators |
+| `discover_projects` | Immediate folders or bounded recursive discovery; repository/worktree identity |
 | `list_directory` | Optional recursion, filename substring filter, offset pagination |
 | `read_file` | Source text with one-based line numbers and continuation |
 | `search_text` | Recursive literal text search, paths/lines/excerpts |
@@ -188,7 +188,7 @@ For an existing connected plugin, prepare and apply a validated release through 
 | `git_read_file`, `git_compare`, `git_blame`, `git_commit` | Historical source, commit comparisons/blame, selected-file local commits |
 | `snapshot_manifest`, `snapshot_cache`, `snapshot_read`, `snapshot_search` | Saved raw/gzip dumps, pose/segment/address mapping, streaming decompression, typed values and byte searches |
 
-File/directory paths are root-relative (`RiftReader/reader`) or absolute inside the root. Git `project` identifies the checkout; Git `path` filters are relative to that checkout's root. New projects need no registration. `discover_projects` only inspects one directory level; use its `directory` argument for grouped projects, or `list_directory` for root files and paging.
+File/directory paths are primary-root-relative (`example/src`) or absolute inside any allowed root. Git `project` identifies the checkout; Git `path` filters are relative to that checkout. Projects within an allowed root need no registration. Use the [local root manager](docs/workspace-roots.md) to add an unrelated folder. `discover_projects` defaults to immediate children; set `recursive=true`, `maxDepth` (1–12, default 4), and follow `nextOffset` for grouped/nested repositories. Its bounded scan reports truncation. `project_overview` distinguishes folders, repositories, and worktrees and identifies scoped AGENTS/README evidence without executing it.
 
 - UTF-8/BOM UTF-16 reads are streamed with no total file-size cap. Output is capped at 60,000 characters; each call scans at most 64 MiB/about five seconds. Supply the returned `cursor` with the same path for efficient continuation; cursors expire when the file changes or server restarts. `totalLines` is null until EOF. Enormous lines can be clipped and a preceding line exceeding a whole scan budget returns `LINE_LIMIT`. These are bounded text reads, not a binary inspection API.
 - SHA256 is returned by reads for files up to 16 MiB; `file_info(hash=true)` also hashes editable-size files. Creates/edits/moves/deletes and their undo backups are limited to 16 MiB per file. This is separate from large-text read support. Existing encoding/BOM/EOL are preserved when editing/replacing text.
@@ -219,7 +219,7 @@ Set-Location C:\work\workbridge-mcp
 node .\scripts\configure-self-commands.mjs
 ```
 
-Profiles are stored in ignored, operator-owned `.local\commands.json`. File tools cannot edit runtime state. Existing command profiles are preserved. Dynamic developer commands use `terminal_run` without a profile; its cwd validation is not an OS sandbox. See [terminal workflow and limits](docs/coding-workflow.md).
+Profiles run the full package build/test lifecycle, including the Windows command host. The default project key is the installation’s absolute path. Existing relative project profiles retain precedence over same-named absolute profiles. Differing existing profiles are reported and preserved; migrate them explicitly when ready. `WORKBRIDGE_STATE_DIR` selects another private state directory. Profiles are stored in ignored, operator-owned `.local\commands.json`. File tools cannot edit runtime state. Existing command profiles are preserved. Dynamic developer commands use `terminal_run` without a profile; its cwd validation is not an OS sandbox. See [terminal workflow and limits](docs/coding-workflow.md).
 
 ## Validate and troubleshoot
 
@@ -231,10 +231,12 @@ if ($LASTEXITCODE -ne 0) { throw 'Windows startup tests failed' }
 npm run format:check
 if ($LASTEXITCODE -ne 0) { throw 'Formatting failed' }
 npm run acceptance
-if ($LASTEXITCODE -ne 0) { throw 'RiftReader acceptance failed' }
+if ($LASTEXITCODE -ne 0) { throw 'Generic acceptance failed' }
 ```
 
-Tests use temporary repositories and a real MCP stdio client; no account key is required. Acceptance launches a fresh server, discovers RiftReader, searches/reads its actual resolver, and inspects Git status/diff/history. Its local evidence is saved to ignored `.local\acceptance.json`. RiftReader must exist under the chosen root. This implementation does not execute RiftReader code.
+Tests use temporary repositories and a real MCP stdio client; no account key is required. Default acceptance owns an isolated arbitrary root/state outside the existing roots, exercises Node failure → guarded fix → pass, plain folders, Git, undo and gzip snapshots, then removes its fixtures. Evidence is saved to `WORKBRIDGE_STATE_DIR/acceptance.json` (default `.local/acceptance.json`). It does not inspect either real RiftReader checkout.
+
+Optional existing-project inspection requires explicit inputs: `npm run acceptance:project -- <project-path> <literal-query>`. The saved-snapshot scenario is opt-in with `npm run acceptance:snapshot -- <manifest-path>`. These are read-only compatibility scenarios, not prerequisites for installing Workbridge.
 
 | Symptom | Next check |
 | --- | --- |
@@ -246,7 +248,7 @@ Tests use temporary repositories and a real MCP stdio client; no account key is 
 | `read_file` returns `{}` in ChatGPT | Use version 0.1.1 or later, rebuild, restart the tunnel, then Manage Workbridge → Refresh tools; try a fresh chat |
 | `This response couldn't load` after tool calls | A fresh chat and one reload displayed the verified answer during setup; check tunnel health separately. Repeated failures can be a ChatGPT display issue even when retrieval succeeds |
 | `OUTSIDE_ROOT` / `LINK_NOT_ALLOWED` | Use the actual path within root; junction targets are not followed |
-| Search incomplete | Read `truncated`/skip counts; narrow to `RiftReader/scripts`, `reader`, or `tools` |
+| Search incomplete | Read `truncated`/skip counts; narrow the directory, glob, or query |
 | Git error | Read the returned Git diagnostic; verify Git PATH and trusted checkout ownership; do not globally disable Git ownership checks |
 
 `npm start` by itself waits for an MCP client on stdin; that is expected. For manual protocol-independent startup only: `$env:WORKBRIDGE_ROOT = 'C:\work'; node .\dist\server.js`.

@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
-import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/client/stdio';
 
 const manifest = process.argv[2];
-if (!manifest) throw new Error('Pass the RiftReader offline self-test manifest path inside C:\\work.');
+if (!manifest) throw new Error('Pass an explicit offline self-test manifest path inside an allowed root.');
 const client = new Client({ name: 'snapshot-acceptance', version: '0.3.0' });
 const call = async (name, args) => {
   const r = await client.callTool({ name, arguments: args });
@@ -21,6 +21,14 @@ try {
       command: process.execPath,
       args: [path.resolve('dist/server.js')],
       stderr: 'inherit',
+      env: {
+        ...getDefaultEnvironment(),
+        ...Object.fromEntries(
+          ['WORKBRIDGE_ROOT', 'WORKBRIDGE_STATE_DIR']
+            .filter((key) => process.env[key])
+            .map((key) => [key, process.env[key]]),
+        ),
+      },
     }),
   );
   const report = await call('snapshot_manifest', {

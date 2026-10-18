@@ -19,6 +19,7 @@ $started = [DateTime]::UtcNow
 Start-ScheduledTask -TaskName $taskName
 $healthFile = Join-Path $repo '.local\health-url.txt'
 $deadline = $started.AddSeconds(30)
+$retriedStart = $false
 do {
     try {
         if ((Get-Item -LiteralPath $healthFile).LastWriteTimeUtc -ge $started.AddSeconds(-1)) {
@@ -32,6 +33,18 @@ do {
             }
         }
     } catch { # The new URL/HTTP listener may not be available yet.
+    }
+    # Task Scheduler can accept Start while the previous stopped instance is
+    # still completing, then return Ready without launching the new wrapper.
+    # Retry that zero-result transition once; real startup failures stay visible.
+    if (!$retriedStart -and [DateTime]::UtcNow -ge $started.AddSeconds(2)) {
+        $task = Get-ScheduledTask -TaskName $taskName
+        $info = Get-ScheduledTaskInfo -TaskName $taskName
+        if ($task.State -eq 'Ready' -and $info.LastTaskResult -eq 0) {
+            $retriedStart = $true
+            Write-Host 'Task Scheduler returned to Ready before tunnel startup; retrying the saved task once.'
+            Start-ScheduledTask -TaskName $taskName
+        }
     }
     if ([DateTime]::UtcNow -ge $deadline) { throw 'Task started but tunnel readiness was not confirmed within 30 seconds. Run scripts\Show-Status.ps1 and inspect .local\logs\autostart.log.' }
     Start-Sleep -Milliseconds 500

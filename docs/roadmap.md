@@ -1,6 +1,8 @@
 # Workbridge upgrade execution
 
-Current runtime: **0.5.0**, 33 tools, with `C:\work` as the default and `C:\rift modding` as an additional allowed root. Multi-root hosted read/write/undo and terminal acceptance passed. See [path configuration](workspace-roots.md) and [validation evidence](validation.md).
+Current runtime: **0.6.0**, 33 tools, with `C:\work` as the stable primary root and `C:\rift modding` as an additional root. **WB-004 is implemented, deployed, and tested.** Operators can register unrelated folders without rebuilding; discovery distinguishes nested repositories/worktrees and plain folders; project overviews expose scoped instruction evidence; generic acceptance has no real-project dependency.
+
+Acceptance passed 80 integration tests, 21 updater cases, Windows startup/restart checks, generic fixtures, full MCP self-build, real scheduled-controller installation/automatic recovery/manual rollback, and fresh hosted failure → guarded fix → pass/undo in an arbitrary temporary root. Original configuration bytes and credentials were preserved; the temporary root was removed and denied afterward. Both real RiftReader repositories and VMware were untouched. See [validation evidence](validation.md) and [root management](workspace-roots.md). WB-003 remains separate; RiftReader comparison/stabilization follows as separate work.
 
 WB-001 update/recovery tooling and WB-002 terminal execution are implemented and active. The 0.4.0 terminal milestone exposed 33 tools and passed fresh hosted terminal acceptance after operation `wb002-first`. See [validation evidence](validation.md) and the [operator workflow](updates.md). WB-003 remains proposed in [pending upgrades](pending-upgrades.md). The first source commit is user-authorized; its author is supplied per invocation without changing Git settings.
 

@@ -4,9 +4,11 @@ This document collects **proposed** upgrades for future consideration. Entries a
 
 _Last updated: 2026-10-18_
 
+**Current status:** WB-004 is complete at 0.6.0 with local, recovery, and hosted acceptance. Both real RiftReader repositories remain untouched. Their comparison and stabilization are separate follow-up work. WB-003 remains a separate proposal.
+
 ## Joint implementation plan — WB-001, WB-002, WB-003
 
-**Scope:** WB-001 and WB-002 were authorized, implemented, and activated with fresh hosted acceptance. WB-002 was activated at 0.4.0; current 0.5.0 adds both workspace roots with the same 33 tools. WB-003 remains proposed. This document alone does not authorize new scope.
+**Scope:** WB-001 and WB-002 were authorized, implemented, and activated with fresh hosted acceptance. WB-002 was activated at 0.4.0; the 0.5.0 milestone added both workspace roots, and current 0.6.0 completes WB-004 with the same 33 tools. WB-003 remains proposed. This document alone does not authorize new scope.
 
 **Recommended sequence (with explicit go/no-go checkpoints):**
 
@@ -151,3 +153,84 @@ Let ChatGPT manage local Git development and GitHub workflows through the existi
 - WB-002 is documented above and is the preferred execution foundation for this integration.
 
 ---
+
+## WB-004 — Independent workspaces and repository workflows
+
+**Status:** Implemented, deployed at 0.6.0, and accepted on October 18, 2026\
+**Priority:** Next Workbridge milestone, before either RiftReader\
+**Baseline:** Committed 0.5.0 at `6a7cd9d`, 33 tools, primary `C:\work` and additional `C:\rift modding`\
+**Objective:** Workbridge can serve any explicitly authorized existing folder and the repositories inside it, using generic file, Git, terminal, and project-inspection capabilities. Its installation, runtime state, credentials, and update/recovery lifecycle remain separate from the projects it serves.
+
+### Completed implementation and acceptance
+
+- Local Show/Validate/Add/Remove root manager, protected-state configuration backups, atomic changes, fixed primary identity, restart-required access guard, and shared Windows native command leases.
+- Bounded recursive discovery with repository/worktree identity and unambiguous paths; overview instruction/README evidence; folders and unborn/dirty repositories supported without history requirements.
+- Disposable default acceptance, explicit optional project/snapshot scenarios, absolute self-profile routing with legacy precedence, and full package lifecycle including verified incremental native builds.
+- 80 integration tests, 21 updater cases, startup/restart fixtures, generic acceptance and actual MCP self-build passed. The real Windows PowerShell 5.1 controller passed 0.5.0 → 0.6.0 installation, forced-failure automatic recovery, and manual rollback.
+- The live Task Scheduler stop/start transition exposed a lost zero-result start. A bounded retry was added, regression-tested, and observed recovering that transition on the live task.
+- Final activation `wb004-final` used `.local/releases/wb004-complete`; all 2,127 installed runtime files match manifest `B9C322D701DFBF72F0BEB0F823B22FB42F78B934C0660CCC5FEADA867D767F0A`. External hosted evidence is `.local/update-operations/wb004-final/hosted-acceptance.json`; the local updater journal deliberately does not certify hosted access.
+- Hosted unrelated Unicode/spaces root: explicit add, pending-restart rejection, nested duplicate repository names and linked worktree, plain Python folder, failure exit 1 → guarded fix → success exit 0 with separate streams and replay, Git inspection, scratch undo, source undo, root removal, and subsequent access/replay denial. Fixtures were removed. Original root/profile/startup/credential hashes match. Neither real RiftReader repository or VMware was modified.
+
+### What the audit established
+
+- The core already accepts arbitrary configured absolute roots. File edits/undo, Git tools, terminal jobs, search, project overview, and saved raw/gzip snapshot access are reusable. This is incremental independence work, not a server rewrite.
+- `scripts/acceptance.mjs` still defaults to the real `RiftReader` project and a particular resolver query, assumes a source-directory layout, and requires existing commit history. That cannot be the default acceptance test for a new installation or unrelated project.
+- `scripts/snapshot-acceptance.mjs` is an explicitly RiftReader-shaped fixture scenario. Its input/error wording assumes `C:\work`. Keep the compatibility scenario while making ordinary Workbridge acceptance self-contained.
+- `scripts/configure-self-commands.mjs` configures the build as TypeScript compilation alone. The actual package build also compiles the Windows command host. Self-validation profiles must exercise the full declared build/test commands.
+- `discover_projects` scans immediate child directories only. `project_overview` exposes manifest evidence but does not yet clearly distinguish a plain folder, repository root, nested repository, and linked worktree or surface project instruction-file locations.
+- Existing relative paths and durable mutation records are anchored to the primary root. Silently changing a global current folder/default root could redirect old operations. Preserve stable targeting and legacy operation identities.
+- Startup scripts already accept a configurable primary `Root`, but setup/docs/fixture defaults still emphasize this PC's paths. Generic setup needs verification with an installation and workspace outside the current project locations.
+
+### Agreed boundaries for the plan
+
+1. Workbridge is the shared project-access service. It does not contain RiftReader application logic, manage its development lifecycle, or select a development model for it.
+2. A folder becomes accessible through explicit operator configuration. Choosing any authorized folder does not mean granting the whole disk or allowing repository content to grant itself new roots.
+3. Every operation continues to identify its folder/repository explicitly. Avoid mutable global current-project state. Existing relative inputs keep their original primary-root meaning; additional roots use absolute paths.
+4. Preserve both current roots, existing tool names/contracts, saved job/change records, command profiles, snapshot support, startup task, tunnel, credential reference, and independent updater. Terminal execution retains Windows user rights; root validation is not an OS sandbox.
+5. Preserve the RiftReader manifest/snapshot compatibility tools as optional capabilities. Synthetic fixtures and named project-specific examples are sufficient; no plugin framework is required for this milestone.
+6. Both real RiftReader repositories, their Git state, VMware setup, evidence, and project configuration remain unchanged throughout this work. Their comparison, stabilization/freeze, and v2 work follow WB-004 acceptance.
+
+### Phase 1 — Workspace configuration and stable path identity
+
+- Add a small local operator command to show, validate, add, and remove allowed roots using the existing protected `workspace-roots.json` mechanism. Use canonical existing absolute paths, duplicate checks, explicit errors, atomic writes, and a recoverable configuration copy. Report whether a restart is required and reuse the existing restart/update workflow.
+- Keep configuration in Workbridge's own state directory; do not write bridge settings into every target repository. A new installation can choose an arbitrary primary root using the supported startup parameters. Keep current installations backward compatible.
+- Keep the existing primary root stable for this milestone. Refuse removal/replacement of it through the new convenience command. A future default-root migration would need explicit handling of legacy relative journals; it is not needed to access arbitrary additional folders now.
+- Root removal revokes access without deleting project files or journals, granting a parent folder, or retargeting old undo records. Reject unsafe configuration changes involving active jobs. Re-adding the same canonical root must retain operation identity.
+- Verify missing/unavailable roots, malformed configuration, Unicode/spaces, aliases/junction policy, and preservation of the independent recovery path. Keep actual root edits separate from changing runtime source.
+
+### Phase 2 — Generic folder and repository inspection
+
+- Extend existing discovery with an opt-in bounded nested-repository scan. Preserve the current immediate-child default and pagination/scan-limit reporting. Reuse current traversal exclusions and path checks.
+- Use normal Git behavior to distinguish repository roots and linked worktrees, supporting both `.git` directories and `.git` files. Return full, reusable target paths; folder names alone do not identify repositories uniquely.
+- Cover an authorized folder containing several repositories, a monorepo with several manifests, nested repositories, and an ordinary source folder without Git. No Git history or particular `src/scripts/reader/tools` layout is required for file/terminal work.
+- Improve `project_overview` with bounded evidence for repository identity and instruction/documentation locations such as applicable `AGENTS.md`, README, and build manifests. Report candidate commands with their source; discovery never automatically executes a script or grants access.
+- Keep project commands explicit through `terminal_run` or existing operator-owned profiles. Reuse Git/gh and installed development CLIs; this milestone does not build a language-server platform or custom GitHub client.
+
+### Phase 3 — Independent acceptance and project compatibility
+
+- Replace default `npm run acceptance` behavior with disposable, Workbridge-owned fixtures and explicit root/state propagation. Include source discovery/read, a controlled failing test, a guarded fix, passing rerun, Git inspection, reversible mutations, and cleanup. Keep fixture Git identities clearly synthetic and confined to fixtures.
+- Ordinary acceptance must run with an arbitrary configured root outside both existing roots, without reading either real RiftReader checkout or depending on their files/history.
+- Retain real-project resolver inspection and RiftReader-shaped snapshot checks as explicitly named opt-in scenarios with caller-selected inputs. Keep saved-snapshot APIs compatible and provide synthetic manifest/raw/gzip fixtures in Workbridge's tests.
+- Correct self-validation profiles so build/test/acceptance match the full package lifecycle, including the native command host. Never replace existing operator profiles silently; report changes and use explicit migration/selection where required.
+- Update setup, examples, tool descriptions, troubleshooting, and the distinction between installation/state paths and project roots. Retain useful historical validation evidence with its original milestone dates.
+
+### Phase 4 — Regression, release, and hosted verification
+
+- Preserve the 64-test integration baseline, 21 updater cases, startup/credential checks, and formatting checks. Add focused tests for the new root-management, nested-discovery, instruction-evidence, and independent-acceptance behavior.
+- Test disposable Node and non-Node/plain-folder projects, dirty/unborn repositories, several repositories with identical directory names, a linked worktree, multiple roots, and an installation/workspace path containing spaces or Unicode. Use installed tools or fixtures; missing optional tools should produce useful diagnostics.
+- Exercise malformed/outside-root paths, protected state, symlinks/junctions, removed roots, request-ID replay, undo identity, active-job configuration conflicts, and cleanup after failed acceptance. No real project staging, commits, or publishing are part of these tests.
+- Prepare a sealed candidate and use WB-001 for installation and recovery. Verify configuration preservation and appropriate rollback behavior for any schema changes. Refresh the hosted tool catalog if tool schemas/descriptions change.
+- Demonstrate fresh hosted calls against disposable unrelated projects: discover the intended repository, inspect its files/context, reproduce/fix a test failure, observe exit/output, and undo scratch changes. Record hosted evidence separately from local update readiness.
+
+### Definition of done
+
+- An operator can register an arbitrary existing folder without editing Workbridge source or rebuilding it; any required restart is explicit and documented.
+- The same Workbridge installation can serve unrelated folders/repositories, including folders without Git, with unambiguous per-operation targets.
+- Generic startup, build, tests, default acceptance, and recovery do not depend on a real RiftReader checkout, its layout, or the existence of `C:\work` on a new installation with another configured primary root.
+- Existing 0.5.0 workflows and both current roots continue working; optional RiftReader snapshot compatibility is preserved.
+- All applicable local checks and disposable hosted acceptance pass, rollback remains available, and test fixtures are cleaned up.
+- Only after this milestone is complete do we compare the two RiftReader copies, define the limited v1 stabilization/freeze checklist, and plan v2.
+
+### Outside this milestone
+
+RiftReader code changes/merges, moving or deleting either checkout, VMware reconfiguration, v1/v2 implementation, broad disk access, new API credentials, remote repository publishing, automatic SDK installation, a plugin framework, and a terminal UI. GitHub authentication/WB-003 can be addressed separately when required.
