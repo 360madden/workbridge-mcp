@@ -7,7 +7,7 @@ Status: implementation in progress, October 24, 2026. This is a new feature lane
 - Primary root: `C:\work`; additional root: `C:\rift modding`.
 - Workbridge command jobs and VMware processes all run in Windows session 2; `UserInteractive=True` and one screen is enumerated. An interactive session alone does not prove input delivery or valid screenshot content.
 - VMware Workstation's `vmrun.exe` exists under `C:\Program Files\VMware\VMware Workstation`. A read-only `vmrun -T ws list` reported `C:\rift modding\VMs\RIFT-Lab\RIFT-Lab.vmx` running.
-- Microsoft's `winapp` command is not installed. WinGet currently indexes `Microsoft.WinAppCli` version 0.7.1. Its public-preview UI Automation CLI offers window enumeration, UIA patterns, targeted input, screenshots, and a desktop-turn coordination mechanism.
+- Microsoft WinApp CLI 0.7.1 is installed for the current Windows user (it was absent at the initial inventory). Its public-preview UI Automation CLI offers window enumeration, UIA patterns, targeted input, screenshots, and a desktop-turn coordination mechanism.
 - The repository contains substantial older unstaged and untracked changes from the 0.16.x workstream. Preserve those files and Git index, do not blanket-stage or overwrite them. The installed owner is not changed by source edits.
 
 ## Scope and architecture
@@ -50,7 +50,9 @@ All interaction is target-specific, observable and serialized across Workbridge 
 - GUI-001: complete, committed as `ad6107f` (Oct 24). Read-only inventory and optional vmrun enumeration passed both tests.
 - GUI-002: WinApp CLI 0.7.1 installed for the current Windows user. The read-only `scripts/desktop-ui.mjs` backend validates version, PID/HWND, optional exact title/process, bounded output, and UIA inspection. It successfully enumerated and inspected the live VMware host window; all five isolated unit tests passed. Validation: five GUI-002 unit tests plus two GUI-001 tests passing, Prettier clean, live WinApp enumeration and UIA inspection passed.
 - Important live observation: `RIFT-Lab-1 - VMware Workstation` was minimized (160x28 host HWND; UIA root offscreen and child geometry near -32000). Inspection worked, but no capture, restoration, input, or guest control is claimed.
-- GUI-003 through GUI-006: pending. Capture must first be proven against a disposable, non-minimized test window, then target-checked interaction and VMware guest state must be validated.
+- GUI-003a capture backend: validated with a real, non-minimized Windows taskbar HWND. The adapter checked PID/HWND/process/class, rejected absent or offscreen targets, wrote a 2560x48 PNG under ignored `.tools/desktop-evidence`, verified size/dimensions/SHA-256, saved an exclusive JSON receipt, and replayed the identical request without another screenshot. Five GUI-003 tests passed; twelve targeted GUI-001..003 tests pass.
+- GUI-003b disposable GUI and MCP image transport: pending. A short-lived WinForms probe launched from Workbridge's hidden command runner was not visible to WinApp; the existing interactive-user task helper was tried but returned exit code 1 before the probe's early diagnostic marker. The temporary scheduled task was removed. The test form and diagnostic tooling are retained in source for investigation; no live VM input was attempted.
+- GUI-004 through GUI-006: pending. Explicit lease/focus checks, synthetic-app input acceptance, VMware guest receiver verification and staged owner rollout are still required.
 
 ## Read-only WinApp CLI adapter
 
@@ -60,3 +62,10 @@ All interaction is target-specific, observable and serialized across Workbridge 
 - Output is compact JSON with `ok`, `readOnly`, backend version and typed failure code. The adapter exposes **no focus, input or screenshot verb** in this phase.
 - WinApp CLI 0.7.1 is a user-scope optional prerequisite, not a bundled Workbridge dependency. An unexpected version fails closed.
 
+## Screenshot CLI prototype (GUI-003a)
+
+- First enumerate with `node scripts/desktop-ui.mjs windows --app explorer` and select one HWND from fresh output.
+- Example using an observed taskbar target: `node scripts/desktop-capture.mjs --pid PID --hwnd HWND --process explorer --class Shell_TrayWnd --request-id UNIQUE_ID`. Substitute the current PID and HWND; never reuse old numeric identities.
+- Evidence stays under ignored `.tools/desktop-evidence/capture-UNIQUE_ID.png` and an exclusive receipt `.json`. Reusing an exact completed request ID returns the same verified result. An image without a receipt halts for recovery rather than silently retaking or overwriting it.
+- Never use `--capture-screen` or `--focus` in the adapter. WinApp may nevertheless briefly foreground the target when its native capture fallback is necessary. Do not capture minimized or offscreen windows.
+- This is a developer script, not yet an MCP tool or a deployed interactive-control service. Screenshot output proves host-window capture only, not VM guest graphics or input.
