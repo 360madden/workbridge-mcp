@@ -47,5 +47,16 @@ All interaction is target-specific, observable and serialized across Workbridge 
 
 ## Progress
 
-- GUI-001: implementing and validating.
-- GUI-002 through GUI-006: pending, blocked from live input by missing tested capture/targeting path.
+- GUI-001: complete, committed as `ad6107f` (Oct 24). Read-only inventory and optional vmrun enumeration passed both tests.
+- GUI-002: WinApp CLI 0.7.1 installed for the current Windows user. The read-only `scripts/desktop-ui.mjs` backend validates version, PID/HWND, optional exact title/process, bounded output, and UIA inspection. It successfully enumerated and inspected the live VMware host window; all five isolated unit tests passed. Validation: five GUI-002 unit tests plus two GUI-001 tests passing, Prettier clean, live WinApp enumeration and UIA inspection passed.
+- Important live observation: `RIFT-Lab-1 - VMware Workstation` was minimized (160x28 host HWND; UIA root offscreen and child geometry near -32000). Inspection worked, but no capture, restoration, input, or guest control is claimed.
+- GUI-003 through GUI-006: pending. Capture must first be proven against a disposable, non-minimized test window, then target-checked interaction and VMware guest state must be validated.
+
+## Read-only WinApp CLI adapter
+
+- `node scripts/desktop-ui.mjs windows --app vmware` — list matching window identities.
+- `node scripts/desktop-ui.mjs inspect --pid PID --hwnd HWND --process vmware --depth 2` — revalidate the discovered PID/HWND before inspecting its UIA tree.
+- `--title` is an optional *exact* title guard. Numbers and identities must come from recent enumeration, not a saved PID across restarts.
+- Output is compact JSON with `ok`, `readOnly`, backend version and typed failure code. The adapter exposes **no focus, input or screenshot verb** in this phase.
+- WinApp CLI 0.7.1 is a user-scope optional prerequisite, not a bundled Workbridge dependency. An unexpected version fails closed.
+
