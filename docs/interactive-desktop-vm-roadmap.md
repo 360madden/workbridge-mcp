@@ -78,3 +78,14 @@ All interaction is target-specific, observable and serialized across Workbridge 
 - Discover the *fresh* `DesktopProbe` PID/HWND. Invoke once with `node scripts/desktop-probe-act.mjs --pid PID --hwnd HWND --request-id UNIQUE_ID --expected-count 0`; replay with identical arguments returns a prior receipt. It cannot invoke other windows or selectors.
 - The action record and native counter evidence stay in `.tools/desktop-evidence`; uncertain outcomes preserve an intent record and block automatic resending. Close the disposable helper and remove only its owned scheduled task after validation.
 - This proof used accessibility-pattern invocation, **not** global key injection, mouse positioning, game focus, VMware guest credentials or guest input.
+
+## VMware guest-display capture gate (GUI-005)
+
+Observed on October 24, 2026:
+
+1. `vmrun.exe -T ws list` still returned exactly one running VM: `C:\rift modding\VMs\RIFT-Lab\RIFT-Lab.vmx`.
+2. Installed `vmrun` help lists `captureScreen` for a VM, so VMware provides a direct candidate for guest pixels without foregrounding Workstation.
+3. A single target-verified, output-nonoverwriting `vmrun -T ws captureScreen` attempt returned `A password is required for this operation` and exit -1. No screenshot was reported. Do not retry until the owner completes VMware's normal unlock/authentication path.
+4. WinApp still reported the main `RIFT-Lab-1 - VMware Workstation` window minimized (160x28) in the read-only enumeration. A host-window screenshot may require restoration and could change foreground state; this is **not** an automatic workaround for a VMware credential gate.
+
+Next gate: have the local operator unlock/authorize the VM through supported VMware UI, or explicitly select and restore a known test window for a separate host-window capture. Then re-enumerate the VM and confirm a real guest frame before any guest input or receiver deployment. Do not include VM credentials in command arguments, logs, or the repository.
