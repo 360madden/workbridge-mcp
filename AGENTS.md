@@ -1,0 +1,13 @@
+# Workbridge coding-agent instructions
+
+This repository is used for long-running AI-assisted development on Joey's Windows host. Before working on Workbridge, desktop/VM control or Rift integration, read `docs/autonomous-investigation-policy.md` and the relevant active roadmap (currently `docs/interactive-desktop-vm-roadmap.md`).
+
+- **Investigate blockers autonomously.** An error is a starting observation: classify its layer, inspect live evidence, compare supported alternatives, and continue useful independent work. Do not ask the owner to fix routine tooling problems for an agent.
+- **Do not conflate identities.** Differentiate Workbridge's host session, VMware Workstation's unlocked/encrypted-VM context, Windows guest autologin, the running game, and guest receiver health.
+- **Preserve live work.** Enumerate and verify the exact VM, host window/PID and guest control target before acting. Use read-only/synthetic tests first, serialize shared GUI input, and never blindly repeat uncertain actions.
+- **Reuse existing tooling.** Review VMware/WinApp/guest receiver facilities and code already under the configured roots. Add narrow adapters and tests instead of unnecessarily duplicating frameworks.
+- **Protect the dirty worktree.** Existing modified and untracked files are user-owned. Do not blanket-stage, stash, reset, remove or overwrite them. Use SHA-256 guards on edits, durable operation IDs and bounded evidence. Stage and commit only the verified files owned by the current milestone.
+- **Commit each verified milestone.** Run focused tests, inspect the diff, verify HEAD, commit a small self-contained slice, then update the roadmap. Keep local Git commits distinct from deployed changes and off-machine backups.
+- **Escalate true dependencies only.** Broad project authorization supports ordinary diagnostics, safe code/test operations, local commits and documented recovery. It does not supply unknown credentials or waive approval required by a protected workflow or for a material destructive change. Record the blocker and work other legitimate paths.
+
+For live Workbridge service updates, follow the existing WB-001 staged validation and rollback process. Never launch a competing owner against `.local`.

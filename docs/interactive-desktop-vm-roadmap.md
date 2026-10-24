@@ -2,6 +2,8 @@
 
 Status: implementation in progress, October 24, 2026. This is a new feature lane, not an authorization to restart or replace the deployed Workbridge owner.
 
+Standing autonomous blocker policy: `docs/autonomous-investigation-policy.md` (also referenced by repository `AGENTS.md`). After a failed adapter, investigate supported alternatives and keep making scoped, evidence-backed progress; escalate only irreducible credential or material-action dependencies.
+
 ## Baseline (observed through running Workbridge 0.16.3-dev)
 
 - Primary root: `C:\work`; additional root: `C:\rift modding`.
@@ -96,7 +98,8 @@ Observed on October 24, 2026:
 
 1. `vmrun.exe -T ws list` still returned exactly one running VM: `C:\rift modding\VMs\RIFT-Lab\RIFT-Lab.vmx`.
 2. Installed `vmrun` help lists `captureScreen` for a VM, so VMware provides a direct candidate for guest pixels without foregrounding Workstation.
-3. A single target-verified, output-nonoverwriting `vmrun -T ws captureScreen` attempt returned `A password is required for this operation` and exit -1. No screenshot was reported. Do not retry until the owner completes VMware's normal unlock/authentication path.
-4. WinApp still reported the main `RIFT-Lab-1 - VMware Workstation` window minimized (160x28) in the read-only enumeration. A host-window screenshot may require restoration and could change foreground state; this is **not** an automatic workaround for a VMware credential gate.
+3. A single target-verified, output-nonoverwriting `vmrun -T ws captureScreen` attempt returned `A password is required for this operation` and exit -1. No screenshot was reported. This is not proof that Windows guest autologin failed.
+4. A later read-only inspection of **key names only** in the exact `.vmx` confirmed `encryption.data`, `encryption.keySafe` and `vtpm.present`. VMware documents encrypted-VM authorization separately from Windows guest credentials; do not demand a guest sign-in to repair the wrong layer.
+5. WinApp reported the main `RIFT-Lab-1 - VMware Workstation` host window minimized (160x28). A separate, target-verified host-window capture may require restoration and foreground coordination. Treat it as a different supported display path, not as a way to evade VMware encryption authorization.
 
-Next gate: have the local operator unlock/authorize the VM through supported VMware UI, or explicitly select and restore a known test window for a separate host-window capture. Then re-enumerate the VM and confirm a real guest frame before any guest input or receiver deployment. Do not include VM credentials in command arguments, logs, or the repository.
+Next independent gates: (a) re-enumerate the running target and legitimate WinApp host window, then test a deliberate, bounded Workstation host-window capture while ensuring the guest/game remain untouched; (b) inventory existing RiftReader2 guest receiver/display transport without changing credentials, VM power or VMX configuration; (c) determine whether another documented VMware API supports capture in the existing authorized session. If native `vmrun` still requires the VM encryption password, leave that path blocked without obtaining or exposing credentials; continue the other paths. Prove real guest pixels before any guest input or receiver deployment.
