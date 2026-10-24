@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// One replay-safe UIA button action on the disposable .NET desktop probe.
-// No global mouse, keyboard, foreground activation or production-VM input.
+// Replay-safe UIA / window-targeted keyboard / pointer trials on disposable DesktopProbe only.
+// No arbitrary app or VMware guest inputs.
 import { open, mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { parseArgs } from 'node:util';
+import { execFile } from 'node:child_process';
+import { parseArgs, promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { DesktopUiError, executeReadOnly, parseRequest, runWinapp } from './desktop-ui.mjs';
 
@@ -13,6 +14,7 @@ const DEFAULT_ROOT = path.join(repo, '.tools', 'desktop-evidence');
 const PROBE_PROCESS = 'DesktopProbe';
 const PROBE_TITLE = 'Workbridge GUI-004 Native Input Probe';
 const BUTTON_SELECTOR = 'IncrementButton';
+const execFileAsync = promisify(execFile);
 
 function fail(code, message) {
   throw new DesktopUiError(code, message);
@@ -29,6 +31,7 @@ export function parseActionRequest(argv) {
         hwnd: { type: 'string' },
         'request-id': { type: 'string' },
         'expected-count': { type: 'string' },
+        method: { type: 'string' },
       },
     }));
   } catch {
@@ -53,7 +56,11 @@ export function parseActionRequest(argv) {
   if (!/^(0|[1-9][0-9]?)$/.test(values['expected-count'] ?? '')) {
     fail('INVALID_EXPECTED_STATE', 'expected-count must be 0-99');
   }
-  return { target, requestId: values['request-id'], expectedCount: Number(values['expected-count']) };
+  const method = values.method ?? 'uia';
+  if (!['uia', 'keyboard', 'mouse'].includes(method)) {
+    fail('INVALID_METHOD', 'Supported disposable-probe methods: uia, keyboard, mouse');
+  }
+  return { target, requestId: values['request-id'], expectedCount: Number(values['expected-count']), method };
 }
 
 function flatten(elements, out = []) {
@@ -87,6 +94,86 @@ export function assertProbeActionReady(preflight) {
   return preflight.target;
 }
 
+// UIA sometimes reports isOffscreen:false even if a minimized window's coordinates are -32000.
+export function assertProbePointerReady(preflight) {
+  const target = assertProbeActionReady(preflight);
+  const window = preflight.tree.windows.find((w) => Number(w.hwnd) === target.hwnd);
+  const root = window?.elements?.[0];
+  const matches = flatten(window?.elements).filter((e) => e.selector === BUTTON_SELECTOR);
+  const button = matches[0];
+  const fields = [
+    root?.x,
+    root?.y,
+    root?.width,
+    root?.height,
+    button?.x,
+    button?.y,
+    button?.width,
+    button?.height,
+  ];
+  if (
+    fields.some((n) => !Number.isFinite(n)) ||
+    root.width < 300 ||
+    root.height < 200 ||
+    button.width < 20 ||
+    button.height < 20 ||
+    Math.abs(root.x) > 20000 ||
+    Math.abs(root.y) > 20000 ||
+    button.x < root.x ||
+    button.y < root.y ||
+    button.x + button.width > root.x + root.width ||
+    button.y + button.height > root.y + root.height
+  ) {
+    fail('TARGET_NOT_VISIBLE', 'Probe button is outside its full, unminimized window');
+  }
+  return { target, button };
+}
+
+async function assertFreshTarget(target, runner, requireForeground = false) {
+  const current = JSON.parse(await runner(['ui', 'list-windows', '-a', String(target.pid), '--json']));
+  const found = Array.isArray(current)
+    ? current.find(
+        (w) =>
+          Number(w.hwnd) === target.hwnd &&
+          Number(w.processId) === target.pid &&
+          String(w.processName) === target.process &&
+          String(w.title ?? '') === target.title &&
+          String(w.className) === target.className,
+      )
+    : null;
+  if (!found) fail('STALE_TARGET', 'Window identity changed immediately before the action');
+  if (requireForeground && !found.isForeground) {
+    fail('FOREGROUND_MISMATCH', 'Window is not foreground; refusing simulated input');
+  }
+  if (Number(found.width) < 300 || Number(found.height) < 200) {
+    fail('TARGET_NOT_VISIBLE', 'Window was minimized or resized before input');
+  }
+  return found;
+}
+
+async function confirmFocusedButton(requestTarget, target, runner) {
+  const focus = JSON.parse(
+    await runner(['ui', 'focus', BUTTON_SELECTOR, '-w', String(target.hwnd), '--json']),
+  );
+  if (Number(focus.hwnd) !== target.hwnd || !focus.elementId) {
+    fail('FOCUS_MISMATCH', 'Focus command did not confirm selected window');
+  }
+  const observed = JSON.parse(await runner(['ui', 'get-focused', '-w', String(target.hwnd), '--json']));
+  if (
+    observed.hasFocus !== true ||
+    observed.element?.automationId !== BUTTON_SELECTOR ||
+    observed.element?.type !== 'Button' ||
+    observed.element?.isEnabled !== true ||
+    observed.element?.isOffscreen === true
+  ) {
+    fail('FOCUS_MISMATCH', 'Keyboard focus is not on verified probe button');
+  }
+  const fresh = await executeReadOnly(requestTarget, runner);
+  const geometry = assertProbePointerReady(fresh);
+  await assertFreshTarget(target, runner, true);
+  return geometry.button;
+}
+
 async function readProbeCount(root, pid) {
   const filename = path.join(root, 'native-probe-' + pid + '.jsonl');
   const raw = await readFile(filename, 'utf8');
@@ -112,7 +199,45 @@ async function readReceipt(filename) {
   }
 }
 
-export async function invokeProbeOnce(request, { runner = runWinapp, root = DEFAULT_ROOT } = {}) {
+export async function inspectChildHandle({ parentHwnd, reportedHwnd, expectedPid }) {
+  if (![parentHwnd, reportedHwnd, expectedPid].every((n) => Number.isSafeInteger(n) && n > 0)) {
+    fail('INVALID_WINDOW_HANDLE', 'Input window handles and process ID must be positive integers');
+  }
+  const script = path.join(repo, 'scripts', 'Check-DesktopWindowHandle.ps1');
+  const { stdout } = await execFileAsync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-File',
+      script,
+      '-ParentHwnd',
+      String(parentHwnd),
+      '-ReportedHwnd',
+      String(reportedHwnd),
+      '-ExpectedPid',
+      String(expectedPid),
+    ],
+    { cwd: repo, windowsHide: true, timeout: 10000, maxBuffer: 8192, shell: false },
+  );
+  const details = JSON.parse(stdout);
+  if (
+    details.schemaVersion !== 1 ||
+    details.parentHwnd !== parentHwnd ||
+    details.reportedHwnd !== reportedHwnd ||
+    details.parentPid !== expectedPid ||
+    details.reportedPid !== expectedPid ||
+    details.ancestorHwnd !== parentHwnd
+  ) {
+    fail('WINDOW_IDENTITY_MISMATCH', 'Reported input HWND did not belong to the selected target');
+  }
+  return details;
+}
+
+export async function invokeProbeOnce(
+  request,
+  { runner = runWinapp, root = DEFAULT_ROOT, handleInspector = inspectChildHandle } = {},
+) {
   await mkdir(root, { recursive: true });
   const base = 'ui-action-' + request.requestId;
   const receiptPath = path.join(root, base + '.json');
@@ -123,7 +248,8 @@ export async function invokeProbeOnce(request, { runner = runWinapp, root = DEFA
     if (
       previous.pid !== request.target.pid ||
       previous.hwnd !== request.target.hwnd ||
-      previous.expectedCount !== request.expectedCount
+      previous.expectedCount !== request.expectedCount ||
+      (previous.method ?? 'uia') !== request.method
     ) {
       fail('REQUEST_ID_CONFLICT', 'Action ID belongs to another target or expected state');
     }
@@ -142,24 +268,12 @@ export async function invokeProbeOnce(request, { runner = runWinapp, root = DEFA
     }
     const preflight = await executeReadOnly(request.target, runner);
     const target = assertProbeActionReady(preflight);
+    if (request.method !== 'uia') assertProbePointerReady(preflight);
     const before = await readProbeCount(root, target.pid);
     if (before.counter !== request.expectedCount) {
       fail('EXPECTED_STATE_MISMATCH', 'Probe counter differs from the expected value');
     }
-    const current = JSON.parse(await runner(['ui', 'list-windows', '-a', String(target.pid), '--json']));
-    if (
-      !Array.isArray(current) ||
-      !current.some(
-        (w) =>
-          Number(w.hwnd) === target.hwnd &&
-          Number(w.processId) === target.pid &&
-          String(w.processName) === target.process &&
-          String(w.title ?? '') === target.title &&
-          String(w.className) === target.className,
-      )
-    ) {
-      fail('STALE_TARGET', 'Window identity changed immediately before the action');
-    }
+    await assertFreshTarget(target, runner);
     const intent = {
       schemaVersion: 1,
       requestId: request.requestId,
@@ -167,28 +281,120 @@ export async function invokeProbeOnce(request, { runner = runWinapp, root = DEFA
       hwnd: target.hwnd,
       expectedCount: request.expectedCount,
       selector: BUTTON_SELECTOR,
+      method: request.method,
       startedUtc: new Date().toISOString(),
     };
     await writeFile(intentPath, JSON.stringify(intent) + '\n', { flag: 'wx' });
     let result;
+    let button = null;
     try {
-      result = JSON.parse(
-        await runner([
-          'ui',
-          'invoke',
-          BUTTON_SELECTOR,
-          '-w',
-          String(target.hwnd),
-          '--action',
-          'invoke',
-          '--json',
-        ]),
+      if (request.method === 'uia') {
+        result = JSON.parse(
+          await runner([
+            'ui',
+            'invoke',
+            BUTTON_SELECTOR,
+            '-w',
+            String(target.hwnd),
+            '--action',
+            'invoke',
+            '--json',
+          ]),
+        );
+      } else {
+        button = await confirmFocusedButton(request.target, target, runner);
+        if (request.method === 'keyboard') {
+          result = JSON.parse(
+            await runner([
+              'ui',
+              'send-keys',
+              'enter',
+              '-w',
+              String(target.hwnd),
+              '--target',
+              BUTTON_SELECTOR,
+              '--via',
+              'post-message',
+              '--json',
+            ]),
+          );
+        } else {
+          result = JSON.parse(
+            await runner(['ui', 'click', BUTTON_SELECTOR, '-w', String(target.hwnd), '--json']),
+          );
+        }
+      }
+    } catch (error) {
+      // Record only a bounded error category; never leak incidental window or typed content.
+      const reason =
+        error instanceof DesktopUiError
+          ? error.code
+          : error instanceof SyntaxError
+            ? 'INVALID_WINAPP_JSON'
+            : 'WINAPP_COMMAND_FAILED';
+      fail(
+        'ACTION_RECOVERY_REQUIRED',
+        `Input result uncertain (${reason}); inspect intent and native probe counter`,
       );
-    } catch {
-      fail('ACTION_RECOVERY_REQUIRED', 'UIA action result is uncertain; inspect intent and probe counter');
     }
-    if (Number(result.hwnd) !== target.hwnd || result.performedAction !== 'invoke') {
-      fail('ACTION_RECOVERY_REQUIRED', 'WinApp reported an unexpected action result');
+    const validAction =
+      request.method === 'uia'
+        ? result.performedAction === 'invoke'
+        : request.method === 'keyboard'
+          ? result.keys === 'enter' &&
+            result.via === 'post-message' &&
+            result.actionCount === 1 &&
+            result.target === BUTTON_SELECTOR &&
+            Array.isArray(result.warnings) &&
+            result.warnings.length === 0
+          : result.clickType === 'click' &&
+            Number.isFinite(result.x) &&
+            Number.isFinite(result.y) &&
+            Math.abs(result.x - (button.x + button.width / 2)) <= 20 &&
+            Math.abs(result.y - (button.y + button.height / 2)) <= 20;
+    let handleMatches = Number(result.hwnd) === target.hwnd;
+    const reportedHwnd = Number(result.hwnd);
+    if (
+      request.method === 'keyboard' &&
+      !handleMatches &&
+      Number.isSafeInteger(reportedHwnd) &&
+      reportedHwnd > 0
+    ) {
+      try {
+        const identity = await handleInspector({
+          parentHwnd: target.hwnd,
+          reportedHwnd,
+          expectedPid: target.pid,
+        });
+        handleMatches =
+          identity.belongsToTarget === true &&
+          identity.parentHwnd === target.hwnd &&
+          identity.reportedHwnd === reportedHwnd &&
+          identity.parentPid === target.pid &&
+          identity.reportedPid === target.pid &&
+          identity.ancestorHwnd === target.hwnd;
+      } catch {
+        fail('ACTION_RECOVERY_REQUIRED', 'Input child-window identity could not be verified');
+      }
+    }
+    if (!handleMatches || !validAction) {
+      const checks = {
+        hwnd: handleMatches,
+        reportedHwnd: Number.isSafeInteger(Number(result.hwnd)) ? Number(result.hwnd) : null,
+        expectedHwnd: target.hwnd,
+        keys: result.keys === 'enter',
+        via: result.via === 'post-message',
+        actionCount: result.actionCount === 1,
+        target: result.target === BUTTON_SELECTOR,
+        warningsEmpty: Array.isArray(result.warnings) && result.warnings.length === 0,
+        coordinates:
+          request.method !== 'mouse' ||
+          (Number.isFinite(result.x) &&
+            Number.isFinite(result.y) &&
+            Math.abs(result.x - (button.x + button.width / 2)) <= 20 &&
+            Math.abs(result.y - (button.y + button.height / 2)) <= 20),
+      };
+      fail('ACTION_RECOVERY_REQUIRED', 'Input metadata guard failed: ' + JSON.stringify(checks));
     }
     let observed = null;
     for (let attempt = 0; attempt < 12; attempt++) {
@@ -213,9 +419,16 @@ export async function invokeProbeOnce(request, { runner = runWinapp, root = DEFA
       ...intent,
       completedUtc: new Date().toISOString(),
       afterCount: observed.counter,
-      action: 'invoke',
-      inputMethod: 'UIAutomation.InvokePattern',
-      osMouseKeyboardInjected: false,
+      reportedHwnd,
+      handleRelationship: reportedHwnd === target.hwnd ? 'top-level' : 'verified-child',
+      action: request.method === 'uia' ? 'invoke' : request.method === 'mouse' ? 'click' : 'enter',
+      inputMethod:
+        request.method === 'uia'
+          ? 'UIAutomation.InvokePattern'
+          : request.method === 'keyboard'
+            ? 'WinApp post-message (HWND-targeted)'
+            : 'WinApp pointer click',
+      osMouseKeyboardInjected: request.method === 'mouse',
     };
     await writeFile(receiptPath, JSON.stringify(receipt) + '\n', { flag: 'wx' });
     return { ok: true, replayed: false, ...receipt };
