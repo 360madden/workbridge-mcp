@@ -12,6 +12,30 @@ $sourcePackage = Get-Content -LiteralPath (Get-WBChild $source 'package.json') -
 $sourceVersion = ($sourcePackage.version -split '-', 2)[0]
 $requiresDesktopRuntime = ([version]$sourceVersion -ge [version]'0.16.4')
 if ($ReleaseId -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$') { throw 'Invalid release ID.' }
+# Pure metadata preflight: avoid PowerShell's numeric coercion accepting quoted sizes.
+# Also used by isolated Windows PowerShell 5.1 synthetic tests without building a release.
+function Assert-WBDesktopManifestMetadata {
+    param([object]$Manifest, [string[]]$ExpectedNames)
+    if ($Manifest -isnot [pscustomobject] -or
+        ($Manifest.schemaVersion -isnot [int] -and $Manifest.schemaVersion -isnot [long]) -or
+        $Manifest.schemaVersion -ne 1 -or
+        $Manifest.files -isnot [array] -or
+        @($Manifest.files).Count -ne $ExpectedNames.Count) {
+        throw 'Desktop runtime manifest has an invalid schema or file count.'
+    }
+    for ($index = 0; $index -lt $ExpectedNames.Count; $index++) {
+        $name = $ExpectedNames[$index]
+        $entry = $Manifest.files[$index]
+        if ($entry -isnot [pscustomobject] -or
+            $entry.name -isnot [string] -or $entry.name -cne $name -or
+            ($entry.sizeBytes -isnot [int] -and $entry.sizeBytes -isnot [long]) -or
+            $entry.sizeBytes -le 0 -or $entry.sizeBytes -gt 1048576 -or
+            $entry.sha256 -isnot [string] -or
+            $entry.sha256 -cnotmatch ('^[0-9a-f]{64}' + [char]36)) {
+            throw "Invalid desktop runtime manifest entry: $name"
+        }
+    }
+}
 $release = Get-WBChild $source ('.local\releases\' + $ReleaseId)
 if (Test-Path -LiteralPath $release) { throw 'Release already exists. Use a new release ID; existing evidence is retained.' }
 $payload = Get-WBChild $release 'payload'
@@ -78,15 +102,10 @@ try {
         throw 'Desktop runtime manifest is unsafe.'
     }
     $desktopManifest = Get-Content -LiteralPath $desktopManifestPath -Raw | ConvertFrom-Json
-    if ($desktopManifest.schemaVersion -ne 1 -or @($desktopManifest.files).Count -ne $desktopNames.Count) {
-        throw 'Desktop runtime manifest has an invalid schema or file count.'
-    }
+    Assert-WBDesktopManifestMetadata -Manifest $desktopManifest -ExpectedNames $desktopNames
     for ($i = 0; $i -lt $desktopNames.Count; $i++) {
         $name = $desktopNames[$i]
         $entry = $desktopManifest.files[$i]
-        if ($entry.name -cne $name -or $entry.sizeBytes -le 0 -or $entry.sizeBytes -gt 1048576 -or $entry.sha256 -cnotmatch ('^[0-9a-f]{64}' + [char]36)) {
-            throw "Invalid desktop runtime manifest entry: $name"
-        }
         foreach ($relative in @("scripts\$name", "dist\$name")) {
             $filePath = Get-WBChild $payload $relative
             $item = Get-Item -LiteralPath $filePath -Force
