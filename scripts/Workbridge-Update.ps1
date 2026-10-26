@@ -152,7 +152,7 @@ function Get-WBRelease([string]$Path) {
     # GUI-006 requires its desktop runtime closure and gate receipts even on a
     # manually supplied release. Legacy releases retain their original contract.
     if ($manifest.version -ceq '0.16.4-dev') {
-        foreach ($check in @('generic', 'desktop-stage', 'desktop-closure')) {
+        foreach ($check in @('install', 'tests', 'startup', 'updater', 'format', 'generic', 'desktop-stage', 'acceptance', 'desktop-closure')) {
             $value = $receipt.checks.$check
             if (($value -isnot [int] -and $value -isnot [long]) -or $value -ne 0) {
                 throw "GUI release validation is missing or failed: $check"
@@ -171,14 +171,21 @@ function Get-WBRelease([string]$Path) {
             throw 'GUI desktop runtime manifest is unsafe.'
         }
         $desktop = Get-Content -LiteralPath $desktopManifestPath -Raw | ConvertFrom-Json
-        if ($desktop.schemaVersion -ne 1 -or @($desktop.files).Count -ne $desktopNames.Count) {
+        if ($desktop -isnot [pscustomobject] -or
+            ($desktop.schemaVersion -isnot [int] -and $desktop.schemaVersion -isnot [long]) -or
+            $desktop.schemaVersion -ne 1 -or
+            $desktop.files -isnot [array] -or
+            @($desktop.files).Count -ne $desktopNames.Count) {
             throw 'GUI desktop runtime manifest has invalid shape.'
         }
         for ($i = 0; $i -lt $desktopNames.Count; $i++) {
             $name = $desktopNames[$i]
             $entry = $desktop.files[$i]
-            if ($entry.name -cne $name -or $entry.sizeBytes -is [string] -or
+            if ($entry -isnot [pscustomobject] -or
+                $entry.name -isnot [string] -or $entry.name -cne $name -or
+                ($entry.sizeBytes -isnot [int] -and $entry.sizeBytes -isnot [long]) -or
                 $entry.sizeBytes -le 0 -or $entry.sizeBytes -gt 1048576 -or
+                $entry.sha256 -isnot [string] -or
                 $entry.sha256 -cnotmatch ('^[0-9a-f]{64}' + [char]36)) {
                 throw "GUI desktop runtime entry is invalid: $name"
             }

@@ -176,6 +176,42 @@ try {
         Write-WBJson $receiptPath $receipt
         Assert-WBThrows { Get-WBRelease $release } '*GUI release validation is missing or failed*'
     }
+    New-WBCase 'gui-006-string-legacy-test-receipt-refused' {
+        Set-WBGuiFixtureRelease $release
+        $receiptPath = Join-Path $release 'validated.json'
+        $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+        $receipt.checks.tests = '0'
+        Write-WBJson $receiptPath $receipt
+        Assert-WBThrows { Get-WBRelease $release } '*GUI release validation is missing or failed: tests*'
+    }
+    New-WBCase 'gui-006-string-schema-version-refused' {
+        Set-WBGuiFixtureRelease $release
+        $desktopPath = Join-Path $release 'payload\dist\desktop-runtime-manifest.json'
+        $desktop = Get-Content -LiteralPath $desktopPath -Raw | ConvertFrom-Json
+        $desktop.schemaVersion = '1'
+        Write-WBJson $desktopPath $desktop
+        Set-WBGuiFixtureSeal $release
+        Assert-WBThrows { Get-WBRelease $release } '*GUI desktop runtime manifest has invalid shape*'
+    }
+    New-WBCase 'gui-006-boolean-schema-version-refused' {
+        Set-WBGuiFixtureRelease $release
+        $desktopPath = Join-Path $release 'payload\dist\desktop-runtime-manifest.json'
+        $desktop = Get-Content -LiteralPath $desktopPath -Raw | ConvertFrom-Json
+        $desktop.schemaVersion = $true
+        Write-WBJson $desktopPath $desktop
+        Set-WBGuiFixtureSeal $release
+        Assert-WBThrows { Get-WBRelease $release } '*GUI desktop runtime manifest has invalid shape*'
+    }
+    New-WBCase 'gui-006-decimal-size-even-if-numerically-equal-refused' {
+        Set-WBGuiFixtureRelease $release
+        $desktopPath = Join-Path $release 'payload\dist\desktop-runtime-manifest.json'
+        $raw = Get-Content -LiteralPath $desktopPath -Raw
+        $modified = $raw -replace '("sizeBytes"\s*:\s*)([0-9]+)', '${1}${2}.0'
+        Assert-WB ($modified -cne $raw) 'Synthetic decimal-size fixture must change the manifest.'
+        Set-Content -LiteralPath $desktopPath -Value $modified -Encoding UTF8
+        Set-WBGuiFixtureSeal $release
+        Assert-WBThrows { Get-WBRelease $release } '*GUI desktop runtime entry is invalid*'
+    }
     New-WBCase 'gui-006-stage-orphan-refused-after-reseal' {
         Set-WBGuiFixtureRelease $release
         $payload = Join-Path $release 'payload'
