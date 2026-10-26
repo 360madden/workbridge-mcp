@@ -72,6 +72,14 @@ Workers read `AGENTS.md`, `docs/autonomous-investigation-policy.md` and `docs/in
 - Fresh six-worker queue: desktop native Windows Job supervisor and synthetic process-tree proof; VMware immutable lease and quarantine ownership; release test-log diagnosis; read-only WB-022 baseline/rollback qualification; release metadata strict-type regression; guest receiver identity-only probe. Coordinator owns cross-client capture integration, scoped commits, safety gates and queue refill.
 - Active owner remains Workbridge `0.16.3-dev` / 52 tools. Disk sources remain ahead at `0.16.4-dev`; WB-001 correctly refuses the mismatch. Do not retry deployment until installed-baseline provenance, supervisor settlement, staged release and rollback are independently proven.
 
+## Validation checkpoint — October 26, sealed candidate and pilot quarantine
+
+- The fresh isolated `pcvm-gui006-20261026-03` release (job `pcvm-third-isolated-gui-release-20261026-01`) passed all reported gates: install, tests, startup, updater, format, generic, desktop-stage and acceptance. The command printed a validated-release path and confirmed no service stop/deployment. It is an isolated sealed source snapshot, **not current deployed code** and not automatic authority for WB-001 activation.
+- The sole earlier full-suite failure was `AGENT_COORDINATION_BUSY` in a synthetic parallel assignment test. The test now permits only explicit idempotent replay after that exact busy refusal; production lock ownership rules are unchanged. Focused `test/agent-coordination.test.mjs`: 26/26 passed and Prettier clean. This currently untracked test belongs with future cohesive agent-coordination source integration.
+- Coordinator improved the MCP `withDesktopCaptureTurn` capture-window owner stamp, immutable lease and quarantine guard. Isolated TypeScript compilation passed, 7/7 focused registration tests passed, and both files are Prettier clean. The two files remain uncommitted until related GUI-006 imports can be committed together.
+- Separate DesktopProbe pilot fix: it previously unconditionally unlinked the shared GUI lock after uncertain post-intent input. It now writes/fsyncs an owner stamp and action intent, retains a modified/uncertain lease, writes linked quarantine metadata and blocks other request IDs. Synthetic `test/desktop-probe-act.test.mjs` passed 16/16, Prettier clean; no live desktop input occurred.
+- A new sealed release is required after all currently active worker changes settle. The current installed Workbridge remains `0.16.3-dev` and only a proven rollback baseline plus guarded WB-001 cutover can change it.
+
 ## Approval visibility
 
 If ChatGPT presents `Allow ChatGPT to use Workbridge?`, surface it in the main conversation; the owner may need to expand `Previous activity`. Do not bypass or auto-click host approval. These prompts are distinct from Windows UAC.

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Replay-safe UIA / window-targeted keyboard / pointer trials on disposable DesktopProbe only.
 // No arbitrary app or VMware guest inputs.
-import { open, mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { open, mkdir, lstat, readFile, writeFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
@@ -203,7 +204,8 @@ export async function inspectChildHandle({ parentHwnd, reportedHwnd, expectedPid
   if (![parentHwnd, reportedHwnd, expectedPid].every((n) => Number.isSafeInteger(n) && n > 0)) {
     fail('INVALID_WINDOW_HANDLE', 'Input window handles and process ID must be positive integers');
   }
-  const script = path.join(repo, 'scripts', 'Check-DesktopWindowHandle.ps1');
+  // Resolve beside this exact versioned prototype (source or staged dist).
+  const script = fileURLToPath(new URL('./Check-DesktopWindowHandle.ps1', import.meta.url));
   const { stdout } = await execFileAsync(
     'powershell.exe',
     [
@@ -255,6 +257,10 @@ export async function invokeProbeOnce(
     }
     return { ok: true, replayed: true, ...previous };
   }
+  // A previous uncertain request remains refused even when its shared lock is retained.
+  if (await readReceipt(intentPath)) {
+    fail('ACTION_RECOVERY_REQUIRED', 'Previous action has an unfinished intent');
+  }
   let lock;
   try {
     lock = await open(lockPath, 'wx');
@@ -262,7 +268,29 @@ export async function invokeProbeOnce(
     if (error.code === 'EEXIST') fail('UI_TURN_BUSY', 'Another desktop input turn or orphaned lock exists');
     throw error;
   }
+  const original = await lock.stat();
+  const leaseId = randomUUID();
+  const ownerStamp = {
+    schemaVersion: 1,
+    kind: 'workbridge.gui-turn',
+    leaseId,
+    producer: 'desktop-probe-action',
+    requestId: request.requestId,
+    owner: { pid: process.pid, processStartUtc: null, sessionId: null },
+    target: { kind: 'window', pid: request.target.pid, hwnd: request.target.hwnd, process: PROBE_PROCESS },
+    acquiredUtc: new Date().toISOString(),
+  };
+  const stampBytes = Buffer.from(JSON.stringify(ownerStamp) + '\n', 'utf8');
+  const stampHash = createHash('sha256').update(stampBytes).digest('hex');
+  let stampReady = false;
+  let intentStarted = false;
+  let intentHash = null;
+  let completed = false;
   try {
+    if (stampBytes.length > 4096) fail('ACTION_RECOVERY_REQUIRED', 'Desktop owner stamp exceeds 4 KiB');
+    await lock.writeFile(stampBytes);
+    await lock.sync();
+    stampReady = true;
     if ((await readReceipt(receiptPath)) || (await readReceipt(intentPath))) {
       fail('ACTION_RECOVERY_REQUIRED', 'Previous action has a receipt or an unfinished intent');
     }
@@ -276,6 +304,7 @@ export async function invokeProbeOnce(
     await assertFreshTarget(target, runner);
     const intent = {
       schemaVersion: 1,
+      leaseId,
       requestId: request.requestId,
       pid: target.pid,
       hwnd: target.hwnd,
@@ -284,7 +313,17 @@ export async function invokeProbeOnce(
       method: request.method,
       startedUtc: new Date().toISOString(),
     };
-    await writeFile(intentPath, JSON.stringify(intent) + '\n', { flag: 'wx' });
+    const intentBytes = JSON.stringify(intent) + '\n';
+    intentHash = createHash('sha256').update(intentBytes).digest('hex');
+    intentStarted = true;
+    let intentHandle;
+    try {
+      intentHandle = await open(intentPath, 'wx');
+      await intentHandle.writeFile(intentBytes, 'utf8');
+      await intentHandle.sync();
+    } finally {
+      await intentHandle?.close();
+    }
     let result;
     let button = null;
     try {
@@ -431,10 +470,54 @@ export async function invokeProbeOnce(
       osMouseKeyboardInjected: request.method === 'mouse',
     };
     await writeFile(receiptPath, JSON.stringify(receipt) + '\n', { flag: 'wx' });
+    completed = true;
     return { ok: true, replayed: false, ...receipt };
   } finally {
-    await lock.close();
-    await unlink(lockPath);
+    // Once intent may have been issued, uncertainty must block ALL other GUI request IDs.
+    // Keep the shared lock and a linked, immutable quarantine record for explicit review.
+    try {
+      if (intentStarted && !completed && stampReady) {
+        const record = {
+          schemaVersion: 1,
+          kind: 'workbridge.gui-turn-quarantine',
+          leaseId,
+          requestId: request.requestId,
+          ownerStampSha256: stampHash,
+          intentSha256: intentHash,
+          reasonCode: 'ACTION_RECOVERY_REQUIRED',
+          processTreeSettlement: 'unknown',
+          automaticRetryAllowed: false,
+          createdUtc: new Date().toISOString(),
+        };
+        let quarantine;
+        try {
+          quarantine = await open(path.join(root, 'desktop-turn-quarantine-' + leaseId + '.json'), 'wx');
+          await quarantine.writeFile(JSON.stringify(record) + '\n', 'utf8');
+          await quarantine.sync();
+        } finally {
+          await quarantine?.close();
+        }
+      }
+    } finally {
+      await lock.close();
+    }
+    let current;
+    let bytes;
+    try {
+      current = await lstat(lockPath);
+      bytes = await readFile(lockPath);
+    } catch {
+      fail('ACTION_RECOVERY_REQUIRED', 'Desktop owner lock disappeared; review required');
+    }
+    if (
+      current.dev !== original.dev ||
+      current.ino !== original.ino ||
+      current.isSymbolicLink() ||
+      createHash('sha256').update(bytes).digest('hex') !== stampHash
+    ) {
+      fail('ACTION_RECOVERY_REQUIRED', 'Desktop owner lock changed; review required');
+    }
+    if (!intentStarted || completed) await unlink(lockPath);
   }
 }
 

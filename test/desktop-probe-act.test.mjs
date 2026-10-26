@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -231,11 +232,57 @@ test('GUI-004 uncertain invoke leaves an intent and refuses automatic repeat', a
       await readFile(path.join(root, 'ui-action-gui004_uncertain_001.intent.json'), 'utf8'),
     );
     assert.equal(intent.selector, 'IncrementButton');
+    const stampBytes = await readFile(path.join(root, 'desktop-input-turn.lock'));
+    const stamp = JSON.parse(stampBytes.toString('utf8'));
+    assert.equal(stamp.kind, 'workbridge.gui-turn');
+    assert.equal(stamp.producer, 'desktop-probe-action');
+    assert.equal(stamp.requestId, action.requestId);
+    assert.equal(stamp.target.hwnd, action.target.hwnd);
+    assert.equal(stamp.leaseId, intent.leaseId);
+    const quarantine = JSON.parse(
+      await readFile(path.join(root, 'desktop-turn-quarantine-' + stamp.leaseId + '.json'), 'utf8'),
+    );
+    assert.equal(quarantine.leaseId, stamp.leaseId);
+    assert.equal(quarantine.ownerStampSha256, createHash('sha256').update(stampBytes).digest('hex'));
+    assert.equal(
+      quarantine.intentSha256,
+      createHash('sha256')
+        .update(JSON.stringify(intent) + '\n')
+        .digest('hex'),
+    );
+    assert.equal(quarantine.automaticRetryAllowed, false);
     await assert.rejects(
       () => invokeProbeOnce(action, { runner, root }),
       (e) => e.code === 'ACTION_RECOVERY_REQUIRED',
     );
+    // Other durable request IDs must also be blocked after uncertain GUI input.
+    await assert.rejects(
+      () => invokeProbeOnce(request('gui004_uncertain_other'), { runner, root }),
+      (e) => e.code === 'UI_TURN_BUSY',
+    );
     assert.equal(calls.filter((x) => x[1] === 'invoke').length, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('GUI-004 refuses to remove a lock modified after synthetic input', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'wb-ui-owner-change-'));
+  try {
+    await addEvent(root, 'shown', 0);
+    const { runner } = fakeUi(root);
+    const changedRunner = async (args) => {
+      const result = await runner(args);
+      if (args[1] === 'invoke') {
+        await writeFile(path.join(root, 'desktop-input-turn.lock'), 'foreign-owner');
+      }
+      return result;
+    };
+    await assert.rejects(
+      () => invokeProbeOnce(request('gui004_changed_owner_001'), { runner: changedRunner, root }),
+      (e) => e.code === 'ACTION_RECOVERY_REQUIRED',
+    );
+    assert.equal(await readFile(path.join(root, 'desktop-input-turn.lock'), 'utf8'), 'foreign-owner');
   } finally {
     await rm(root, { recursive: true, force: true });
   }
