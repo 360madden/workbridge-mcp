@@ -50,6 +50,36 @@ function New-WBCase([string]$Name, [scriptblock]$Code) {
         Write-Output "FAIL: $Name - $($_.Exception.Message)"
     }
 }
+function Set-WBGuiFixtureRelease([string]$ReleasePath) {
+    $payload = Join-Path $ReleasePath 'payload'
+    Write-WBJson (Join-Path $payload 'package.json') ([pscustomobject]@{name='workbridge-mcp'; version='0.16.4-dev'; type='module'})
+    $names = @('desktop-ui.mjs', 'desktop-capture.mjs', 'vmware-host-capture.mjs', 'desktop-probe-act.mjs', 'Check-DesktopWindowHandle.ps1')
+    $entries = @()
+    foreach ($name in $names) {
+        $content = "fixture desktop runtime: $name"
+        Set-Content -LiteralPath (Join-Path $payload "scripts\$name") -Value $content
+        $runtimePath = Join-Path $payload "dist\$name"
+        Set-Content -LiteralPath $runtimePath -Value $content
+        $item = Get-Item -LiteralPath $runtimePath
+        $entries += [pscustomobject]@{name=$name; sizeBytes=$item.Length; sha256=(Get-FileHash -LiteralPath $runtimePath -Algorithm SHA256).Hash.ToLowerInvariant()}
+    }
+    Write-WBJson (Join-Path $payload 'dist\desktop-runtime-manifest.json') ([pscustomobject]@{schemaVersion=1; files=$entries})
+    Set-WBGuiFixtureSeal $ReleasePath
+}
+function Set-WBGuiFixtureSeal([string]$ReleasePath) {
+    $payload = Join-Path $ReleasePath 'payload'
+    Write-WBJson (Join-Path $ReleasePath 'manifest.json') ([pscustomobject]@{schema=1; version='0.16.4-dev'; files=@(Get-WBManifest $payload)})
+    $receiptPath = Join-Path $ReleasePath 'validated.json'
+    $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+    $receipt.version = '0.16.4-dev'
+    if (!$receipt.checks.PSObject.Properties['generic']) {
+        Add-Member -InputObject $receipt.checks -MemberType NoteProperty -Name generic -Value 0
+        Add-Member -InputObject $receipt.checks -MemberType NoteProperty -Name 'desktop-stage' -Value 0
+        Add-Member -InputObject $receipt.checks -MemberType NoteProperty -Name 'desktop-closure' -Value 0
+    }
+    $receipt.manifestSha256 = (Get-FileHash -LiteralPath (Join-Path $ReleasePath 'manifest.json')).Hash
+    Write-WBJson $receiptPath $receipt
+}
 try {
     New-WBCase 'success-idempotence-and-manual-rollback' {
         $rootsFile = Join-Path $install '.local\workspace-roots.json'
@@ -108,6 +138,62 @@ try {
         Assert-WB ((Get-FileHash -LiteralPath $packagePath).Hash -ceq $packageHash) 'On-disk version metadata must remain unchanged.'
         Assert-WB ((Get-FileHash -LiteralPath $runtimePath).Hash -ceq $runtimeHash) 'On-disk runtime must remain unchanged.'
         Assert-WB (@($result.events | Where-Object { $_.phase -in @('stopping','installing','starting','verifying','completed') }).Count -eq 0) 'No installation phase may begin.'
+    }
+    New-WBCase 'gui-006-valid-closure-accepted' {
+        Set-WBGuiFixtureRelease $release
+        $verified = Get-WBRelease $release
+        Assert-WB ($verified.version -ceq '0.16.4-dev') 'Complete GUI closure should verify.'
+    }
+    New-WBCase 'gui-006-missing-stage-receipt-refused' {
+        Set-WBGuiFixtureRelease $release
+        $receiptPath = Join-Path $release 'validated.json'
+        $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+        $receipt.checks.PSObject.Properties.Remove('desktop-stage')
+        Write-WBJson $receiptPath $receipt
+        Assert-WBThrows { Get-WBRelease $release } '*GUI release validation is missing or failed*'
+    }
+    New-WBCase 'gui-006-string-closure-receipt-refused' {
+        Set-WBGuiFixtureRelease $release
+        $receiptPath = Join-Path $release 'validated.json'
+        $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+        $receipt.checks.'desktop-closure' = '0'
+        Write-WBJson $receiptPath $receipt
+        Assert-WBThrows { Get-WBRelease $release } '*GUI release validation is missing or failed*'
+    }
+    New-WBCase 'gui-006-array-stage-receipt-refused' {
+        Set-WBGuiFixtureRelease $release
+        $receiptPath = Join-Path $release 'validated.json'
+        $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+        $receipt.checks.'desktop-stage' = @(0)
+        Write-WBJson $receiptPath $receipt
+        Assert-WBThrows { Get-WBRelease $release } '*GUI release validation is missing or failed*'
+    }
+    New-WBCase 'gui-006-boolean-closure-receipt-refused' {
+        Set-WBGuiFixtureRelease $release
+        $receiptPath = Join-Path $release 'validated.json'
+        $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+        $receipt.checks.'desktop-closure' = $false
+        Write-WBJson $receiptPath $receipt
+        Assert-WBThrows { Get-WBRelease $release } '*GUI release validation is missing or failed*'
+    }
+    New-WBCase 'gui-006-stage-orphan-refused-after-reseal' {
+        Set-WBGuiFixtureRelease $release
+        $payload = Join-Path $release 'payload'
+        Set-Content -LiteralPath (Join-Path $payload 'dist\.desktop-runtime-stage.lock') -Value 'simulated interrupted stage'
+        Set-WBGuiFixtureSeal $release
+        Assert-WBThrows { Get-WBRelease $release } '*staging requires recovery*'
+    }
+    New-WBCase 'legacy-0163-six-gate-receipt-accepted' {
+        $legacy = New-WBFixtureRelease (Join-Path $caseRoot 'legacy sealed') '0.16.3-dev'
+        $verified = Get-WBRelease $legacy
+        Assert-WB ($verified.version -ceq '0.16.3-dev') 'Prior production release contract remains valid.'
+    }
+    New-WBCase 'gui-006-missing-sealed-helper-refused' {
+        Set-WBGuiFixtureRelease $release
+        $payload = Join-Path $release 'payload'
+        Move-Item -LiteralPath (Join-Path $payload 'dist\Check-DesktopWindowHandle.ps1') -Destination (Join-Path $payload 'dist\withheld-helper.txt')
+        Set-WBGuiFixtureSeal $release
+        Assert-WBThrows { Get-WBRelease $release } '*Check-DesktopWindowHandle.ps1*'
     }
     New-WBCase 'tampered-candidate-rejected' {
         Add-Content -LiteralPath (Join-Path $release 'payload\dist\server.js') -Value 'tampered'

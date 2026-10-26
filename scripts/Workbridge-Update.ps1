@@ -149,6 +149,49 @@ function Get-WBRelease([string]$Path) {
     $manifest = Get-Content -LiteralPath $manifestFile -Raw | ConvertFrom-Json
     $payload = Get-WBChild $release 'payload'
     Test-WBManifest $payload $manifest.files
+    # GUI-006 requires its desktop runtime closure and gate receipts even on a
+    # manually supplied release. Legacy releases retain their original contract.
+    if ($manifest.version -ceq '0.16.4-dev') {
+        foreach ($check in @('generic', 'desktop-stage', 'desktop-closure')) {
+            $value = $receipt.checks.$check
+            if (($value -isnot [int] -and $value -isnot [long]) -or $value -ne 0) {
+                throw "GUI release validation is missing or failed: $check"
+            }
+        }
+        $desktopNames = @('desktop-ui.mjs', 'desktop-capture.mjs', 'vmware-host-capture.mjs', 'desktop-probe-act.mjs', 'Check-DesktopWindowHandle.ps1')
+        $desktopDist = Get-WBChild $payload 'dist'
+        foreach ($item in @(Get-ChildItem -LiteralPath $desktopDist -Force)) {
+            if ($item.Name -ceq '.desktop-runtime-stage.lock' -or $item.Name.StartsWith('.desktop-stage-', [StringComparison]::Ordinal)) {
+                throw 'GUI desktop runtime staging requires recovery.'
+            }
+        }
+        $desktopManifestPath = Get-WBChild $payload 'dist\desktop-runtime-manifest.json'
+        $desktopManifestItem = Get-Item -LiteralPath $desktopManifestPath -Force
+        if ($desktopManifestItem.PSIsContainer -or ($desktopManifestItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $desktopManifestItem.Length -gt 65536) {
+            throw 'GUI desktop runtime manifest is unsafe.'
+        }
+        $desktop = Get-Content -LiteralPath $desktopManifestPath -Raw | ConvertFrom-Json
+        if ($desktop.schemaVersion -ne 1 -or @($desktop.files).Count -ne $desktopNames.Count) {
+            throw 'GUI desktop runtime manifest has invalid shape.'
+        }
+        for ($i = 0; $i -lt $desktopNames.Count; $i++) {
+            $name = $desktopNames[$i]
+            $entry = $desktop.files[$i]
+            if ($entry.name -cne $name -or $entry.sizeBytes -is [string] -or
+                $entry.sizeBytes -le 0 -or $entry.sizeBytes -gt 1048576 -or
+                $entry.sha256 -cnotmatch ('^[0-9a-f]{64}' + [char]36)) {
+                throw "GUI desktop runtime entry is invalid: $name"
+            }
+            foreach ($relative in @("scripts\$name", "dist\$name")) {
+                $item = Get-Item -LiteralPath (Get-WBChild $payload $relative) -Force
+                if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+                    $item.Length -ne $entry.sizeBytes -or
+                    (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -cne $entry.sha256) {
+                    throw "GUI desktop runtime checksum differs: $relative"
+                }
+            }
+        }
+    }
     $package = Get-Content -LiteralPath (Join-Path $payload 'package.json') -Raw | ConvertFrom-Json
     if ($package.name -cne 'workbridge-mcp' -or $package.version -cne $manifest.version -or $receipt.version -cne $manifest.version) { throw 'Release package version differs from its validation receipt.' }
     foreach ($name in $script:WBRuntimeNames) {
