@@ -93,15 +93,19 @@ try {
         $marker = Join-Path $install '.local\installed-release.json'
         Write-WBJson $marker ([pscustomobject]@{schema=1; operationId='previous-fixture'; version='1.0.0'; releaseDigest='fixture'})
         $markerHash = (Get-FileHash -LiteralPath $marker).Hash
-        Write-WBJson (Join-Path $install 'package.json') ([pscustomobject]@{name='workbridge-mcp'; version='1.1.0'; type='module'})
+        $packagePath = Join-Path $install 'package.json'
+        Write-WBJson $packagePath ([pscustomobject]@{name='workbridge-mcp'; version='1.1.0'; type='module'})
+        $packageHash = (Get-FileHash -LiteralPath $packagePath).Hash
         $runtimePath = Join-Path $install 'dist\server.js'
         Set-Content -LiteralPath $runtimePath -Value 'runtime-1.1.0'
         $runtimeHash = (Get-FileHash -LiteralPath $runtimePath).Hash
         $arguments.CurrentVersion = '1.0.0'
         $result = Invoke-WBDeployment @arguments
         Assert-WB ($result.phase -eq 'preflight_failed') 'A disk-ahead-of-live baseline must fail preflight.'
+        Assert-WB ($result.error -like '*pre-update health check*') 'Expected live-version health mismatch refusal.'
         Assert-WB ($service.stops -eq 0 -and $service.starts -eq 0) 'Mismatch must not stop or restart service.'
         Assert-WB ((Get-FileHash -LiteralPath $marker).Hash -ceq $markerHash) 'Installed marker must remain unchanged.'
+        Assert-WB ((Get-FileHash -LiteralPath $packagePath).Hash -ceq $packageHash) 'On-disk version metadata must remain unchanged.'
         Assert-WB ((Get-FileHash -LiteralPath $runtimePath).Hash -ceq $runtimeHash) 'On-disk runtime must remain unchanged.'
         Assert-WB (@($result.events | Where-Object { $_.phase -in @('stopping','installing','starting','verifying','completed') }).Count -eq 0) 'No installation phase may begin.'
     }

@@ -37,6 +37,16 @@ Workers read `AGENTS.md`, `docs/autonomous-investigation-policy.md` and `docs/in
 - Focused copied test: `pcvm-registration-focused-test-20261026-01`, 6/6 pass, exit 0; includes `DESKTOP_TREE_UNSETTLED` quarantine and second-caller refusal. Focused Prettier check `pcvm-registration-format-20261026-01` exited 0. Independent reviewer gave conditional PASS pending actual runner emission.
 - External `wb26-followup-codex-11-20261026-01` timed out after 600 seconds, not a completed milestone. Its staging helper/test require read-only artifact audit and focused fresh checks before promotion.
 
+## Coordinator checkpoint — October 26, 15:19 UTC
+
+- GUI source integration: desktop CLI runner classifies uncertain nested/outer child termination as `DESKTOP_TREE_UNSETTLED`; registration quarantines the shared desktop lease. Windows native Job Object subtree settlement remains **required before live input**. Isolated TypeScript build and 14/14 runner, 6/6 registration tests previously passed.
+- VMware host capture: aggregate replay now verifies saved intent, inner receipt, PNG signature/dimensions, SHA-256, target identity, and time/state chronology entirely offline. Falsey/malformed journals and orphan images fail closed. Shared lock is preserved after uncertain intent; recovery inspector can hash saved evidence without VM backend calls. Quarantine owner metadata/release reconciliation remain missing and must not be automated by lock age. A source-only replay snapshot-stability guard was added after independent review.
+- Combined desktop/VM tests `pcvm-vm-immutable-replay-tests-20261026-01`: 71/71 pass, exit 0. Focused Prettier check `pcvm-vm-immutable-format-check-20261026-01`: exit 0. No live VM actions.
+- Five-file staging `scripts/stage-desktop-runtime.mjs` was reused from existing worker; focused suite `pcvm-stage-runtime-root-regression-20261026-01`: 19 pass, 1 skip for Windows symlink privilege, exit 0. Release builder now stages after generic build and before acceptance, verifies source vs dist hashes and rejects unresolved stage artifacts before sealing. PowerShell 5.1 syntax parser `pcvm-release-stage-syntax-20261026-01`: exit 0; full sealed release test still pending.
+- WB-001 regression `disk-ahead-of-live-refuses-before-stop` was committed as `400b6cefcf3a2f60eec3a6d401752f11c2307787`; updater suite `pcvm-wb001-disk-ahead-test-20261026-01`: 22/22 pass, exit 0. Additional error-reason and package-hash assertions are being retested. Current live 0.16.3 vs disk 0.16.4 mismatch remains protected; no service update or restart attempted.
+- Independent review identified a downstream release-gate validation gap in `Get-WBRelease`: it checks six legacy gate receipts but not `generic`, `desktop-stage`, `desktop-closure` for 0.16.4. This is queued as a version-scoped guard with legacy release compatibility; do not claim complete WB-001 acceptance yet.
+- RiftReader2 receiver reused existing tools and discovered V14 config path with matching SHA-256 without reading credentials; current PID/start identity and guest readiness are not yet confirmed. No game input is authorized by that historic receipt alone.
+
 ## Promotion gates
 
 1. Independently inspect each owned diff, targeted tests, hashes and all errors/negative cases.
