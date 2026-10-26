@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { link, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -243,6 +243,113 @@ test('shared lease is preserved and blocks even read-only backend probes', async
   const result = await h.inspect();
   assert.equal(result.status, 'manual-review');
   assert.equal(result.reason, 'DESKTOP_TURN_BUSY');
+  assert.equal(result.evidenceCheckedOffline, true);
+  assert.equal(result.originalWindowState, 'minimized');
+  assert.equal(result.evidence.length, 3, 'saved intent, capture receipt, and PNG remain inspectable');
+  assert.deepEqual(h.calls, []);
+  assert.deepEqual(await h.snapshot(), before);
+});
+
+function activeVmwareLease(leaseId) {
+  return {
+    schemaVersion: 1,
+    kind: 'workbridge.gui-turn',
+    leaseId,
+    producer: 'vmware-host-capture',
+    requestId: request.requestId,
+    owner: { pid: process.pid, processStartUtc: null, sessionId: null },
+    target: {
+      kind: 'vmware-host-window',
+      pid: request.target.pid,
+      hwnd: request.target.hwnd,
+      vmx: request.vmx,
+    },
+    acquiredUtc: new Date().toISOString(),
+  };
+}
+
+test('structured owner lease is classified offline without claiming live owner verification', async (t) => {
+  const h = await fixture(t);
+  const leaseId = randomUUID();
+  await h.save('intent', { ...h.intent, leaseId });
+  await writeFile(h.paths.lease, JSON.stringify(activeVmwareLease(leaseId)) + '\n');
+  const before = await h.snapshot();
+  const result = await h.inspect();
+  assert.equal(result.reason, 'DESKTOP_TURN_ACTIVE');
+  assert.equal(result.lease.state, 'active');
+  assert.equal(result.lease.leaseId, leaseId);
+  assert.equal(result.lease.requestMatches, true);
+  assert.equal(result.lease.ownerVerified, false);
+  assert.equal(result.lease.releaseEligible, false);
+  assert.equal(result.evidenceCheckedOffline, true);
+  assert.deepEqual(h.calls, []);
+  assert.deepEqual(await h.snapshot(), before);
+});
+
+test('matching quarantine stamp and intent digest block all backend probes', async (t) => {
+  const h = await fixture(t);
+  const leaseId = randomUUID();
+  await h.save('intent', { ...h.intent, leaseId });
+  const stampBytes = Buffer.from(JSON.stringify(activeVmwareLease(leaseId)) + '\n');
+  await writeFile(h.paths.lease, stampBytes);
+  const sidecar = path.join(h.evidenceRoot, 'desktop-turn-quarantine-' + leaseId + '.json');
+  await writeFile(
+    sidecar,
+    JSON.stringify({
+      schemaVersion: 1,
+      kind: 'workbridge.gui-turn-quarantine',
+      leaseId,
+      requestId: request.requestId,
+      ownerStampSha256: digest(stampBytes),
+      intentSha256: digest(await readFile(h.paths.intent)),
+      automaticRetryAllowed: false,
+    }) + '\n',
+  );
+  const before = await h.snapshot();
+  const result = await h.inspect();
+  assert.equal(result.reason, 'QUARANTINED_CAPTURE_REQUIRES_RELEASE');
+  assert.equal(result.lease.state, 'quarantined');
+  assert.equal(result.automaticRetryAllowed, false);
+  assert.equal(result.evidenceCheckedOffline, true);
+  assert.deepEqual(h.calls, []);
+  assert.deepEqual(await h.snapshot(), before);
+});
+
+test('a lease-to-intent token mismatch never certifies owner or probes VMware', async (t) => {
+  const h = await fixture(t);
+  const leaseId = randomUUID();
+  await h.save('intent', { ...h.intent, leaseId: randomUUID() });
+  await writeFile(h.paths.lease, JSON.stringify(activeVmwareLease(leaseId)) + '\n');
+  const result = await h.inspect();
+  assert.equal(result.reason, 'LEASE_ID_MISMATCH');
+  assert.equal(result.lease.state, 'changed');
+  assert.equal(result.lease.ownerVerified, false);
+  assert.deepEqual(h.calls, []);
+});
+
+test('legacy empty, malformed and foreign owner locks all refuse backend probes', async (t) => {
+  for (const [bytes, state, reason] of [
+    ['', 'legacy', 'DESKTOP_TURN_UNATTRIBUTED'],
+    ['{bad', 'invalid', 'INVALID_DESKTOP_LEASE'],
+    ['another owner', 'foreign', 'DESKTOP_TURN_BUSY'],
+  ]) {
+    const h = await fixture(t);
+    await writeFile(h.paths.lease, bytes);
+    const result = await h.inspect();
+    assert.equal(result.reason, reason);
+    assert.equal(result.lease.state, state);
+    assert.equal(result.lease.releaseEligible, false);
+    assert.deepEqual(h.calls, []);
+  }
+});
+
+test('orphaned desktop quarantine without a lock blocks fresh live probes', async (t) => {
+  const h = await fixture(t);
+  await writeFile(path.join(h.evidenceRoot, 'desktop-turn-quarantine-' + randomUUID() + '.json'), '{}\n');
+  const before = await h.snapshot();
+  const result = await h.inspect();
+  assert.equal(result.reason, 'ORPHANED_QUARANTINE_RECORD');
+  assert.equal(result.lease.releaseEligible, false);
   assert.deepEqual(h.calls, []);
   assert.deepEqual(await h.snapshot(), before);
 });

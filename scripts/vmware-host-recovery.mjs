@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Inspection only: never capture, replay, restore, minimize, acquire a lease, or write evidence.
 import { createHash } from 'node:crypto';
-import { lstat, open, realpath } from 'node:fs/promises';
+import { lstat, open, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { verifyPng } from './desktop-capture.mjs';
@@ -146,6 +146,88 @@ async function leaseExists(filename) {
   }
 }
 
+// The recovery inspector never trusts a stamp as proof that its process still owns a
+// Windows session. It only classifies immutable, bounded evidence and never clears a lease.
+const leaseResult = (state, reason, extra = {}) => ({
+  state,
+  reason,
+  ownerVerified: false,
+  releaseEligible: false,
+  ...extra,
+});
+
+async function classifyLease(root, leasePath, request, intent) {
+  let info;
+  try {
+    info = await checkedPath(leasePath);
+  } catch (error) {
+    if (error.code === 'ENOENT') return leaseResult('changed', 'DESKTOP_TURN_CHANGED');
+    throw error;
+  }
+  if (info.size === 0) return leaseResult('legacy', 'DESKTOP_TURN_UNATTRIBUTED');
+  if (info.size > 4096) return leaseResult('invalid', 'INVALID_DESKTOP_LEASE');
+  const saved = await readBounded(leasePath, 4096, false);
+  if (!saved) return leaseResult('changed', 'DESKTOP_TURN_CHANGED');
+  let stamp;
+  try {
+    stamp = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(saved.bytes));
+  } catch {
+    const prefix = saved.bytes.toString('utf8').trimStart();
+    return prefix.startsWith('{')
+      ? leaseResult('invalid', 'INVALID_DESKTOP_LEASE')
+      : leaseResult('foreign', 'DESKTOP_TURN_BUSY');
+  }
+  if (
+    !stamp ||
+    typeof stamp !== 'object' ||
+    Array.isArray(stamp) ||
+    stamp.schemaVersion !== 1 ||
+    stamp.kind !== 'workbridge.gui-turn' ||
+    typeof stamp.leaseId !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(stamp.leaseId) ||
+    !Number.isSafeInteger(stamp.owner?.pid) ||
+    stamp.owner.pid <= 0 ||
+    !validTime(stamp.acquiredUtc)
+  ) {
+    return leaseResult('invalid', 'INVALID_DESKTOP_LEASE');
+  }
+  const matching =
+    stamp.producer === 'vmware-host-capture' &&
+    stamp.requestId === request.requestId &&
+    stamp.target?.kind === 'vmware-host-window' &&
+    stamp.target?.pid === request.target.pid &&
+    stamp.target?.hwnd === request.target.hwnd &&
+    stamp.target?.vmx === request.vmx;
+  if (!matching) return leaseResult('foreign', 'DESKTOP_TURN_BUSY');
+  const identity = { leaseId: stamp.leaseId, requestMatches: true };
+  if (intent?.value?.leaseId !== stamp.leaseId) {
+    return leaseResult('changed', 'LEASE_ID_MISMATCH', identity);
+  }
+  const quarantine = await readBounded(
+    path.join(root, 'desktop-turn-quarantine-' + stamp.leaseId + '.json'),
+    4096,
+  );
+  if (!quarantine) return leaseResult('active', 'DESKTOP_TURN_ACTIVE', identity);
+  if (
+    quarantine.value.kind !== 'workbridge.gui-turn-quarantine' ||
+    quarantine.value.schemaVersion !== 1 ||
+    quarantine.value.leaseId !== stamp.leaseId ||
+    quarantine.value.requestId !== request.requestId ||
+    quarantine.value.ownerStampSha256 !== saved.sha256 ||
+    quarantine.value.intentSha256 !== intent.sha256 ||
+    quarantine.value.automaticRetryAllowed !== false
+  ) {
+    return leaseResult('changed', 'LEASE_ID_MISMATCH', identity);
+  }
+  return leaseResult('quarantined', 'QUARANTINED_CAPTURE_REQUIRES_RELEASE', identity);
+}
+
+async function orphanQuarantineExists(root) {
+  const entries = await readdir(root, { withFileTypes: true });
+  requireEvidence(entries.length <= 4096, 'EVIDENCE_BOUNDS');
+  return entries.some((entry) => /^desktop-turn-quarantine-[0-9a-f-]{36}\.json$/.test(entry.name));
+}
+
 function canonicalRequest(request) {
   const canonical = parseVmwareCaptureRequest([
     '--pid',
@@ -197,9 +279,8 @@ export async function inspectVmwareHostCaptureRecovery(
       `capture-${request.requestId}.png`,
     ];
     const leasePath = path.join(root, 'desktop-input-turn.lock');
-    if (await leaseExists(leasePath)) {
-      return { ...result, reason: 'DESKTOP_TURN_BUSY' };
-    }
+    // A held lease forbids live backend probes, but must not hide inspectable saved evidence.
+    const leaseAtStart = await leaseExists(leasePath);
     const records = [];
     for (const [i, name] of names.entries()) {
       const record = await readBounded(
@@ -261,6 +342,18 @@ export async function inspectVmwareHostCaptureRecovery(
         Date.parse(receipt.value.completedUtc) >= Date.parse(captureReceipt.value.capturedUtc),
         'INVALID_HOST_RECEIPT',
       );
+    }
+    if (leaseAtStart || (await leaseExists(leasePath))) {
+      const lease = await classifyLease(root, leasePath, request, intent);
+      return { ...result, reason: lease.reason, lease, evidenceCheckedOffline: true };
+    }
+    if (await orphanQuarantineExists(root)) {
+      return {
+        ...result,
+        reason: 'ORPHANED_QUARANTINE_RECORD',
+        lease: leaseResult('changed', 'ORPHANED_QUARANTINE_RECORD'),
+        evidenceCheckedOffline: true,
+      };
     }
 
     const running = await vmLister();
