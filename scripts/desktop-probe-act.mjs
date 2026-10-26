@@ -490,12 +490,22 @@ export async function invokeProbeOnce(
           createdUtc: new Date().toISOString(),
         };
         let quarantine;
+        let sealFailed = false;
         try {
           quarantine = await open(path.join(root, 'desktop-turn-quarantine-' + leaseId + '.json'), 'wx');
           await quarantine.writeFile(JSON.stringify(record) + '\n', 'utf8');
           await quarantine.sync();
+        } catch {
+          sealFailed = true;
         } finally {
-          await quarantine?.close();
+          try {
+            await quarantine?.close();
+          } catch {
+            sealFailed = true;
+          }
+        }
+        if (sealFailed) {
+          fail('ACTION_RECOVERY_REQUIRED', 'Quarantine seal unavailable; original desktop lock retained');
         }
       }
     } finally {

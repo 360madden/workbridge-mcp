@@ -266,6 +266,37 @@ test('GUI-004 uncertain invoke leaves an intent and refuses automatic repeat', a
   }
 });
 
+test('GUI-004 sidecar seal failure retains its original desktop owner lock', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'wb-ui-sidecar-failure-'));
+  try {
+    await addEvent(root, 'shown', 0);
+    const lockPath = path.join(root, 'desktop-input-turn.lock');
+    const { runner, calls } = fakeUi(root, { failAction: true });
+    let foreignSidecar;
+    const blockedSealRunner = async (args) => {
+      if (args[1] === 'invoke') {
+        const owner = JSON.parse(await readFile(lockPath, 'utf8'));
+        foreignSidecar = path.join(root, 'desktop-turn-quarantine-' + owner.leaseId + '.json');
+        await writeFile(foreignSidecar, 'foreign-sidecar', { flag: 'wx' });
+      }
+      return runner(args);
+    };
+    await assert.rejects(
+      () => invokeProbeOnce(request('gui004_sidecar_fail_001'), { runner: blockedSealRunner, root }),
+      (e) => e.code === 'ACTION_RECOVERY_REQUIRED',
+    );
+    assert.equal(JSON.parse(await readFile(lockPath, 'utf8')).producer, 'desktop-probe-action');
+    assert.equal(await readFile(foreignSidecar, 'utf8'), 'foreign-sidecar');
+    await assert.rejects(
+      () => invokeProbeOnce(request('gui004_sidecar_fail_002'), { runner: blockedSealRunner, root }),
+      (e) => e.code === 'UI_TURN_BUSY',
+    );
+    assert.equal(calls.filter((x) => x[1] === 'invoke').length, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('GUI-004 refuses to remove a lock modified after synthetic input', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'wb-ui-owner-change-'));
   try {
