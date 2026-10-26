@@ -64,6 +64,14 @@ Workers read `AGENTS.md`, `docs/autonomous-investigation-policy.md` and `docs/in
 - Fresh VMware host image plus guest receiver telemetry correlation, read-only first.
 - Coherent GUI-006 source integration and fresh full release build only after all active workers settle.
 
+## Coordinator checkpoint — October 26, 15:40 UTC
+
+- Workbridge history HEAD after the scoped release closure commit is `796787eb1f84ee53d39c285ca9aeebe6b4707030` (`feat(workbridge): stage and verify desktop runtime in sealed GUI releases`). That commit records five named release/stage/update files; this is **source Git only**, not a service deployment.
+- Newly tested source: VMware desktop/capture/recovery replay `71/71` passed, stage helper `19 passed / 1 skipped (Windows symlink privilege)`, updater `30/30` passed, baseline planner fixture `36/36` passed, and PowerShell 5.1 syntax was accepted for the three release/update test scripts. No VM input.
+- Isolated GUI-006 release attempt `pcvm-gui006-20261026-02` (job `pcvm-new-sealed-release-builder-20261026-02`) **failed at the tests gate** after dependency installation; exit 1. No validated release receipt, deployment, service stop, or active dist overwrite. Independent test-log triage assigned; once fixed, create a fresh isolated release ID rather than editing a failed sealed candidate.
+- Fresh six-worker queue: desktop native Windows Job supervisor and synthetic process-tree proof; VMware immutable lease and quarantine ownership; release test-log diagnosis; read-only WB-022 baseline/rollback qualification; release metadata strict-type regression; guest receiver identity-only probe. Coordinator owns cross-client capture integration, scoped commits, safety gates and queue refill.
+- Active owner remains Workbridge `0.16.3-dev` / 52 tools. Disk sources remain ahead at `0.16.4-dev`; WB-001 correctly refuses the mismatch. Do not retry deployment until installed-baseline provenance, supervisor settlement, staged release and rollback are independently proven.
+
 ## Approval visibility
 
 If ChatGPT presents `Allow ChatGPT to use Workbridge?`, surface it in the main conversation; the owner may need to expand `Previous activity`. Do not bypass or auto-click host approval. These prompts are distinct from Windows UAC.
