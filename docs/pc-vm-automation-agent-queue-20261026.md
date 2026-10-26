@@ -14,15 +14,28 @@ Coordinator: ChatGPT /root. Six workers active at launch; root owns integration,
 
 | Lane | Agent | Exclusive write ownership | Acceptance focus | Initial state |
 | --- | --- | --- | --- | --- |
-| 1 Release cutover | `/root/release_cutover` | `scripts/Update-Workbridge.ps1`, `scripts/Workbridge-Update.ps1`, `test/updater.test.ps1` | Address safe baseline/candidate identity path without weakening validation; synthetic tests only | Assigned |
-| 2 Runtime closure | `/root/runtime_bundle` | `scripts/New-WorkbridgeRelease.ps1`, `scripts/stage-desktop-runtime.mjs`, `test/stage-desktop-runtime.test.mjs` | Seal and verify desktop-script dependencies in immutable candidate; no activation | Assigned |
+| 1 Release cutover | `/root/release_cutover` | `scripts/Update-Workbridge.ps1`, `scripts/Invoke-WorkbridgeUpdate.ps1`, `test/updater.test.ps1` | Controller disk/live version mismatch guard and synthetic safe recovery; defer `Workbridge-Update.ps1` to another active worker | In progress |
+| 2 Runtime closure | `/root/runtime_bundle` | `scripts/New-WorkbridgeRelease.ps1` | Invoke existing isolated runtime-script staging as sealed release gate; defer staging helper/test edits to another active worker | In progress |
 | 3 Desktop action | `/root/desktop_action` | `src/desktop-probe-action-tool.ts`, `test/desktop-probe-action-tool.test.mjs` | Exact disposable target, fresh identity/lease, fail-closed action tests | Assigned |
-| 4 VMware recovery | `/root/vmware_recovery` | `scripts/vmware-host-recovery.mjs`, `test/vmware-host-recovery.test.mjs` | Interrupted host-frame intent/receipt reconciliation; no VM input | Assigned |
-| 5 Guest receiver | `/root/guest_receiver` | `scripts/Inspect-RiftGuestReceiver.ps1`, `test/inspect-rift-guest-receiver.test.mjs` | Read-only host-versus-guest receiver evidence and bounded explicit unknowns | Assigned |
+| 4 VMware recovery | `/root/vmware_recovery` | `scripts/vmware-host-recovery.mjs`, `test/vmware-host-recovery.test.mjs`, `scripts/vmware-host-capture.mjs`, `test/vmware-host-capture.test.mjs` | Fail-closed aggregate replay without unleased recapture; verify foreign lock preservation | In progress |
+| 5 Desktop process cleanup | `/root/guest_receiver` | `src/desktop-cli-runner.ts`, `test/desktop-cli-runner.test.mjs` | On uncertain grandchild termination emit typed DESKTOP_TREE_UNSETTLED; synthetic timeout/race tests; no actual input | Reassigned, in progress |
 | 6 Independent review | `/root/independent_review` | None — read-only | Concrete release, desktop/VM security/race/regression review; follow-up code review | Assigned |
-| Coordinator | `/root` | This ledger and designated integration paths only | Integration, test receipts, scoped commits, queue assignment, release gating | Active |
+| Coordinator | `/root` | This ledger, `src/desktop-registration.ts`, `test/desktop-registration.test.mjs` | Quarantine GUI lease on unsettled tree, integrate/test/review worker changes, scoped commits and release gating | Active |
 
-Workers read `AGENTS.md`, `docs/autonomous-investigation-policy.md` and `docs/interactive-desktop-vm-roadmap.md`; file modifications require fresh hash checks and unique durable IDs. Root alone performs cross-lane edits/commits after verifying ownership and tests. Jobs use distinct request IDs. Five implementation workers may use Workbridge command slots; coordinator reserves capacity for integration and does not blindly overlap full test gates.
+Workers read `AGENTS.md`, `docs/autonomous-investigation-policy.md` and `docs/interactive-desktop-vm-roadmap.md`; file modifications require fresh hash checks and unique durable IDs. Root alone performs cross-lane edits/commits after verifying ownership and tests. Jobs use distinct request IDs. The live Workbridge six-slot capacity is shared with separately running Codex CLI jobs; check live command status before starting isolated tests. Do not run `npm run build` in the active checkout: it changes on-disk `dist` while service 0.16.3 remains loaded. Build only into isolated disposable paths.
+
+## Cross-workstream discoveries and collision resolution
+
+- Other active Codex CLI jobs `wb26-followup-codex-11-20261026-01` and `wb26-followup-codex-12-20261026-01` were independently found targeting desktop staging and release baseline logic. The matching two worker lanes above relinquished overlapping files; preserve their ongoing work. Job `wb26-followup-codex-13-20261026-01` is also active on separate Git/recovery work. These jobs are outside this coordinator's direct agent roster.
+- Guest receiver lane reused RiftReader2 `control_client.py status` and `verify_guest_recovery.py` with read-only SQLite/identity checks. No duplicate inspector created; guest receiver startup and current live control still need independent evidence.
+- Independent review found a desktop runner timeout/grandchild race plus VMware replay-before-lease and foreign-lock unlink gaps. Root added a guarded `DESKTOP_TREE_UNSETTLED` lease quarantine and regression test; runner and VMware workers are closing source-level causes. Code is not deployed; isolated build/test evidence is still required.
+
+## Verified integration checkpoint — October 26, 14:06 UTC
+
+- Root's desktop turn quarantine edit has current source SHA-256 `c35b8be87574ac07011ca8260f53d7859f4181abe77d98aafc85f38051186b2c`; test SHA-256 `1c34789b9441f45b738d2c52544146aa158be05378c31ae7f1ace15e26e48af9`. These existing untracked GUI source/test files are **not** individually committed, because their imports still depend on other uncommitted GUI files. No live runtime changes.
+- Isolated TypeScript build: Workbridge job `pcvm-registration-isolated-tsc-20261026-01`, `node node_modules/typescript/bin/tsc --project tsconfig.json --outDir .tools/pcvm-registration-20261026-01/dist`, exit 0. No active `dist/` rewrite.
+- Focused copied test: `pcvm-registration-focused-test-20261026-01`, 6/6 pass, exit 0; includes `DESKTOP_TREE_UNSETTLED` quarantine and second-caller refusal. Focused Prettier check `pcvm-registration-format-20261026-01` exited 0. Independent reviewer gave conditional PASS pending actual runner emission.
+- External `wb26-followup-codex-11-20261026-01` timed out after 600 seconds, not a completed milestone. Its staging helper/test require read-only artifact audit and focused fresh checks before promotion.
 
 ## Promotion gates
 
