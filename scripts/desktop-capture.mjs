@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Bounded, targeted WinApp screenshot capture. Never sends keyboard or mouse input.
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -98,8 +98,14 @@ export function verifyPng(bytes) {
 }
 
 async function readVerifiedEvidence(filename) {
-  const info = await stat(filename);
-  if (!info.isFile() || info.size < 45 || info.size > MAX_PNG_BYTES) {
+  const info = await lstat(filename);
+  if (
+    !info.isFile() ||
+    info.isSymbolicLink() ||
+    info.nlink !== 1 ||
+    info.size < 45 ||
+    info.size > MAX_PNG_BYTES
+  ) {
     fail('CAPTURE_BOUNDS', 'Screenshot file exceeded bounded image size');
   }
   const image = await readFile(filename);
@@ -128,7 +134,20 @@ export async function captureWindow(
   await mkdir(evidenceRoot, { recursive: true });
   let prior = null;
   try {
+    const info = await lstat(receiptPath);
+    if (
+      !info.isFile() ||
+      info.isSymbolicLink() ||
+      info.nlink !== 1 ||
+      info.size < 2 ||
+      info.size > 64 * 1024
+    ) {
+      fail('CAPTURE_RECOVERY_REQUIRED', 'Existing receipt is not a bounded regular file');
+    }
     prior = JSON.parse(await readFile(receiptPath, 'utf8'));
+    if (!prior || typeof prior !== 'object' || Array.isArray(prior)) {
+      fail('CAPTURE_RECOVERY_REQUIRED', 'Existing receipt has invalid shape');
+    }
   } catch (error) {
     if (error.code !== 'ENOENT') fail('CAPTURE_RECOVERY_REQUIRED', 'Existing receipt is unreadable');
   }
@@ -142,13 +161,26 @@ export async function captureWindow(
       fail('REQUEST_ID_CONFLICT', 'Request ID already belongs to another target');
     }
     const evidence = await readVerifiedEvidence(imagePath);
-    if (evidence.sha256 !== prior.sha256) {
-      fail('CAPTURE_RECOVERY_REQUIRED', 'Existing evidence changed; refusing recapture');
+    if (
+      prior.schemaVersion !== 1 ||
+      prior.requestId !== request.requestId ||
+      typeof prior.title !== 'string' ||
+      prior.title.length > 200 ||
+      (request.target.title != null && prior.title !== request.target.title) ||
+      prior.inputInjected !== false ||
+      prior.foregroundMayChange !== true ||
+      prior.imagePath !== imagePath ||
+      prior.width !== evidence.width ||
+      prior.height !== evidence.height ||
+      prior.sizeBytes !== evidence.sizeBytes ||
+      prior.sha256 !== evidence.sha256
+    ) {
+      fail('CAPTURE_RECOVERY_REQUIRED', 'Existing receipt or image evidence changed; refusing recapture');
     }
-    return { ok: true, replayed: true, ...prior };
+    return { ...prior, ok: true, replayed: true };
   }
   try {
-    await stat(imagePath);
+    await lstat(imagePath);
     fail('CAPTURE_RECOVERY_REQUIRED', 'Image exists without receipt; do not overwrite or retry blindly');
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;

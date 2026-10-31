@@ -197,6 +197,23 @@ test('GUI-003 writes fingerprinted evidence once and replays without recapture',
   }
 });
 
+test('GUI-003 malformed or falsey existing receipts cannot trigger a second capture', async () => {
+  for (const serialized of ['null\n', 'false\n', '0\n', '\"\"\n', '[]\n', '{invalid']) {
+    const evidenceRoot = await mkdtemp(path.join(os.tmpdir(), 'wb-gui003-falsey-'));
+    try {
+      const { calls, runner } = fakeBackend();
+      const request = parse();
+      await writeFile(path.join(evidenceRoot, 'capture-' + request.requestId + '.json'), serialized);
+      await assert.rejects(captureWindow(request, { runner, evidenceRoot }), {
+        code: 'CAPTURE_RECOVERY_REQUIRED',
+      });
+      assert.deepEqual(calls, [], 'invalid persisted receipt must block all WinApp calls');
+    } finally {
+      await rm(evidenceRoot, { recursive: true, force: true });
+    }
+  }
+});
+
 test('GUI-003 fails closed on offscreen target without writing image', async () => {
   const evidenceRoot = await mkdtemp(path.join(os.tmpdir(), 'wb-gui003-offscreen-'));
   try {
