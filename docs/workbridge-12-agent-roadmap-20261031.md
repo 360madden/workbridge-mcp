@@ -2,7 +2,7 @@
 
 Repository: `C:\work\workbridge-mcp`. Owner: Joey. Scope: ordinary ChatGPT + Workbridge; no Codex CLI or external model API.
 
-## Baseline verified today
+## Initial baseline (before deployment and tool refresh)
 
 - Live service `0.16.4-dev`, instance `595ecff2-578d-4767-9aaa-ed5da32b23f8`; 12 command jobs and 12 coordination assignments, distinct from AI reasoning sessions.
 - Initial Git HEAD `d2c97e7f237b6e16533d0413c1a31fe9cf975332`, branch `main`, no staged files or recovery markers.
@@ -52,7 +52,7 @@ Gate: actual independently reasoning workers with traceable Workbridge responses
 
 - M1: scoped Git gate passed. Four exact-file local commits: `3700955` (audit/planner, 24/24 tests), `edef6a0` (screenshot receipt, 6/6), `66e12a3` (offline desktop policy, 44/44), `c2d1de8` (read-only retention preview, 18 passed/1 skipped). Uncommitted 0.16.4 integration dependencies and historical documents remain; no blanket staging or push.
 - M2: deployed. Sealed candidate `artifact-verify-20261031-01`, manifest SHA-256 `1DD6D4457B3182A695EB8C4AC3E51BEEAB1C87724B841A69BF6B8CAED21B4A5B`, all nine recorded checks exit 0. WB-001 operation `artifact-verify-update-20261031-01` journal phase `completed`, new instance `6b9008e9-990b-4078-a6fd-6fc0214b24bd`. Five changed `dist` files match the sealed payload; native command-host source/compiler input digest unchanged; 2,731 dependency files and both package manifests identical. Disposable compiled-runtime MCP artifact mismatch/recovery test 2/2 passed. Healthy tunnel and 12 free command slots.
-- M3: externally blocked. The direct sealed runtime has 64 MCP tools with all eight coordination tools, but ChatGPT's cached connector remains at 51 with none of the eight. The connected browser refused access to `chatgpt.com` settings; Joey must use Workbridge plugin Settings > Refresh tools and start a new turn. No permissions reset.
+- M3: achieved. After Joey refreshed Workbridge's catalog, a fresh ChatGPT turn exposed all 64 tools including all eight `agent_*` coordination tools. Direct ChatGPT calls to `agent_list` and `agent_status` passed: 12 worker assignments available, zero running assignments and zero file owners. Live diagnostics show `0.16.4-dev`, the postdeployment service instance, a ready tunnel and healthy command capacity. No permissions reset or service restart was needed.
 - M4: twelve distinct independent reasoning agents each made live Workbridge calls and returned separate reviews, in two waves of six. The current runtime permits only six simultaneous subagents plus the coordinator; the full twelve-simultaneous inference gate is not yet demonstrated. Twelve command/metadata slots must not be called twelve AI sessions.
 
 ## Release collision and recovery
@@ -62,7 +62,7 @@ Gate: actual independently reasoning workers with traceable Workbridge responses
 
 ## Next actionable gates
 
-1. Joey refreshes the ChatGPT Workbridge tool catalog; a new turn must expose 64 tools including the eight `agent_*` entries.
+1. M3 complete: keep the verified 64/64 ChatGPT tool catalog and all eight direct coordination entries; no more refresh actions are needed.
 2. Review, test and commit the full 0.16.4 runtime dependency closure (package manifests, shared server/jobs/schema, all imported modules) without staging unrelated dirty paths. Update stale deployment references before committing docs.
 3. Add updater-owned job-admission/quiescence protection and test the cross-project launch race before any future production update.
 4. Inspect the interrupted RiftReader2 command's external effects before its owner chooses recovery.
