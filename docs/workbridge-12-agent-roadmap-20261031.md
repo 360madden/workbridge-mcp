@@ -48,24 +48,25 @@ Gate: eight direct ChatGPT tools available, or an explicit externally controlled
 
 Gate: actual independently reasoning workers with traceable Workbridge responses and measured concurrency.
 
-## Progress ledger — verified after deployment
+## Progress ledger — verified deployed and isolated gates
 
-- M1: scoped Git gate passed. Four exact-file local commits: `3700955` (audit/planner, 24/24 tests), `edef6a0` (screenshot receipt, 6/6), `66e12a3` (offline desktop policy, 44/44), `c2d1de8` (read-only retention preview, 18 passed/1 skipped). Uncommitted 0.16.4 integration dependencies and historical documents remain; no blanket staging or push.
+- M1: scoped Git gate passed. Five narrowly reviewed local commits: `3700955` (audit/planner, 24/24 tests), `edef6a0` (screenshot receipt, 6/6), `66e12a3` (offline desktop policy, 44/44), `c2d1de8` (read-only retention preview, 18 passed/1 skipped), and `e6331a4` (one-file JSON LF checkout rule). Separate roadmap documentation commits: `4766a7b` and `54bef54`. Uncommitted 0.16.4 integration dependencies and historical documents remain; no blanket staging or push.
 - M2: deployed. Sealed candidate `artifact-verify-20261031-01`, manifest SHA-256 `1DD6D4457B3182A695EB8C4AC3E51BEEAB1C87724B841A69BF6B8CAED21B4A5B`, all nine recorded checks exit 0. WB-001 operation `artifact-verify-update-20261031-01` journal phase `completed`, new instance `6b9008e9-990b-4078-a6fd-6fc0214b24bd`. Five changed `dist` files match the sealed payload; native command-host source/compiler input digest unchanged; 2,731 dependency files and both package manifests identical. Disposable compiled-runtime MCP artifact mismatch/recovery test 2/2 passed. Healthy tunnel and 12 free command slots.
 - M3: achieved. After Joey refreshed Workbridge's catalog, a fresh ChatGPT turn exposed all 64 tools including all eight `agent_*` coordination tools. Direct ChatGPT calls to `agent_list` and `agent_status` passed: 12 worker assignments available, zero running assignments and zero file owners. Live diagnostics show `0.16.4-dev`, the postdeployment service instance, a ready tunnel and healthy command capacity. No permissions reset or service restart was needed.
 - M4: twelve distinct independent reasoning agents each made live Workbridge calls and returned separate reviews, in two waves of six. The current runtime permits only six simultaneous subagents plus the coordinator; the full twelve-simultaneous inference gate is not yet demonstrated. Twelve command/metadata slots must not be called twelve AI sessions.
+- M5 release-race guard: source updated but **not deployed**. `src/jobs.ts` shares `.local/updater.lock` across durable command admission; `Workbridge-Update.ps1` requires a stop-time `CheckIdle`; the controller queries live diagnostics through the local CLI and refuses busy, retained, closing, incomplete or unavailable states. All 37 updater fixtures passed; both adversarial Windows cross-process lock tests passed. Fresh sealed candidate `updater-quiescence-20261031-03` passed all nine release checks, including full compiled-runtime tests (1,030 passed, 0 failed, 3 skipped), TypeScript and formatting. Manifest SHA-256 `B5E61D7204E8294376C55EC719AF8A891EC48193A401F9E4810B0CF78F9B23A8`. No service stop, deployment, Git push or new instance; the old deployed binary remains in service.
 
 ## Release collision and recovery
 
 - At the pre-Apply idle check all 12 command slots were free. The separate `riftreader2` job `rr2-lab1-bind-final-execute-20261031-a` started at `2026-10-31T17:57:26Z` after dispatch, while WB-001 was preparing. The updater stopped Workbridge at approximately `17:57:32Z`; that job is now `interrupted` with no retained output. Do not blindly replay; its owner should inspect partial external effects and issue a new recovery command only if safe.
-- This is an admission race in the release workflow, not a failed release or rollback. Implement a quiescence gate covering the interval from preflight to stop, then add an adversarial test where another project launches a command during backup. Keep its fix separate from the deployed artifact-verification change.
+- This was an admission race in the release workflow, not a failed release or rollback. The new source and sealed candidate cover both sides of the lock race, but the running binary still predates the guard. **Initial activation requires an exclusive maintenance window agreed with all Workbridge command clients**, not merely an observed idle snapshot. Do not replace this gate with a forced stop or replay the interrupted RiftReader2 job.
 
 ## Next actionable gates
 
-1. M3 complete: keep the verified 64/64 ChatGPT tool catalog and all eight direct coordination entries; no more refresh actions are needed.
-2. Review, test and commit the full 0.16.4 runtime dependency closure (package manifests, shared server/jobs/schema, all imported modules) without staging unrelated dirty paths. Update stale deployment references before committing docs.
-3. Add updater-owned job-admission/quiescence protection and test the cross-project launch race before any future production update.
-4. Inspect the interrupted RiftReader2 command's external effects before its owner chooses recovery.
-5. Arrange a runtime with twelve genuine simultaneous AI reasoning slots and instrument overlap, per-agent live calls, ownership and completion.
+1. Keep M3's verified 64/64 ChatGPT catalog; no additional refresh is needed.
+2. Review, test and commit a coherent 0.16.4 runtime dependency closure (package manifests, shared server/jobs/schema, imported modules, local CLI), including the guarded release workflow. Preserve unrelated dirty paths, untracked files and Git staging; do not commit a partial nonbuildable runtime.
+3. Agree an exclusive window with all Workbridge command clients for the **first** guarded rollout. Recheck the sealed candidate against current source, Apply through WB-001 only during that window, then verify the new instance/tunnel, admission refusal under a synthetic held lock and postrelease diagnostics. The existing running binary cannot honor an updater lock yet.
+4. Leave the interrupted RiftReader2 command untouched until its owner inspects possible external side effects and chooses recovery.
+5. Arrange an environment with twelve genuine simultaneous AI reasoning slots, then instrument overlapping per-agent live calls, ownership and completion; twelve command slots or two waves of six do not satisfy this gate.
 
 Use `AGENTS.md` and `docs/autonomous-investigation-policy.md` for scope, approval notices, and recovery. Source commits, live deployment and off-machine backups are separate outcomes.
