@@ -4,6 +4,8 @@
 
 **Historical checkpoints (preserved):** The [WB-022 deployment](docs/wb022-deployment.md) records the 0.16.3-dev publication safeguards and 52-tool service. The [GUI-006 desktop/VMware investigation](docs/gui006-desktop-vmware-2026-10-26.md) records a sealed candidate and a guarded deployment preflight refusal. Those documents describe earlier states, not the current 36-slot service.
 
+**Historical fixture locations (2026-11-01):** All 34 older Workbridge experiment/validation folders formerly at `C:\work\<historical-name>` are preserved at `C:\work\workbridge-mcp\temp\<historical-name>`. The active `workbridge-mcp` and `Workbridge Health` folders were not moved. Live path references and archived Git worktree pointers were propagated; old absolute paths in sealed historical evidence remain as original records. See the [verified relocation and recovery index](docs/workbridge-historical-fixture-relocation-20261101.md).
+
 The existing [multi-file reads](docs/multi-file-reads.md), job discovery, output tails, structured edit errors, [RRE validation profiles](docs/rre-validation-profiles.md), recoverable multi-file patches, [resumable validation/review](docs/resumable-workflows.md), and [task context](docs/task-context.md) remain available. See [release verification](docs/wb022-validation.md) and the [impact-first roadmap](docs/ai-workflow-improvements.md).
 
 **Historical CLI checkpoint — WB-025:** Input-consistency protection and its 509/509 tests were validated without upgrading the then-running 0.16.3-dev service. [WB-025 verification](docs/wb025-validation.md) and the [October handoff](docs/handoff-20261020.md) remain available as historical evidence.
