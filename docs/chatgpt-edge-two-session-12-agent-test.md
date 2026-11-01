@@ -28,7 +28,14 @@ The operational gate is twelve individually identifiable, _overlapping_ AI reaso
 
 **Important disclosure:** The automated navigation failure was an explicit browser automation permission boundary. It was **not** a ChatGPT account login failure, an Edge application outage, or evidence that Joey cannot open ChatGPT manually. The attempt never verified a persistent second ChatGPT session. It should have been surfaced to Joey clearly when it happened.
 
-Do not circumvent that host-level rejection using a different browser automation adapter, cloud browser, raw CDP, redirected URL, or indirect navigation. A manually opened tab controlled by Joey is a distinct, allowed next step. An independently supported and properly authorized top-level conversation creation facility could be considered if actually offered; none has been verified in this session.
+Do not circumvent that host-level rejection using a different browser automation adapter, cloud browser, raw CDP, redirected URL, or indirect navigation. Joey may manually open a second tab, but that action alone does not confer browser-agent authority to inspect or operate it. An independently supported and properly authorized top-level conversation creation facility could be considered if actually offered; none has been verified in this session.
+
+## Follow-up: user-opened second tab (2026-11-01)
+
+- Joey manually opened a new Edge tab at `https://chatgpt.com/`. The browser extension's read-only tab inventory confirmed the new entry (title `ChatGPT`) alongside the existing Workbridge project conversation. **Manual tab opening succeeded.**
+- A subsequent attempt to claim/inspect that specific newly opened tab was **rejected by the browser host security policy**, which denied authority to observe content at `https://chatgpt.com/`. It was not possible to verify that tab's ChatGPT sign-in, plugin selection, independent conversation state, or ability to spawn reasoning workers.
+- Control of the **already-open Workbridge project conversation** had separately been verified; that success does not imply authority for the newly opened root tab. Do not retry the denied inspection through another automation adapter or indirect mechanism.
+- The remaining supported path is Joey manually pasting the Session B coordinator prompt below and reporting whether it can access Workbridge and initiate six workers. Session A can then start six workers as closely coordinated as practical. Without receipt/timing evidence from Session B, the twelve-way inference gate remains **unverified**.
 
 ## Manual pilot in Microsoft Edge
 
