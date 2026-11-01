@@ -54,6 +54,25 @@ Do not circumvent that host-level rejection using a different browser automation
 
 > Prepare six independent reasoning workers A1-A6 for the read-only Workbridge concurrency experiment. Joey will separately initiate B7-B12 in a second Edge ChatGPT conversation. Use real independent worker sessions and direct read-only Workbridge calls. Correlate identity, observed times and tool results; report any unsupported concurrency separately. No file edits, command jobs, service changes, or unsupported claims of model overlap.
 
+## First 6+6 pilot: Session A results (2026-11-01 UTC)
+
+Joey manually submitted the coordinator B prompt in the separate Edge ChatGPT tab. The main coordinator cannot inspect the B tab through the blocked browser-control surface, so **B worker identities, responses and timings were not yet independently received** at this checkpoint.
+
+Six existing independent ChatGPT child reasoning sessions A1-A6 were reactivated concurrently in Session A. One coordinator status snapshot reported all six as `running`; this snapshot was not independently wall-clock stamped and does not by itself measure inference concurrency. Each worker directly called read-only Workbridge tools and returned success receipts:
+
+| Worker | First successful tool call began (UTC) | Last successful tool call ended (UTC) | Distinct reasoning topic              |
+| ------ | -------------------------------------- | ------------------------------------- | ------------------------------------- |
+| A1     | 07:52:52.760                           | 07:53:04.975                          | Service/tunnel readiness              |
+| A2     | 07:52:58.629                           | 07:53:12.562                          | Coordination slots versus AI sessions |
+| A3     | 07:52:56.728                           | 07:53:08.942                          | Twelve-command stress evidence        |
+| A4     | 07:52:59.020                           | 07:53:17.262                          | Git provenance and dirty-tree safety  |
+| A5     | 07:53:04.381                           | 07:53:11.043                          | Release admission race and quiescence |
+| A6     | 07:53:04.857                           | 07:53:14.684                          | Edge browser authority boundary       |
+
+The columns are **enclosing observed tool-call timestamps**, not measured start/end times of model inference. All workers made at least two direct successful Workbridge read-only calls. The common service remained `0.16.4-dev`, instance `6b9008e9-990b-4078-a6fd-6fc0214b24bd`. Workers did not launch command jobs, modify files/assignments or deploy. A2 observed Workbridge assignment `running=0` while actively reasoning, directly showing that its metadata is not a live model-agent count.
+
+**Checkpoint:** Session A six-worker participation **passed**. Session B six-worker evidence **pending**. Twelve-way simultaneous AI inference **not yet verified**, regardless of reported A-side activity or tool-call overlaps. On receipt of B7-B12 evidence, calculate per-session identity and actual timing overlap, and do not call an inference overlap proven by tool timestamps alone.
+
 ## Acceptance / falsification criteria
 
 **Pass:** Twelve distinct reasoning-worker sessions from the two conversations demonstrably run over an overlapping real-time window, each gives a traceable direct Workbridge response, and both coordinators record the evidence. Record what measures inference overlap separately from Workbridge tool overlap.
