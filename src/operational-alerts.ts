@@ -18,8 +18,8 @@ type Action = { tool: 'diagnostics' | 'command_list' | 'command_status'; jobId?:
 type Row = { jobId: string; status: Status; state: State; nextAction: Action };
 type Alert = { code: string; severity: 'info' | 'warning'; nextAction: Action };
 const statuses: readonly string[] = ['running', 'passed', 'failed', 'cancelled', 'timed_out', 'interrupted'];
-// Current Jobs.capacity schema has six owner slots. Catalog pages contain at most 100 rows.
-const slotLimit = 6;
+// Bound supplied diagnostics independently of the installed Workbridge version.
+const slotLimit = 1024;
 const scanLimit = 100;
 const rowLimit = 20;
 
@@ -68,9 +68,10 @@ export function classifyOperationalAlerts(input: OperationalAlertsInput) {
   const catalogAge = freshness(catalog, now, maxAge);
   const capacity = record(record(record(diagnostics.data).jobs).capacity);
   const slots = Array.isArray(capacity.jobs) ? capacity.jobs : [];
+  const reportedLimit = integer(capacity.limit, slotLimit) && capacity.limit > 0 ? capacity.limit : null;
   const slotMap = new Map<string, { status: Status; kind: 'in_progress' | 'retained_result' }>();
   let invalidSlots = false;
-  for (const value of slots.slice(0, slotLimit)) {
+  for (const value of slots.slice(0, reportedLimit ?? 0)) {
     const row = record(value);
     if (
       !id(row.jobId) ||
@@ -87,12 +88,12 @@ export function classifyOperationalAlerts(input: OperationalAlertsInput) {
   const retained = [...slotMap.values()].filter((row) => row.kind === 'retained_result').length;
   const capacityValid =
     capacity.schemaVersion === 1 &&
-    capacity.limit === slotLimit &&
-    integer(capacity.occupied, slotLimit) &&
-    integer(capacity.available, slotLimit) &&
-    integer(capacity.inProgress, slotLimit) &&
-    integer(capacity.retainedResults, slotLimit) &&
-    capacity.occupied + capacity.available === slotLimit &&
+    reportedLimit !== null &&
+    integer(capacity.occupied, reportedLimit) &&
+    integer(capacity.available, reportedLimit) &&
+    integer(capacity.inProgress, reportedLimit) &&
+    integer(capacity.retainedResults, reportedLimit) &&
+    capacity.occupied + capacity.available === reportedLimit &&
     capacity.inProgress + capacity.retainedResults === capacity.occupied &&
     capacity.retainedResults === retained &&
     typeof capacity.closing === 'boolean' &&

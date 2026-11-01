@@ -14,9 +14,9 @@ function fixture(slots = [], jobs = []) {
         jobs: {
           capacity: {
             schemaVersion: 1,
-            limit: 6,
+            limit: 12,
             occupied: slots.length,
-            available: 6 - slots.length,
+            available: 12 - slots.length,
             inProgress: slots.length - retainedResults,
             retainedResults,
             closing: false,
@@ -41,11 +41,11 @@ const slot = (jobId, status = 'running', kind = 'in_progress') => ({ jobId, stat
 const job = (id, status = 'running', completionPending = false) => ({ id, status, completionPending });
 const codes = (result) => result.alerts.map((item) => item.code);
 
-test('fresh empty evidence is idle and does not reserve six slots or infer agents', () => {
+test('fresh empty evidence is idle and does not reserve twelve slots or infer agents', () => {
   const result = classifyOperationalAlerts(fixture());
   assert.equal(result.state, 'idle');
   assert.equal(result.readOnly, true);
-  assert.equal(result.capacity.available, 6);
+  assert.equal(result.capacity.available, 12);
   assert.equal(result.capacity.reservation, false);
   assert.equal(result.jobs.complete, true);
   assert.deepEqual(result.alerts, []);
@@ -70,13 +70,25 @@ test('fresh slots distinguish live work, terminal finalization, and blocked publ
 
 test('full live capacity is busy; retained results make capacity blocked', () => {
   for (const held of [false, true]) {
-    const slots = Array.from({ length: 6 }, (_, i) =>
+    const slots = Array.from({ length: 12 }, (_, i) =>
       slot(`j-${i}`, held ? 'failed' : 'running', held ? 'retained_result' : 'in_progress'),
     );
     const result = classifyOperationalAlerts(fixture(slots));
     assert.equal(result.state, held ? 'blocked' : 'live_reported');
     assert.ok(codes(result).includes(held ? 'CAPACITY_BLOCKED' : 'CAPACITY_BUSY'));
   }
+});
+
+test('thirty-six active slots remain a valid full-capacity diagnostic snapshot', () => {
+  const slots = Array.from({ length: 36 }, (_, i) => slot(`worker-${i + 1}`));
+  const input = fixture(slots);
+  input.diagnostics.data.jobs.capacity.limit = 36;
+  input.diagnostics.data.jobs.capacity.available = 0;
+  const result = classifyOperationalAlerts(input);
+  assert.equal(result.capacity.valid, true);
+  assert.equal(result.capacity.occupied, 36);
+  assert.equal(result.state, 'live_reported');
+  assert.ok(codes(result).includes('CAPACITY_BUSY'));
 });
 
 test('closing owner blocks admission even with all slots available', () => {
