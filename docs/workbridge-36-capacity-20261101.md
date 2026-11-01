@@ -38,20 +38,29 @@ After fresh diagnostics showed the old owner healthy, a complete inventory, zero
 
 ## Git and safety boundaries
 
-The existing dirty working tree contains numerous earlier user-owned edits, including files touched by this change. Keep those edits intact. Do not blanket-stage or claim a clean narrow source commit that would inadvertently include unrelated hunks.
+**Pre-adoption safety record:** At initial deployment the working tree contained earlier user-owned changes, including overlapping source and tests. They were not blanket-staged or discarded. The subsequent adoption used explicit selected paths and SHA-256 preconditions, with all prior commits and release receipts preserved.
 
-**Git reconciliation checkpoint (2026-11-01):** two narrow commits were completed on `main`:
+**Initial reconciliation checkpoint (before baseline adoption, 2026-11-01):** two narrow commits were completed on `main`:
 
 - `b1a451532197ed1ba8f2d6c4ff597437562d2c8a` — the read-only capacity alert classifier and its 17/17 passing tests, with formatting verified.
 - `e307d65d49d0e8feb9c34ba2a3c68f5674e93714` — this verified rollout and recovery record.
 
-A fresh status after these commits showed **29 modified tracked paths, 153 untracked entries, and no staged paths**. These belong to previous workstreams unless independently reviewed. The committed `HEAD:src/server.ts` still describes the older `0.6.0` architecture, while the deployed source is `0.16.4-dev`; the committed `HEAD:src/jobs.ts` does not yet expose `MAX_CONCURRENT_JOBS`, while the current file depends on additional uncommitted job-record modules. Thus committing only the new `36` constant or only the new coordination file would leave an incomplete, non-buildable Git baseline. The deployed sealed candidate and its SHA-256 manifest remain the exact-byte release evidence. A separate, audited reconciliation of the older runtime dependency stack is required before committing the remaining 36-slot runtime source without including unrelated work.
+**Historical pre-adoption state:** After the two narrow commits Git showed **29 modified tracked paths, 153 untracked entries, and no staged paths**. The then-committed `HEAD:src/server.ts` was still the older `0.6.0` implementation and `HEAD:src/jobs.ts` lacked `MAX_CONCURRENT_JOBS`, while the validated installed source was `0.16.4-dev`. A one-file 36-slot commit would have produced an incomplete source baseline; the audited whole-source adoption below resolved that mismatch without discarding historical commits.
+
+**Official 36-slot Git baseline adoption (2026-11-01):** The sealed candidate's manifest contains 3,165 entries (including generated `dist` and `node_modules`). Its 302 source, script, test, documentation, and root files were compared to the working tree by SHA-256. **301 matched exactly**; this handoff document had been updated and already committed after sealing, so the newer version was preserved. `AGENTS.md` was retained untouched. No working files were overwritten. Git's 100-path commit limit was respected by four SHA-guarded, dependency-grouped selected-file commits:
+
+- `9419b764a046d38c4404ff02386b1bfa97d4d846` — build, operations scripts, and root manifests.
+- `d0fe92e4c1aa5c681a35440c1ea171448e10a35f` — deployed runtime modules (36-slot capacity).
+- `e3194dac60685f301a3b04df961b4a27f01b1c18` — matching automated tests.
+- `be2dbd5da39a0347c82f544f20a063e5928f3901` — validated documentation.
+
+A fresh `git_status` immediately after these commits returned `## main` with **no modified, staged, or untracked paths**. The 0.16.4-dev/36-slot source is now the committed operational baseline; the older 0.6.0/0.16.3-era implementations and their history remain recoverable through Git. This was a source-history reconciliation only: **no forced stop, service restart, fresh deployment, or destructive cleanup**.
 
 An earlier WB-001 release collided with an unrelated RiftReader2 command admission. The first guarded rollout of the new admission-lock code was therefore conducted only after Joey approved an exclusive maintenance window, followed by a fresh complete idle diagnostic and the independent WB-001 updater. The now-running owner includes the updater/admission-lock synchronization; future deployments still require normal WB-001 guards. No client interruption was reported during this rollout.
 
 ## Remaining work
 
-1. Audit the interdependent pre-existing `0.6.0`→`0.16.4-dev` runtime/source/test delta against the validated release and partition it into explicitly selected, reviewable dependency groups. The 36-slot production bytes are deployed and sealed, but the runtime source stack is not yet fully represented by buildable commits on `main`. Do not blanket-stage the remaining dirty tree.
+1. **Completed:** Audited and committed the interdependent `0.6.0`→`0.16.4-dev` dependency stack into the four reviewable selected-file baseline commits above. `main` now describes the deployed 36-slot architecture; historical commits, failed releases and validation receipts remain intact.
 2. In a separately coordinated load window, optionally test **live** 36-job occupancy, 37th-job `JOB_LIMIT` rejection while all 36 are confirmed active, read-only diagnostics under saturation, and clean recovery. Only the isolated compiled-runtime 36-job stress test has passed so far.
 3. Test independent AI reasoning-worker sessions separately. Never equate command slots, browser tabs, coordination assignments and model inference; ChatGPT's six-worker-per-conversation observation is not a guaranteed provider limit.
 4. Revisit the separate two-chat rendezvous helper's stale-registration issue and disposable browser-session helper design without broadening Workbridge core.

@@ -1,8 +1,10 @@
 # Workbridge upgrade execution
 
-## Current checkpoint — 2026-10-21
+## Current checkpoint — 2026-11-01
 
-**WB-025 is complete as a CLI input-consistency milestone.** Observed request-file growth, rewrite or replacement is rejected before execution. Final full suites passed **509/509**, including 19 new cases also checked with production dependencies only. An existing cancellation-test readiness failure was reproduced and corrected; the original failed run is retained. The server remains **0.16.3-dev / WB-022**, with no rebuild, restart or deployment. See [verification](wb025-validation.md), [last runtime deployment](wb022-deployment.md), and [handoff](handoff-20261020.md).
+**Current deployed and committed baseline: Workbridge 0.16.4-dev / 36 command-job slots / 36 coordinated-worker assignments.** The sealed release passed nine WB-001 gates and 1,037 tests (zero failures; three skips). The healthy hosted instance and its capacity were independently verified, and the source, scripts, tests and documentation were reconciled into selected-file Git commits on `main`. The previous 0.16.3-dev/six-slot architecture is retired from active use, while Git and release history are retained. See [36-slot release and adoption evidence](workbridge-36-capacity-20261101.md). Browser-session helpers and tests of 36 independent AI reasoning workers remain separate future work.
+
+**Historical checkpoint — 2026-10-21:** WB-025 was complete as a CLI input-consistency milestone. Observed request-file growth, rewrite or replacement is rejected before execution. Final full suites passed **509/509**, including 19 new cases also checked with production dependencies only. An existing cancellation-test readiness failure was reproduced and corrected; the original failed run is retained. At that time the server remained **0.16.3-dev / WB-022**, with no rebuild, restart or deployment for WB-025. See [verification](wb025-validation.md), [last runtime deployment](wb022-deployment.md), and [handoff](handoff-20261020.md).
 
 The sections below retain earlier milestone history and separate local-PC work. Their historical versions are not the current deployment.
 
