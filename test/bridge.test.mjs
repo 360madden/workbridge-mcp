@@ -80,7 +80,7 @@ after(async () => {
 
 test('MCP initialize, discovery, and accurate read/write annotations', async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 33);
+  assert.equal(tools.length, 64);
   assert.ok(tools.find((t) => t.name === 'read_file').annotations.readOnlyHint);
   assert.equal(tools.find((t) => t.name === 'edit_file').annotations.readOnlyHint, false);
   assert.equal(tools.find((t) => t.name === 'command_run').annotations.openWorldHint, true);
@@ -102,6 +102,22 @@ test('literal source search, exclusions, UTF-16, and line reads over real stdio'
     [['Project with spaces/src/chain.ts', 2]],
   );
   assert.equal(result.data.truncated, false);
+  const globbed = await call('search_text', {
+    directory: 'Project with spaces',
+    query: 'resolvePointerChain',
+    glob: ['**'],
+  });
+  assert.deepEqual(
+    globbed.data.matches.map((m) => m.path),
+    ['Project with spaces/src/chain.ts'],
+  );
+  const generated = await call('search_text', {
+    directory: 'Project with spaces',
+    query: 'resolvePointerChain',
+    glob: ['**'],
+    includeGenerated: true,
+  });
+  assert.ok(generated.data.matches.some((m) => m.path === 'Project with spaces/node_modules/ignored.js'));
   const read = await call('read_file', { path: result.data.matches[0].path, startLine: 2, lineCount: 1 });
   assert.match(read.data.text, /^2: function resolvePointerChain/);
   assert.equal(read.data.nextLine, 3);

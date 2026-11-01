@@ -563,5 +563,6 @@ test('durable journals survive server restart and diagnostics remain usable', as
   assert.equal((await call('change_status', { operationId: 'edit-apply' })).state, 'applied');
   assert.equal((await call('command_status', { jobId: 'job-pass' })).status, 'passed');
   assert.ok((await call('change_list')).changes.length);
-  assert.equal((await call('diagnostics')).version, '0.6.0');
+  assert.equal((await call('diagnostics')).version, '0.16.4-dev');
+  assert.equal((await call('workspace_info')).limits.commandJobs, 36);
 });

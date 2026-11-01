@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { MAX_CONCURRENT_JOBS } from '../dist/jobs.js';
 
 let root, project, state, client, transport;
 const cwd = 'Project ü 空';
@@ -262,43 +263,93 @@ test(
   },
 );
 test('legacy output records remain readable without inventing separated streams', async () => {
-  await writeFile(
-    path.join(state, 'jobs/legacy.json'),
-    JSON.stringify({
-      id: 'legacy',
-      request: 'legacy',
-      project: cwd,
-      command: 'old',
-      status: 'passed',
-      startedAt: 'fixture',
-      exitCode: 0,
-      output: 'combined only',
-      outputTruncated: false,
-    }),
-  );
+  await run('legacy-source', 'process.stdout.write("combined only")');
+  assert.equal((await ended('legacy-source')).status, 'passed');
+  // Passed is published only after the final record is saved; no fixture timing workaround.
+  const legacy = JSON.parse(await readFile(path.join(state, 'jobs/legacy-source.json'), 'utf8'));
+  assert.equal(legacy.status, 'passed');
+  assert.equal(legacy.output, 'combined only');
+  // Preserve genuine request/date metadata; only remove fields absent from legacy records.
+  legacy.id = 'legacy';
+  for (const field of ['mode', 'executable', 'timeoutSeconds', 'stdout', 'stderr']) delete legacy[field];
+  await writeFile(path.join(state, 'jobs/legacy.json'), JSON.stringify(legacy));
   assert.equal((await call('command_output', { jobId: 'legacy' })).text, 'combined only');
   await call('command_output', { jobId: 'legacy', stream: 'stdout' }, 'OUTPUT_STREAM_UNAVAILABLE');
 });
-test('terminal jobs share the two-job capacity limit', async () => {
-  await run('capacity-one', 'setInterval(()=>{},1000)');
-  await run('capacity-two', 'setInterval(()=>{},1000)');
-  try {
-    await call(
-      'terminal_run',
-      { cwd, executable: process.execPath, args: ['--version'], requestId: 'capacity-third' },
-      'JOB_LIMIT',
-    );
-  } finally {
-    await call('command_cancel', { jobId: 'capacity-one' });
-    await call('command_cancel', { jobId: 'capacity-two' });
-  }
-  await call('terminal_run', {
+test('profile and terminal jobs share thirty-six slots, preserve replay, and reuse released capacity', async () => {
+  const code = 'console.log("capacity-ready");setInterval(()=>{},1000)';
+  assert.equal(MAX_CONCURRENT_JOBS, 36);
+  const ids = Array.from({ length: MAX_CONCURRENT_JOBS }, (_, index) => `capacity-${index + 1}`);
+  const admitted = [];
+  const profilesFile = path.join(state, 'commands.json');
+  const previousProfiles = await readFile(profilesFile).catch((error) => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  });
+  const terminalArgs = (requestId) => ({
+    cwd,
+    executable: process.execPath,
+    args: ['-e', code],
+    timeoutSeconds: 30,
+    requestId,
+  });
+  const profileArgs = (requestId) => ({ project: cwd, command: 'capacity', requestId });
+  const seventh = {
     cwd,
     executable: process.execPath,
     args: ['--version'],
-    requestId: 'capacity-third',
-  });
-  assert.equal((await ended('capacity-third')).status, 'passed');
+    timeoutSeconds: 30,
+    requestId: 'capacity-seventh',
+  };
+  await writeFile(
+    profilesFile,
+    JSON.stringify({
+      projects: {
+        [cwd]: {
+          capacity: { executable: process.execPath, args: ['-e', code], timeoutSeconds: 30 },
+        },
+      },
+    }),
+  );
+  try {
+    for (let index = 0; index < ids.length; index++) {
+      const id = ids[index];
+      const job =
+        index % 2 === 0
+          ? await call('terminal_run', terminalArgs(id))
+          : await call('command_run', profileArgs(id));
+      admitted.push(job);
+      assert.equal(job.status, 'running');
+    }
+    for (const id of ids) await outputUntil(id, (text) => text.includes('capacity-ready'));
+    assert.equal((await call('workspace_info')).limits.commandJobs, MAX_CONCURRENT_JOBS);
+    assert.equal((await call('diagnostics')).jobs.runningJobs, MAX_CONCURRENT_JOBS);
+    await call('terminal_run', seventh, 'JOB_LIMIT');
+    await call('command_run', profileArgs('capacity-profile-overflow'), 'JOB_LIMIT');
+
+    for (let index = 0; index < 2; index++) {
+      const replay =
+        index === 0
+          ? await call('terminal_run', terminalArgs(ids[index]))
+          : await call('command_run', profileArgs(ids[index]));
+      assert.equal(replay.id, admitted[index].id);
+      assert.equal(replay.startedAt, admitted[index].startedAt);
+      assert.equal(replay.status, 'running');
+    }
+    assert.equal((await call('diagnostics')).jobs.runningJobs, MAX_CONCURRENT_JOBS);
+
+    await call('command_cancel', { jobId: ids[0] });
+    assert.equal((await ended(ids[0])).status, 'cancelled');
+    assert.equal((await call('diagnostics')).jobs.runningJobs, MAX_CONCURRENT_JOBS - 1);
+    await call('terminal_run', seventh);
+    const completed = await ended(seventh.requestId);
+    assert.equal(completed.status, 'passed');
+    assert.equal(completed.exitCode, 0);
+  } finally {
+    for (const job of admitted) await call('command_cancel', { jobId: job.id });
+    if (previousProfiles) await writeFile(profilesFile, previousProfiles);
+    else await rm(profilesFile, { force: true });
+  }
 });
 test(
   'npm is callable without a shell and arbitrary Windows batch files require an explicit interpreter',

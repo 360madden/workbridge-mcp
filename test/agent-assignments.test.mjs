@@ -103,8 +103,8 @@ const finish = (id, worker, job) => ({
   ...dispatch(id, worker, job),
   receipt: { outcome: 'completed', testExitCodes: [0], artifacts: [] },
 });
-test('exposes five-worker durable coordination states rather than process claims', () => {
-  assert.equal(MAX_AGENT_WORKERS, 5);
+test('exposes thirty-six-worker durable coordination states rather than process claims', () => {
+  assert.equal(MAX_AGENT_WORKERS, 36);
   assert.deepEqual([...agentWorkerStatuses], ['idle', 'queued', 'review', 'blocked', 'running']);
 });
 test('queued assignment reports file ownership, sorted workers and independent snapshots', async () => {

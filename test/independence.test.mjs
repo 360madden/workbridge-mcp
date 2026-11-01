@@ -442,7 +442,12 @@ test(
     const installation = path.join(fixture, 'native receipt fixture');
     await mkdir(path.join(installation, 'scripts'), { recursive: true });
     await mkdir(path.join(installation, 'dist'));
-    for (const file of ['build-command-host.mjs', 'Command-Host.cs', 'Tunnel-ProcessLifetime.cs'])
+    for (const file of [
+      'build-command-host.mjs',
+      'Command-Host.cs',
+      'Tunnel-ProcessLifetime.cs',
+      'Local-Service-Descriptor.ps1',
+    ])
       await copyFile(path.join('scripts', file), path.join(installation, 'scripts', file));
     const build = () =>
       execFileSync(process.execPath, ['scripts/build-command-host.mjs'], {

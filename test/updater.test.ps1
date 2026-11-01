@@ -40,7 +40,7 @@ function New-WBCase([string]$Name, [scriptblock]$Code) {
     $stop = { $service.stops++ }.GetNewClosure()
     $start = { $service.starts++; if ($service.starts -le $service.failStarts) { throw 'Fixture startup failed.' } }.GetNewClosure()
     $probe = { param($version,$fresh); $service.probes++; if ($version -ceq $service.unhealthy) { return $false }; return ((Get-Content -LiteralPath (Join-Path $install 'dist\server.js') -Raw).Trim() -ceq ('runtime-' + $version)) }.GetNewClosure()
-    $arguments = @{InstallRoot=$install; OperationId='update-1'; ReleasePath=$release; StopService=$stop; StartService=$start; TestService=$probe}
+    $arguments = @{InstallRoot=$install; OperationId='update-1'; ReleasePath=$release; StopService=$stop; StartService=$start; TestService=$probe; CheckIdle={ return $true }}
     try {
         & $Code
         $results.Add([pscustomobject]@{name=$Name; passed=$true})
@@ -113,6 +113,25 @@ try {
         $service.unhealthy = '2.0.0'
         $result = Invoke-WBDeployment @arguments
         Assert-WB ($result.phase -eq 'failed_rolled_back') 'Bad readiness must roll back.'
+    }
+    New-WBCase 'busy-command-capacity-does-not-stop' {
+        $arguments.CheckIdle = { return $false }
+        $result = Invoke-WBDeployment @arguments
+        Assert-WB ($result.phase -eq 'preflight_failed' -and $service.stops -eq 0 -and $service.starts -eq 0) 'Busy command capacity must prevent stop and restart.'
+        Assert-WB ($result.error -like '*not verified idle*') 'Busy rejection must name the quiescence gate.'
+        Assert-WB (@($result.events | Where-Object { $_.phase -eq 'stopping' }).Count -eq 0) 'Busy preflight must never enter stopping phase.'
+    }
+    New-WBCase 'idle-diagnostic-error-does-not-stop' {
+        $arguments.CheckIdle = { throw 'Disposable fixture diagnostics unavailable' }
+        $result = Invoke-WBDeployment @arguments
+        Assert-WB ($result.phase -eq 'preflight_failed' -and $service.stops -eq 0) 'Unknown live command capacity must prevent stop.'
+        Assert-WB ($result.error -like '*diagnostics unavailable*') 'Diagnostic failure must be journaled.'
+    }
+    New-WBCase 'missing-quiescence-gate-does-not-stop' {
+        $arguments.Remove('CheckIdle')
+        $result = Invoke-WBDeployment @arguments
+        Assert-WB ($result.phase -eq 'preflight_failed' -and $service.stops -eq 0) 'Missing idle guard must prevent stop.'
+        Assert-WB ($result.error -like '*requires a live command-quiescence check*') 'Mandatory guard absence must be explicit.'
     }
     New-WBCase 'unhealthy-baseline-does-not-stop' {
         $service.unhealthy = '1.0.0'
@@ -306,7 +325,7 @@ for ($index=0; $index -lt 250; $index++) {
 param($Library,$Install,$Release)
 $ErrorActionPreference = 'Stop'
 . $Library
-Invoke-WBDeployment -InstallRoot $Install -ReleasePath $Release -OperationId update-1 -StopService {} -StartService { [Environment]::Exit(23) } -TestService { param($version,$fresh); $true }
+Invoke-WBDeployment -InstallRoot $Install -ReleasePath $Release -OperationId update-1 -StopService {} -StartService { [Environment]::Exit(23) } -TestService { param($version,$fresh); $true } -CheckIdle { $true }
 '@ | Set-Content -LiteralPath $crashScript -Encoding UTF8
         $shell = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
         & $shell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File $crashScript -Library (Join-Path $repo 'scripts\Workbridge-Update.ps1') -Install $install -Release $release
