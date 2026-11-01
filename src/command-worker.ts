@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { commandIdentity, serializeCommandResult } from './command-result.js';
 
 // An internal worker, not a public shell API. The Windows host keeps a Job
 // Object open around this worker and all command descendants. Exit on the
@@ -9,16 +10,21 @@ const input = JSON.parse(readFileSync(0, 'utf8')) as {
   executable: string;
   args: string[];
   resultFile: string;
+  jobId: string;
+  invocationId: string;
   timeoutSeconds: number;
   rootsFile?: string;
   rootsFingerprint?: string;
 };
+const identity = commandIdentity.parse(input);
 let finished = false;
 function finish(exitCode: number | null, errorCode?: string, timedOut = false) {
   if (finished) return;
   finished = true;
   try {
-    writeFileSync(input.resultFile, JSON.stringify({ exitCode, errorCode, timedOut }));
+    writeFileSync(input.resultFile, serializeCommandResult(identity, exitCode, errorCode, timedOut), {
+      flag: 'wx',
+    });
   } catch {
     console.error('Command result could not be recorded.');
     process.exit(126);

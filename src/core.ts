@@ -1,6 +1,7 @@
 export const limits = {
   editBytes: 16 * 1024 * 1024,
   outputChars: 60_000,
+  readFiles: 20,
   scanEntries: 20_000,
   scanMs: 20_000,
 };
@@ -25,12 +26,18 @@ export class BridgeError extends Error {
   constructor(
     public code: string,
     message: string,
+    public details?: Record<string, unknown>,
   ) {
     super(message);
   }
 }
 export function errorDetails(error: unknown) {
-  if (error instanceof BridgeError) return { code: error.code, message: error.message };
+  if (error instanceof BridgeError)
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.details ? { details: error.details } : {}),
+    };
   const code = (error as NodeJS.ErrnoException)?.code;
   if (code === 'ENOENT')
     return { code, message: 'Path does not exist. Discover/list directories to check the path.' };

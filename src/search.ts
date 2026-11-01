@@ -30,18 +30,17 @@ export async function search(workspace: Workspace, options: SearchOptions) {
     'default',
     '--regex-size-limit',
     '1M',
-    '--glob',
-    '!**/.git/**',
-    '--glob',
-    '!**/.workbridge-*.tmp',
   ];
   if (!options.regex) args.push('--fixed-strings');
   if (!options.caseSensitive) args.push('--ignore-case');
   if (options.includeIgnored) args.push('--no-ignore');
+  // Ripgrep resolves overlapping globs in argument order. Caller inclusions must
+  // never override protected metadata or the generated-folder policy.
+  for (const glob of options.glob ?? []) args.push('--glob', glob);
+  args.push('--glob', '!**/.git/**', '--glob', '!**/.workbridge-*.tmp');
   if (!options.includeGenerated)
     for (const directory of excludedDirectories.filter((x) => x !== '.git'))
       args.push('--glob', `!**/${directory}/**`);
-  for (const glob of options.glob ?? []) args.push('--glob', glob);
   args.push('--', options.query, '.');
   const child = spawn(rgPath, args, {
     cwd: root,
@@ -153,6 +152,6 @@ export async function search(workspace: Workspace, options: SearchOptions) {
     scanLimitReached: reason === 'time' || reason === 'output',
     nextOffset: reason === 'results' ? offset + matches.length : null,
     limitReason: reason,
-    note: 'Sorted live results, not a filesystem snapshot. Git ignore rules apply unless includeIgnored=true. Binary files, links and .git are excluded. A budget-limited search is incomplete; narrow it.',
+    note: 'Sorted live results, not a filesystem snapshot. Git ignore rules apply unless includeIgnored=true or an explicit positive glob overrides them (ripgrep semantics). Generated-folder exclusions remain enforced unless includeGenerated=true. Binary files, links and .git are excluded. A budget-limited search is incomplete; narrow it.',
   };
 }

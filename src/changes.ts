@@ -1,10 +1,38 @@
-import { mkdir, open, rename, unlink, link, readFile, readdir, rmdir, lstat, stat } from 'node:fs/promises';
+import { mkdir, open, rename, unlink, link, readdir, rmdir, lstat, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { createTwoFilesPatch } from 'diff';
 import type { Workspace } from './workspace.js';
 import { BridgeError, limits } from './core.js';
 import { decodeText, fileHash } from './text.js';
+import { z } from 'zod';
+import { historyJson, historyMatch, historyPage, type HistoryFilters } from './history.js';
+
+export const changeStates = ['prepared', 'applied', 'failed', 'undone'] as const;
+const historyRecord = z.object({
+  id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/),
+  type: z.enum(['write', 'mkdir', 'move', 'delete']),
+  path: z.string().min(1).max(4096),
+  destination: z.string().min(1).max(4096).optional(),
+  state: z.enum(changeStates),
+  beforeHash: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable(),
+  afterHash: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable(),
+  time: z.string().max(100),
+  error: z.string().max(1000).optional(),
+});
+const changeRecord = historyRecord
+  .extend({
+    request: z.string().regex(/^[a-f0-9]{64}$/),
+    before: z.string().max(107).nullable(),
+    directory: z.boolean(),
+  })
+  .strict();
 
 export const digest = (data: Buffer | string) => createHash('sha256').update(data).digest('hex');
 export async function atomicWrite(file: string, data: Buffer | string, exclusive = false) {
@@ -31,20 +59,7 @@ export class Serial {
     return result;
   }
 }
-type RecordData = {
-  id: string;
-  request: string;
-  type: 'write' | 'mkdir' | 'move' | 'delete';
-  path: string;
-  destination?: string;
-  before: string | null;
-  beforeHash: string | null;
-  afterHash: string | null;
-  directory: boolean;
-  state: 'prepared' | 'applied' | 'failed' | 'undone';
-  time: string;
-  error?: string;
-};
+type RecordData = z.infer<typeof changeRecord>;
 export function encodeText(text: string, original?: Buffer) {
   if (!original) return Buffer.from(text, 'utf8');
   const eol = decodeText(original).text.includes('\r\n')
@@ -99,14 +114,54 @@ export class Changes {
         'CORRUPT_BACKUP',
         'Backup metadata is invalid; the working file was not restored.',
       );
-    const bytes = await readFile(path.join(this.directory, record.before));
+    let bytes: Buffer;
+    try {
+      bytes = await this.bytes(path.join(this.directory, record.before));
+    } catch {
+      throw new BridgeError(
+        'CORRUPT_BACKUP',
+        'Backup must be an accessible regular file within the edit size limit; the working file was not restored.',
+      );
+    }
     if (digest(bytes) !== record.beforeHash)
       throw new BridgeError('CORRUPT_BACKUP', 'Backup checksum failed; the working file was not restored.');
     return bytes;
   }
+  private async readRecord(id: string): Promise<RecordData> {
+    const file = this.journal(id);
+    const directory = await lstat(this.directory);
+    if (!directory.isDirectory() || directory.isSymbolicLink())
+      throw new BridgeError('HISTORY_METADATA', 'The change catalog must be a regular directory.');
+    const parsed = changeRecord.safeParse(await historyJson(file));
+    if (!parsed.success)
+      throw new BridgeError('CORRUPT_CHANGE', 'Change journal is invalid. No project files were changed.');
+    const record = parsed.data;
+    const validDirectory =
+      record.directory &&
+      ['mkdir', 'delete'].includes(record.type) &&
+      record.before === null &&
+      record.beforeHash === null &&
+      record.afterHash === null;
+    const validFile =
+      !record.directory &&
+      (record.beforeHash === null ? record.before === null : record.before === `${id}.before`) &&
+      ((record.type === 'write' && record.afterHash !== null) ||
+        (record.type === 'delete' && record.beforeHash !== null && record.afterHash === null) ||
+        (record.type === 'move' && record.beforeHash !== null && record.beforeHash === record.afterHash));
+    if (
+      record.id !== id ||
+      (record.type === 'move') !== (record.destination !== undefined) ||
+      (!validDirectory && !validFile)
+    )
+      throw new BridgeError(
+        'CORRUPT_CHANGE',
+        'Change journal identity or recovery metadata is inconsistent. No project files were changed.',
+      );
+    return record;
+  }
   private async load(id: string): Promise<RecordData | null> {
     try {
-      return JSON.parse(await readFile(this.journal(id), 'utf8')) as RecordData;
+      return await this.readRecord(id);
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw e;
@@ -140,17 +195,24 @@ export class Changes {
   private async verify(target: string, hash: string | null) {
     try {
       await this.workspace.resolve(target);
-      if (hash === null || (await fileHash(target)) !== hash)
+      const actualHash = hash === null ? null : await fileHash(target);
+      if (hash === null || actualHash !== hash)
         throw new BridgeError(
           'CONFLICT',
           'File changed or destination exists. Reread it before changing anything.',
+          {
+            reason: hash === null ? 'destination_exists' : 'stale_hash',
+            expectedHash: hash,
+            actualHash,
+            nextAction: 'reread',
+          },
         );
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT' && hash === null) return;
       throw e;
     }
   }
-  private summary(r: RecordData) {
+  private summary(r: z.infer<typeof historyRecord>) {
     return {
       operationId: r.id,
       type: r.type,
@@ -252,7 +314,7 @@ export class Changes {
         let content = input.content ?? decodeText(before!).text;
         if (input.edits) {
           const eol = content.includes('\r\n') ? '\r\n' : content.includes('\r') ? '\r' : '\n';
-          for (const edit of input.edits) {
+          for (const [editIndex, edit] of input.edits.entries()) {
             const oldText = edit.oldText.replace(/\r\n|\r|\n/g, eol),
               newText = edit.newText.replace(/\r\n|\r|\n/g, eol);
             if (!oldText) throw new BridgeError('INVALID_EDIT', 'oldText must not be empty.');
@@ -267,6 +329,14 @@ export class Changes {
               throw new BridgeError(
                 'EDIT_MISMATCH',
                 `Expected ${edit.occurrences} exact occurrences; found ${count}. Reread and narrow the edit.`,
+                {
+                  reason: count === 0 ? 'missing_text' : 'occurrence_mismatch',
+                  editIndex,
+                  expectedOccurrences: edit.occurrences,
+                  observedOccurrences: count,
+                  countExact: count <= edit.occurrences,
+                  nextAction: 'reread_and_narrow_edit',
+                },
               );
             if (content.length + count * (newText.length - oldText.length) > limits.editBytes)
               throw new BridgeError('EDIT_LIMIT', 'The edit would expand beyond the editable limit.');
@@ -418,16 +488,21 @@ export class Changes {
       },
     );
   }
-  async list(offset = 0, limit = 20) {
-    await mkdir(this.directory, { recursive: true });
-    const files = (await readdir(this.directory)).filter((x) => /^[A-Za-z0-9_-]+\.json$/.test(x));
-    const records: (RecordData | null)[] = [];
-    for (const name of files) records.push(await this.load(name.slice(0, -5)));
-    const sorted = records.filter((x): x is RecordData => !!x).sort((a, b) => b.time.localeCompare(a.time));
-    return {
-      changes: sorted.slice(offset, offset + limit).map((r) => this.summary(r)),
-      nextOffset: offset + limit < sorted.length ? offset + limit : null,
-    };
+  async list(offset = 0, limit = 20, filters: HistoryFilters = {}) {
+    const matches = await historyMatch(this.workspace, filters);
+    const { items, ...page } = await historyPage({
+      directory: this.directory,
+      directories: false,
+      offset,
+      limit,
+      scanLimit: filters.scanLimit,
+      load: async (id) => {
+        const record = await this.readRecord(id);
+        const paths = [record.path, ...(record.destination ? [record.destination] : [])];
+        return (await matches(paths, record.state)) ? this.summary(record) : null;
+      },
+    });
+    return { ...page, changes: items };
   }
   async status(id: string) {
     const record = await this.load(id);

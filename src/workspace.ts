@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { readPage, fileHash } from './text.js';
 import { search } from './search.js';
 import { readRoots } from './roots-config.js';
-import { BridgeError, limits, excludedDirectories } from './core.js';
+import { BridgeError, limits, excludedDirectories, errorDetails } from './core.js';
 export { BridgeError, limits, excludedDirectories, errorDetails } from './core.js';
 
 const execute = promisify(execFile);
@@ -62,6 +62,24 @@ export class Workspace {
   }
 
   async resolve(input = '.') {
+    return this.resolvePath(input, false);
+  }
+
+  /** Read-only identity for historical paths, including missing parents. Never use for writes. */
+  async historyPath(input: string, directory = false) {
+    const target = await this.resolvePath(input, true);
+    if (directory) {
+      try {
+        if (!(await lstat(target)).isDirectory())
+          throw new BridgeError('NOT_DIRECTORY', 'Expected a directory path.');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
+    return target;
+  }
+
+  private async resolvePath(input: string, allowMissing: boolean) {
     await this.ensureConfiguration();
     // Reject Windows alternate streams/device names, including on non-Windows test hosts.
     const absolute = path.resolve(this.root, input);
@@ -74,6 +92,10 @@ export class Workspace {
     if (!root) throw new BridgeError('OUTSIDE_ROOT', 'Path must stay inside a configured workspace root.');
     const relative = path.relative(root, absolute);
     let current = root;
+    let existing = root;
+    let missing = false;
+    if (allowMissing && (await lstat(root)).isSymbolicLink())
+      throw new BridgeError('LINK_NOT_ALLOWED', 'The configured root cannot be a link.');
     for (const part of relative.split(path.sep).filter(Boolean)) {
       if (
         part.includes(':') ||
@@ -88,13 +110,21 @@ export class Workspace {
       if (part.toLowerCase() === '.git')
         throw new BridgeError('GIT_INTERNAL', 'Use the Git tools instead of reading .git internals.');
       current = path.join(current, part);
-      if ((await lstat(current)).isSymbolicLink())
-        throw new BridgeError(
-          'LINK_NOT_ALLOWED',
-          'Symlinks and directory junctions are not followed. Use the real path inside an allowed root.',
-        );
+      if (!missing) {
+        try {
+          if ((await lstat(current)).isSymbolicLink())
+            throw new BridgeError(
+              'LINK_NOT_ALLOWED',
+              'Symlinks and directory junctions are not followed. Use the real path inside an allowed root.',
+            );
+          existing = current;
+        } catch (error) {
+          if (!allowMissing || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          missing = true;
+        }
+      }
     }
-    if (!inside(root, await realpath(absolute)))
+    if (!inside(root, await realpath(missing ? existing : absolute)))
       throw new BridgeError('OUTSIDE_ROOT', 'Resolved path leaves the workspace.');
     return absolute;
   }
@@ -296,6 +326,79 @@ export class Workspace {
   async read(file: string, startLine = 1, lineCount = 200, cursor?: string) {
     const target = await this.resolve(file);
     return readPage(target, this.relative(target), startLine, lineCount, cursor);
+  }
+
+  async readFiles(
+    files: { path: string; startLine?: number; lineCount?: number; cursor?: string }[],
+    offset = 0,
+  ) {
+    if (files.length < 1 || files.length > limits.readFiles)
+      throw new BridgeError('READ_BATCH_LIMIT', `Request 1-${limits.readFiles} files.`);
+    if (!Number.isInteger(offset) || offset < 0 || offset > files.length)
+      throw new BridgeError(
+        'INVALID_OFFSET',
+        'Offset must identify a request index or the end of this batch.',
+      );
+    type Item = { index: number; path: string } & (
+      | { ok: true; result: Awaited<ReturnType<Workspace['read']>> }
+      | { ok: false; error: ReturnType<typeof errorDetails> }
+    );
+    let result = {
+      results: [] as Item[],
+      nextOffset: offset < files.length ? offset : null,
+      hasErrors: false,
+      outputLimitReached: false,
+      timeLimitReached: false,
+    };
+    const deadline = Date.now() + limits.scanMs;
+    for (let index = offset; index < files.length; index++) {
+      // Each read retains its own scan limit; the batch deadline is checked between files.
+      if (Date.now() >= deadline) {
+        result.timeLimitReached = true;
+        break;
+      }
+      const request = files[index]!;
+      let item: Item;
+      try {
+        item = {
+          index,
+          path: request.path,
+          ok: true,
+          result: await this.read(request.path, request.startLine, request.lineCount, request.cursor),
+        };
+      } catch (error) {
+        item = { index, path: request.path, ok: false, error: errorDetails(error) };
+      }
+      const nextOffset = index + 1 < files.length ? index + 1 : null;
+      // A page too large even on its own must not produce an endless batch continuation.
+      if (JSON.stringify({ ...result, results: [item], nextOffset }).length > limits.outputChars) {
+        item = {
+          index,
+          path: request.path,
+          ok: false,
+          error: errorDetails(
+            new BridgeError(
+              'BATCH_ITEM_LIMIT',
+              'This file page exceeds the batch response limit. Use read_file or a smaller lineCount.',
+              { nextAction: 'read_file' },
+            ),
+          ),
+        };
+        result.outputLimitReached = true;
+      }
+      const candidate = {
+        ...result,
+        results: [...result.results, item],
+        nextOffset,
+        hasErrors: result.hasErrors || !item.ok,
+      };
+      if (JSON.stringify(candidate).length > limits.outputChars) {
+        result.outputLimitReached = true;
+        break;
+      }
+      result = candidate;
+    }
+    return result;
   }
 
   async search(
