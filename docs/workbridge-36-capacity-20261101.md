@@ -40,11 +40,18 @@ After fresh diagnostics showed the old owner healthy, a complete inventory, zero
 
 The existing dirty working tree contains numerous earlier user-owned edits, including files touched by this change. Keep those edits intact. Do not blanket-stage or claim a clean narrow source commit that would inadvertently include unrelated hunks.
 
+**Git reconciliation checkpoint (2026-11-01):** two narrow commits were completed on `main`:
+
+- `b1a451532197ed1ba8f2d6c4ff597437562d2c8a` — the read-only capacity alert classifier and its 17/17 passing tests, with formatting verified.
+- `e307d65d49d0e8feb9c34ba2a3c68f5674e93714` — this verified rollout and recovery record.
+
+A fresh status after these commits showed **29 modified tracked paths, 153 untracked entries, and no staged paths**. These belong to previous workstreams unless independently reviewed. The committed `HEAD:src/server.ts` still describes the older `0.6.0` architecture, while the deployed source is `0.16.4-dev`; the committed `HEAD:src/jobs.ts` does not yet expose `MAX_CONCURRENT_JOBS`, while the current file depends on additional uncommitted job-record modules. Thus committing only the new `36` constant or only the new coordination file would leave an incomplete, non-buildable Git baseline. The deployed sealed candidate and its SHA-256 manifest remain the exact-byte release evidence. A separate, audited reconciliation of the older runtime dependency stack is required before committing the remaining 36-slot runtime source without including unrelated work.
+
 An earlier WB-001 release collided with an unrelated RiftReader2 command admission. The first guarded rollout of the new admission-lock code was therefore conducted only after Joey approved an exclusive maintenance window, followed by a fresh complete idle diagnostic and the independent WB-001 updater. The now-running owner includes the updater/admission-lock synchronization; future deployments still require normal WB-001 guards. No client interruption was reported during this rollout.
 
 ## Remaining work
 
-1. Reconcile the pre-existing shared-runtime dirty worktree without staging unrelated hunks, and make a coherent reviewable source commit for this change. The deployed sealed release is already retained independently; a Git commit is not yet complete.
+1. Audit the interdependent pre-existing `0.6.0`→`0.16.4-dev` runtime/source/test delta against the validated release and partition it into explicitly selected, reviewable dependency groups. The 36-slot production bytes are deployed and sealed, but the runtime source stack is not yet fully represented by buildable commits on `main`. Do not blanket-stage the remaining dirty tree.
 2. In a separately coordinated load window, optionally test **live** 36-job occupancy, 37th-job `JOB_LIMIT` rejection while all 36 are confirmed active, read-only diagnostics under saturation, and clean recovery. Only the isolated compiled-runtime 36-job stress test has passed so far.
 3. Test independent AI reasoning-worker sessions separately. Never equate command slots, browser tabs, coordination assignments and model inference; ChatGPT's six-worker-per-conversation observation is not a guaranteed provider limit.
 4. Revisit the separate two-chat rendezvous helper's stale-registration issue and disposable browser-session helper design without broadening Workbridge core.
