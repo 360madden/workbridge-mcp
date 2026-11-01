@@ -73,6 +73,30 @@ The columns are **enclosing observed tool-call timestamps**, not measured start/
 
 **Checkpoint:** Session A six-worker participation **passed**. Session B six-worker evidence **pending**. Twelve-way simultaneous AI inference **not yet verified**, regardless of reported A-side activity or tool-call overlaps. On receipt of B7-B12 evidence, calculate per-session identity and actual timing overlap, and do not call an inference overlap proven by tool timestamps alone.
 
+## Session B report and twelve-worker comparison (2026-11-01 UTC)
+
+Joey subsequently pasted a full Coordinator B report from the separately opened ChatGPT conversation. This is **user-supplied second-conversation evidence**, not an independently inspected B tab: the browser host continued to deny control of that tab. B reported six independent reasoning workers B7-B12, **34/34 successful direct read-only Workbridge calls**, six distinct bounded reviews, no terminal jobs/writes/deployments, and live service instance `6b9008e9-990b-4078-a6fd-6fc0214b24bd`.
+
+| B worker | Read-only call family | Successes | First observed (UTC) | Last observed (UTC) |
+| -------- | --------------------- | --------: | -------------------- | ------------------- |
+| B7       | `workspace_info`      |       6/6 | 07:53:30.342         | 07:55:59.403        |
+| B8       | `diagnostics`         |       5/5 | 07:53:37.961         | 07:55:40.815        |
+| B9       | `discover_projects`   |       6/6 | 07:53:42.671         | 07:56:21.449        |
+| B10      | `command_list`        |       6/6 | 07:53:50.083         | 07:56:20.819        |
+| B11      | `agent_list`          |       6/6 | 07:53:54.176         | 07:56:12.414        |
+| B12      | `commands_list`       |       5/5 | 07:54:02.791         | 07:56:28.127        |
+
+From the enclosing first/last-successful-tool-call intervals (not measured inference lifetimes):
+
+- A-side six-way common observation window: **07:53:04.857–07:53:04.975Z**, **0.118 seconds**. This is only intersection of _envelopes_; it does not establish six simultaneously outstanding requests.
+- B-side six-way common observation window: **07:54:02.791–07:55:40.815Z**, **98.024 seconds**. B separately reported three outstanding MCP requests overlapping for **2.274 seconds**, not six concurrent backend executions.
+- All-twelve common interval: latest start **07:54:02.791Z** (B12), earliest end **07:53:04.975Z** (A1); **no intersection, 0 seconds**. Raw end-minus-start is **-57.816 seconds**.
+- Even the _last_ recorded A activity (A4 ended **07:53:17.262Z**) preceded the _first_ recorded B activity (B7 started **07:53:30.342Z**) by **13.080 seconds**.
+
+**Verdict:** Each conversation separately demonstrated six active reasoning workers with live Workbridge calls, per the available A receipts and user-supplied B report. The recorded activity spans **do not overlap across conversations**. Therefore the operational gate for twelve simultaneous reasoning agents **remains open**; neither independent model-token-generation overlap nor even cross-conversation tool-window overlap was measured. A second, deliberately synchronized 6+6 run is required.
+
+Separately, the coordinator later stress-tested **all twelve Workbridge command slots**, with 15.552 seconds of actual twelve-process overlap and clean recovery, as recorded in [the mixed-load saturation report](workbridge-mixed-saturation-20261101.md). That command-pool test began **after** B's last recorded tool call, and those jobs were not dispatched by twelve independent reasoning workers; it cannot close the AI concurrency gate.
+
 ## Acceptance / falsification criteria
 
 **Pass:** Twelve distinct reasoning-worker sessions from the two conversations demonstrably run over an overlapping real-time window, each gives a traceable direct Workbridge response, and both coordinators record the evidence. Record what measures inference overlap separately from Workbridge tool overlap.
