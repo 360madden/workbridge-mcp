@@ -1,6 +1,6 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
-Status: implementation in progress, October 24, 2026. This is a new feature lane, not an authorization to restart or replace the deployed Workbridge owner.
+Status: GUI-006 source/private-MCP integration completed October 26, 2026; 0.16.4-dev candidate passed seven release checks but **has not been deployed**. The first independent updater activation was safely refused at preflight; live owner remains 0.16.3-dev / 52 tools. See [the full GUI-006 evidence and recovery blocker](gui006-desktop-vmware-2026-10-26.md). Existing instructions prohibit force-restarting the deployed owner or bypassing its healthy-installation check.
 
 Standing autonomous blocker policy: `docs/autonomous-investigation-policy.md` (also referenced by repository `AGENTS.md`). After a failed adapter, investigate supported alternatives and keep making scoped, evidence-backed progress; escalate only irreducible credential or material-action dependencies.
 
@@ -113,6 +113,8 @@ Observed on October 24, 2026:
 - This proves a bounded **host-window guest-image capture path**, not `vmrun captureScreen` authorization, guest receiver health, VMware guest autologin or in-game input delivery. The native VMware capture route remains independently password-gated by encrypted-VM metadata.
 
 ### Next independent gates
+
+GUI-006 read-only MCP metadata and screenshot-image transport are implemented and tested with an actual VMware host frame (1215×878), four additional tools and a separate private server. The candidate full source suite passed 600/601 with one expected skip; the sealed WB-001 candidate passed seven gates. **Its activation was blocked before deployment** by a disk/runtime version mismatch after building in the live source checkout. Resolve the on-disk baseline/rollback identity under WB-001 with preserved backups before another deployment attempt. Production general-purpose keyboard/mouse actions are still outside this milestone.
 
 1. Inspect the existing RiftReader2 receiver/service wiring, guest health, logs, and reachable ports _read-only_, without changing credentials or VM power. Confirm whether control-plane failures originate from host↔guest transport, session/focus, process mismatch, or test design.
 2. Validate screenshot freshness and guest receiver telemetry together before any bounded game input. Add recoverable explicit state restoration/reconciliation for an interrupted host-capture intent using fresh identity and independent receipt verification.

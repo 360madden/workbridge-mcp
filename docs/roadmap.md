@@ -1,6 +1,38 @@
 # Workbridge upgrade execution
 
-Current runtime: **0.6.0**, 33 tools, with `C:\work` as the stable primary root and `C:\rift modding` as an additional root. **WB-004 is implemented, deployed, and tested.** Operators can register unrelated folders without rebuilding; discovery distinguishes nested repositories/worktrees and plain folders; project overviews expose scoped instruction evidence; generic acceptance has no real-project dependency.
+## Current checkpoint — 2026-10-21
+
+**WB-025 is complete as a CLI input-consistency milestone.** Observed request-file growth, rewrite or replacement is rejected before execution. Final full suites passed **509/509**, including 19 new cases also checked with production dependencies only. An existing cancellation-test readiness failure was reproduced and corrected; the original failed run is retained. The server remains **0.16.3-dev / WB-022**, with no rebuild, restart or deployment. See [verification](wb025-validation.md), [last runtime deployment](wb022-deployment.md), and [handoff](handoff-20261020.md).
+
+The sections below retain earlier milestone history and separate local-PC work. Their historical versions are not the current deployment.
+
+The useful-helper phase adds a normal-user PC health recorder and a fixed,
+UAC-approved Windows component-store diagnostic. See the
+[PC health and Windows scan roadmap](pc-health-and-windows-scan.md) for operation,
+report storage, validation, and removal commands.
+
+Administrator report cleanup, manual recorder restart rehearsal, and the real
+[sign-in recovery test](pc-health-recovery-and-cleanup.md) have passed. After the
+approved sign-out, read-only verification confirmed a new Windows logon and a fresh
+normal-user recorder instance without manual Start. No restart or sign-out is
+automatic.
+
+The [full reboot recovery test](pc-health-full-reboot-test.md) also passed after an
+explicitly approved orderly restart. Verification confirmed a new boot and logon,
+a new normal-user recorder instance with advancing samples, both tasks running,
+and a successful live Workbridge read without manual helper/bridge Start.
+Unexpected-power-loss and operation before Windows sign-in remain untested.
+
+The next local-PC phase is implemented as a prototype in
+[administrator/UAC and persistent helpers](admin-and-persistent-helpers.md),
+with native user-task lifecycle control and a separate locally approved UAC diagnostic.
+
+For the October 18 local-PC capability investigation and phased helper-app,
+installation, configuration, and ordinary ChatGPT acceptance plan, see
+[local PC roadmap](local-pc-roadmap.md). The existing 0.6.0 command tools passed
+the connected PowerShell/.NET 10 helper proof without a runtime upgrade.
+
+Historical WB-004 runtime: **0.6.1**, 33 tools and six shared command slots, with `C:\work` as the stable primary root and `C:\rift modding` as an additional root. **WB-004 is implemented, deployed, and tested.** Operators can register unrelated folders without rebuilding; discovery distinguishes nested repositories/worktrees and plain folders; project overviews expose scoped instruction evidence; generic acceptance has no real-project dependency.
 
 Acceptance passed 80 integration tests, 21 updater cases, Windows startup/restart checks, generic fixtures, full MCP self-build, real scheduled-controller installation/automatic recovery/manual rollback, and fresh hosted failure → guarded fix → pass/undo in an arbitrary temporary root. Original configuration bytes and credentials were preserved; the temporary root was removed and denied afterward. Both real RiftReader repositories and VMware were untouched. See [validation evidence](validation.md) and [root management](workspace-roots.md). WB-003 remains separate; RiftReader comparison/stabilization follows as separate work.
 

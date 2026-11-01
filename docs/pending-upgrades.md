@@ -2,9 +2,22 @@
 
 This document collects **proposed** upgrades for future consideration. Entries are ideas, not approval to implement or deploy them. Add further proposals as numbered entries.
 
-_Last updated: 2026-10-18_
+_Last updated: 2026-10-21_
 
-**Current status:** WB-004 is complete at 0.6.0 with local, recovery, and hosted acceptance. Both real RiftReader repositories remain untouched. Their comparison and stabilization are separate follow-up work. WB-003 remains a separate proposal.
+**Latest deployment:** 0.16.3-dev / WB-022 guards initial final-result saving and verifies stored bytes before releasing output. All 473 installed tests, 20 new production-only cases, seven release gates and normal browser/shared-CLI acceptance passed. See [deployment evidence](wb022-deployment.md).
+
+**Historical status (2026-10-18):** WB-004 is complete at 0.6.0 with local, recovery, and hosted acceptance. Both real RiftReader repositories remained untouched by that milestone. Their comparison and stabilization were separate follow-up work. WB-003 remains a separate proposal.
+
+## WB-005 — Impact-first improvements for AI-driven workflows
+
+**Status:** AI-001 through AI-011 are retained in deployed 0.16.3-dev. Fresh browser/CLI tool acceptance passed; final-response rendering remains intermittent. Project/path/recorded-state history filtering is complete.\
+**Priority:** Complete AI editing workflows, reliable recovery, and practical benefit; effort determines sequencing rather than eligibility\
+**Plan:** [Impact priorities, implementation sequence, and acceptance criteria](ai-workflow-improvements.md)\
+**Requirement:** [CLI-001](cli-requirements.md)
+
+Completed capabilities include paged job discovery, output tails, structured exact-edit errors, [named RRE validation profiles](rre-validation-profiles.md), [bounded multi-file reads](multi-file-reads.md), shared service/CLI access, recoverable multi-file edits, [resumable validation](resumable-workflows.md), [task context](task-context.md), and [structured configuration editing](structured-config-edits.md). See [WB-010 verification](wb010-validation.md) and [deployment acceptance](wb010-deployment.md). [Filtered change/patch history](filtered-history.md) is deployed in 0.12.0-dev; see [WB-011 verification](wb011-validation.md) and [deployment acceptance](wb011-deployment.md).
+
+AI-008 [recoverable multi-file patches](multi-file-patches.md) are deployed in 0.8.0-dev with CLI/MCP parity, combined diffs, conflict preflight, explicit resume, and guarded undo. [WB-007 verification](wb007-validation.md) records all seven passing release checks; [deployment acceptance](wb007-deployment.md) records the subsequent browser/CLI results. AI-009 is deployed in 0.9.0-dev; see [WB-008 verification](wb008-validation.md) and [deployment acceptance](wb008-deployment.md).
 
 ## Joint implementation plan — WB-001, WB-002, WB-003
 

@@ -1,0 +1,20 @@
+{
+  "projects": {
+    "C:/work/rre": {
+      "roadmap_validate": {
+        "executable": "C:/Program Files/nodejs/node.exe",
+        "args": ["tools/validate-roadmap.mjs"],
+        "timeoutSeconds": 30
+      },
+      "review_adapter_test": {
+        "executable": "C:/Program Files/nodejs/node.exe",
+        "args": [
+          "--test",
+          "--test-reporter=tap",
+          "tools/agents/validation/test_agent_review_runner.mjs"
+        ],
+        "timeoutSeconds": 60
+      }
+    }
+  }
+}
