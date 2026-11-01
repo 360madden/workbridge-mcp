@@ -1,6 +1,6 @@
 {
   "name": "workbridge-mcp",
-  "version": "0.6.0",
+  "version": "0.16.4-dev",
   "private": true,
   "description": "Small Windows coding bridge for browser ChatGPT via Secure MCP Tunnel",
   "type": "module",
@@ -8,6 +8,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "cli": "node scripts/workbridge-cli.mjs",
     "build": "tsc && node scripts/build-command-host.mjs",
     "start": "node dist/server.js",
     "test": "npm run build && node --test test/*.test.mjs",
@@ -22,13 +23,15 @@
     "acceptance:snapshot": "npm run build && node scripts/snapshot-acceptance.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/client": "2.3.1",
+    "@modelcontextprotocol/node": "2.1.1",
     "@modelcontextprotocol/server": "2.3.1",
     "@vscode/ripgrep": "1.18.0",
     "diff": "9.0.0",
+    "jsonc-parser": "3.3.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "2.3.1",
     "@types/node": "26.6.5",
     "prettier": "3.9.10",
     "typescript": "7.0.2"

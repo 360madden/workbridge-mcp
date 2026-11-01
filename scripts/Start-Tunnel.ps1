@@ -11,12 +11,15 @@ if (!(Test-Path -LiteralPath $Root -PathType Container)) { throw "Workspace dire
 $tunnel = (Get-Content -LiteralPath $pointer -Raw).Trim()
 $previousRoot = $env:WORKBRIDGE_ROOT
 $previousKey = $env:CONTROL_PLANE_API_KEY
+$previousLocalCli = $env:WORKBRIDGE_LOCAL_CLI
 $healthFile = Join-Path $repo '.local\health-url.txt'
 $runLock = $null
 try {
     try { $runLock = [IO.File]::Open((Join-Path $repo '.local\tunnel.lock'), 'OpenOrCreate', 'ReadWrite', 'None') }
     catch { throw 'Another Workbridge launcher is already running, or its lock file is inaccessible.' }
     $env:WORKBRIDGE_ROOT = (Resolve-Path -LiteralPath $Root).Path
+    # The stdio child remains the owner; local CLI clients attach to its authenticated endpoint.
+    $env:WORKBRIDGE_LOCAL_CLI = '1'
     if (!$env:CONTROL_PLANE_API_KEY) {
         $secret = Read-TunnelCredential -CredentialPath $CredentialPath
         if (!$secret -and $NonInteractive) { throw 'No saved Workbridge runtime key. Run Save-TunnelCredential.ps1 once.' }
@@ -37,5 +40,6 @@ try {
 } finally {
     $env:WORKBRIDGE_ROOT = $previousRoot
     $env:CONTROL_PLANE_API_KEY = $previousKey
+    $env:WORKBRIDGE_LOCAL_CLI = $previousLocalCli
     if ($runLock) { $runLock.Dispose() }
 }

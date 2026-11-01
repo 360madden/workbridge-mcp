@@ -1,6 +1,16 @@
 # Workbridge MCP
 
-Inspect and edit local coding projects from **browser ChatGPT**, through OpenAI Secure MCP Tunnel. Default root: `C:\work`. Version **0.6.0** adds operator-managed roots, bounded nested repository discovery, scoped project context, and self-contained acceptance alongside developer commands, recoverable edits, Git inspection, and saved snapshots. See [multiple roots](docs/workspace-roots.md) for `C:\work` plus `C:\rift modding` access.
+**GUI-006 desktop/VMware tools (October 26): 0.16.4-dev sealed but NOT deployed.** Five Codex workers implemented four scoped MCP tools (window discovery, UIA inspection, PNG capture, VMware host capture). A private MCP accepted a real 1215×878 VMware PNG with verified bytes and window-state restoration; source tests and all seven WB-001 release gates passed. The independent updater refused its initial preflight before replacing the live runtime because the on-disk rebuilt candidate (0.16.4) did not match the still-running service (0.16.3). The live tunnel remains healthy on **0.16.3-dev / 52 tools**. Do not force-restart or bypass the updater; see [GUI-006 evidence, sealed release and activation blocker](docs/gui006-desktop-vmware-2026-10-26.md).
+
+**Deployed and verified: 0.16.3-dev, 2026-10-21.** WB-022 checks original job-record bytes before initial final-result publication and verifies the saved bytes before releasing owned output. The same guard serves explicit recovery. Observed conflicts retain the original result instead of overwriting evidence or rerunning a command. [Deployment evidence](docs/wb022-deployment.md) records 473 installed tests, 20 production-only cases and normal browser/shared-CLI acceptance. There are still 52 tools. See [publication semantics and limits](docs/job-publication.md).
+
+The existing [multi-file reads](docs/multi-file-reads.md), job discovery, output tails, structured edit errors, [RRE validation profiles](docs/rre-validation-profiles.md), recoverable multi-file patches, [resumable validation/review](docs/resumable-workflows.md), and [task context](docs/task-context.md) remain available. See [release verification](docs/wb022-validation.md) and the [impact-first roadmap](docs/ai-workflow-improvements.md).
+
+**Current checkpoint: WB-025 complete (CLI-only).** The CLI rejects observed request-file changes before connection or execution, preserving its existing bounds and Unicode handling. Final isolated/main suites passed 509/509; an existing cancellation-test readiness issue found during validation was also corrected without changing the runtime. The server remains **0.16.3-dev / WB-022**. See [WB-025 verification](docs/wb025-validation.md) and [handoff](docs/handoff-20261020.md).
+
+Single-file history now uses ascending operation IDs, matching patch discovery; restart old pagination at offset 0. Existing summaries, durable IDs, journal formats, and guarded recovery remain available. See the [history contract](docs/filtered-history.md) and [release verification](docs/wb011-validation.md).
+
+Inspect and edit local coding projects from **browser ChatGPT**, through OpenAI Secure MCP Tunnel. Default root: `C:\work`. The deployed service provides six shared command-job slots alongside operator-managed roots, bounded nested repository discovery, scoped project context, recoverable edits, Git inspection, and saved snapshots. `workspace_info.limits.commandJobs` reports the active command capacity; the ChatGPT/Codex runtime configures AI subagent capacity separately. See [multiple roots](docs/workspace-roots.md) for `C:\work` plus `C:\rift modding` access.
 
 ```text
 Browser ChatGPT → OpenAI Secure MCP Tunnel ← outbound tunnel-client
@@ -10,9 +20,9 @@ Browser ChatGPT → OpenAI Secure MCP Tunnel ← outbound tunnel-client
                                                 C:\work
 ```
 
-One small TypeScript server and the official tunnel client. No Supergateway, public listener, custom HTTP layer, database, Docker, or model API integration is needed. `tunnel-client` owns the server child process. The tunnel needs its own runtime API key and account permissions; the MCP server itself needs no key.
+One TypeScript server and the official tunnel client. No Supergateway, public listener, database, Docker, or model API integration is needed. `tunnel-client` owns the server child process. The deployed shared-service CLI uses an authenticated loopback endpoint with the official MCP HTTP adapter; browser access retains the existing stdio tunnel. The tunnel needs its own runtime API key and account permissions. Local CLI credentials are generated per service start and protected with Windows DPAPI.
 
-This installation is active at **0.6.0**, with **33 tools** and two allowed roots: **`C:\work`** (default) and **`C:\rift modding`**. Windows sign-in startup and **Allow all actions for Workbridge** are preserved. WB-004 generic and hosted acceptance passed using disposable unrelated projects; both existing roots were preserved and neither real RiftReader repository was modified. See [hosted validation evidence](docs/validation.md).
+The deployed installation is **0.16.3-dev**, with **52 tools** and two allowed roots: **`C:\work`** (default) and **`C:\rift modding`**. Windows sign-in startup and the existing Workbridge permissions are preserved. Acceptance used disposable projects; neither real RiftReader repository was modified. See [current deployment evidence](docs/wb022-deployment.md) and [historical hosted validation](docs/validation.md).
 
 ## Windows setup
 
@@ -163,30 +173,36 @@ With the tunnel running:
 
    > Use Workbridge. Show the configured roots, discover projects in my chosen folder, inspect its README and source, and report the relevant file paths and line numbers.
 
-Version 0.6.0 advertises **33 tools**. A local test or a ready health endpoint alone does not prove hosted retrieval. See [validation evidence](docs/validation.md).
+The deployed 0.12.0-dev service advertises **51 tools**, including seven patch operations, six workflow operations, task context, and two structured configuration operations. A local test or a ready health endpoint alone does not prove hosted retrieval. See [deployment and cross-client evidence](docs/wb011-deployment.md).
 
 For an existing connected plugin, prepare and apply a validated release through the independent [WB-001 updater](docs/updates.md), then open **Manage Workbridge → Refresh tools** in ChatGPT. Review the expanded write/command access before enabling it. ChatGPT's plugin permissions determine whether actions ask first. The bridge does not bypass those controls. The existing tunnel and saved key are reused.
 
 ## Tools and behavior
 
-| Tool | Purpose |
-| --- | --- |
-| `workspace_info` | Primary root, all allowed roots, limits, path rules |
-| `discover_projects` | Immediate folders or bounded recursive discovery; repository/worktree identity |
-| `list_directory` | Optional recursion, filename substring filter, offset pagination |
-| `read_file` | Source text with one-based line numbers and continuation |
-| `search_text` | Recursive literal text search, paths/lines/excerpts |
-| `git_status` | Branch and staged/unstaged/untracked status |
-| `git_diff` | Unstaged, staged, or base-commit diff; optional path filter |
-| `git_history` | Commit hashes/dates/authors/subjects, path filter and pagination |
-| `file_info`, `project_overview`, `diagnostics` | Metadata/hashes, manifest evidence, bridge health |
-| `write_file`, `edit_file`, `create_directory` | Create text/directories and exact conflict-checked edits |
-| `move_file`, `delete_file` | Individual file renames/moves and recoverable deletion; empty directories only |
-| `change_list`, `change_status`, `undo_change` | Durable operation IDs, current-file checks, conflict-aware undo |
-| `terminal_run` | Explicit executable, arguments, and project working directory; bounded noninteractive developer commands |
-| `commands_list`, `command_run`, `command_status`, `command_output`, `command_cancel` | Fixed profiles and shared job polling/cancellation; combined or separate stdout/stderr |
-| `git_read_file`, `git_compare`, `git_blame`, `git_commit` | Historical source, commit comparisons/blame, selected-file local commits |
-| `snapshot_manifest`, `snapshot_cache`, `snapshot_read`, `snapshot_search` | Saved raw/gzip dumps, pose/segment/address mapping, streaming decompression, typed values and byte searches |
+| Tool                                                                                                           | Purpose                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `workspace_info`                                                                                               | Primary root, all allowed roots, limits, path rules                                                         |
+| `discover_projects`                                                                                            | Immediate folders or bounded recursive discovery; repository/worktree identity                              |
+| `list_directory`                                                                                               | Optional recursion, filename substring filter, offset pagination                                            |
+| `read_file`                                                                                                    | Source text with one-based line numbers and continuation                                                    |
+| `read_files`                                                                                                   | Bounded multi-file reads with per-file hashes, errors, and continuation                                       |
+| `search_text`                                                                                                  | Recursive literal text search, paths/lines/excerpts                                                         |
+| `git_status`                                                                                                   | Branch and staged/unstaged/untracked status                                                                 |
+| `git_diff`                                                                                                     | Unstaged, staged, or base-commit diff; optional path filter                                                 |
+| `git_history`                                                                                                  | Commit hashes/dates/authors/subjects, path filter and pagination                                            |
+| `file_info`, `project_overview`, `diagnostics`                                                                 | Metadata/hashes, manifest evidence, bridge health                                                           |
+| `task_context`                                                                                                 | Scoped instructions, source/test excerpts, search results, and related workflow IDs                          |
+| `write_file`, `edit_file`, `create_directory`                                                                  | Create text/directories and exact conflict-checked edits                                                    |
+| `move_file`, `delete_file`                                                                                     | Individual file renames/moves and recoverable deletion; empty directories only                              |
+| `change_list`, `change_status`, `undo_change`                                                                  | Durable operation IDs, current-file checks, conflict-aware undo                                             |
+| `patch_preview`, `patch_apply`, `patch_status`, `patch_diff`, `patch_list`, `patch_resume`, `patch_undo`       | Recoverable multi-file text patches, combined review and guarded recovery                                   |
+| `config_preview`, `config_apply`                                                                                | Conflict-checked JSON/JSONC pointer edits using the patch journal and recovery operations                    |
+| `workflow_create`, `workflow_status`, `workflow_list`, `workflow_resume`, `workflow_review`, `workflow_cancel` | Saved validation plans, explicit continuation/retry, combined review, and cancellation                      |
+| `terminal_run`                                                                                                 | Explicit executable, arguments, and project working directory; bounded noninteractive developer commands    |
+| `commands_list`, `command_run`, `command_list`, `command_status`, `command_output`, `command_cancel`           | Fixed profiles, job discovery, status, output tails/paging, and cancellation                                  |
+| `command_retry_save` | Explicit publication of a retained final job result; no command execution |
+| `git_read_file`, `git_compare`, `git_blame`, `git_commit`                                                      | Historical source, commit comparisons/blame, selected-file local commits                                    |
+| `snapshot_manifest`, `snapshot_cache`, `snapshot_read`, `snapshot_search`                                      | Saved raw/gzip dumps, pose/segment/address mapping, streaming decompression, typed values and byte searches |
 
 File/directory paths are primary-root-relative (`example/src`) or absolute inside any allowed root. Git `project` identifies the checkout; Git `path` filters are relative to that checkout. Projects within an allowed root need no registration. Use the [local root manager](docs/workspace-roots.md) to add an unrelated folder. `discover_projects` defaults to immediate children; set `recursive=true`, `maxDepth` (1–12, default 4), and follow `nextOffset` for grouped/nested repositories. Its bounded scan reports truncation. `project_overview` distinguishes folders, repositories, and worktrees and identifies scoped AGENTS/README evidence without executing it.
 
@@ -194,7 +210,7 @@ File/directory paths are primary-root-relative (`example/src`) or absolute insid
 - SHA256 is returned by reads for files up to 16 MiB; `file_info(hash=true)` also hashes editable-size files. Creates/edits/moves/deletes and their undo backups are limited to 16 MiB per file. This is separate from large-text read support. Existing encoding/BOM/EOL are preserved when editing/replacing text.
 - Saved binary snapshots use separate byte-range tools with no whole-file size cap. Raw files need no preparation; gzip is streamed into a private disk cache with a 32 GiB total budget. Reads return at most 4 KiB, typed decoding at most 128 values, and byte searches at most 64 MiB/about five seconds per page. These are per-call output/work bounds, not a 2 MiB snapshot limit. See [snapshot workflow](docs/snapshots.md), including cache cleanup and capacity configuration.
 - Listing/search excludes `.git`, links/junctions and generated folders by default. `includeGenerated` includes generated folders. Search additionally honors Git ignore rules unless `includeIgnored=true`; listing does not interpret `.gitignore`. Workbridge runtime state is protected from file tools. There is no blanket filter for other project credential/hidden files.
-- Search uses pinned, bundled Microsoft ripgrep: literal by default, optional Rust regex/globs, sorted live offset pages, at most 100 matches/page, 20 seconds and 2 MiB of captured search-protocol output. Time/output truncation requires a narrower search; `nextOffset` is only provided for result-count pagination. Skipped counts unavailable from the backend are null, rather than invented.
+- Search uses pinned, bundled Microsoft ripgrep: literal by default, optional Rust regex/globs, sorted live offset pages, at most 100 matches/page, 20 seconds and 2 MiB of captured search-protocol output. Explicit positive globs can override Git ignore matches. In the deployed 0.12.0-dev release, generated-folder exclusions take precedence over caller globs unless `includeGenerated=true`; Git internals and mutation temporary files stay excluded. Time/output truncation requires a narrower search; `nextOffset` is only provided for result-count pagination. Skipped counts unavailable from the backend are null, rather than invented.
 - Listing offsets refer to live filesystem enumeration, not a sorted snapshot. Files changing during inspection can shift pages. Read/search results also reflect live files.
 - Git uses fixed arguments and no shell; optional index locks, fsmonitor, external diff/textconv helpers, signature display, and submodule traversal are disabled. Git commands have a 15-second timeout and 1 MiB capture limit; displayed output is capped at 60,000 characters. These commands inspect already trusted local checkouts; this is not an OS security sandbox against concurrent malicious filesystem/config changes.
 - Tool annotations distinguish reads from mutations. File edits are recoverable; configured commands execute trusted project code and may write files or access the network. Root/path checks are not a process sandbox. Git commits use normal hooks/signing and never push. Retrieved text remains untrusted data; requested project data is shared with ChatGPT.
@@ -238,23 +254,23 @@ Tests use temporary repositories and a real MCP stdio client; no account key is 
 
 Optional existing-project inspection requires explicit inputs: `npm run acceptance:project -- <project-path> <literal-query>`. The saved-snapshot scenario is opt-in with `npm run acceptance:snapshot -- <manifest-path>`. These are read-only compatibility scenarios, not prerequisites for installing Workbridge.
 
-| Symptom | Next check |
-| --- | --- |
-| Tunnel absent from ChatGPT | Intended workspace association and operator Tunnels Read + Use; paste exact ID if supported |
-| Missing custom MCP / Tunnel controls | ChatGPT account rollout, developer mode, workspace controls, Platform permissions |
-| Polling 401/403/404 or readiness failure | Correct runtime key, owning organization, tunnel ID/associations; inspect `/ui` logs |
-| Connection refused at health URL | Tunnel stopped or stale health file; restart `Start-Tunnel` and rerun health script |
-| Tools absent or child exits | Rebuild; check Node/server paths in YAML and stderr. Start server via `node dist/server.js`, without npm banners |
-| `read_file` returns `{}` in ChatGPT | Use version 0.1.1 or later, rebuild, restart the tunnel, then Manage Workbridge → Refresh tools; try a fresh chat |
+| Symptom                                        | Next check                                                                                                                                                                            |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tunnel absent from ChatGPT                     | Intended workspace association and operator Tunnels Read + Use; paste exact ID if supported                                                                                           |
+| Missing custom MCP / Tunnel controls           | ChatGPT account rollout, developer mode, workspace controls, Platform permissions                                                                                                     |
+| Polling 401/403/404 or readiness failure       | Correct runtime key, owning organization, tunnel ID/associations; inspect `/ui` logs                                                                                                  |
+| Connection refused at health URL               | Tunnel stopped or stale health file; restart `Start-Tunnel` and rerun health script                                                                                                   |
+| Tools absent or child exits                    | Rebuild; check Node/server paths in YAML and stderr. Start server via `node dist/server.js`, without npm banners                                                                      |
+| `read_file` returns `{}` in ChatGPT            | Use version 0.1.1 or later, rebuild, restart the tunnel, then Manage Workbridge → Refresh tools; try a fresh chat                                                                     |
 | `This response couldn't load` after tool calls | A fresh chat and one reload displayed the verified answer during setup; check tunnel health separately. Repeated failures can be a ChatGPT display issue even when retrieval succeeds |
-| `OUTSIDE_ROOT` / `LINK_NOT_ALLOWED` | Use the actual path within root; junction targets are not followed |
-| Search incomplete | Read `truncated`/skip counts; narrow the directory, glob, or query |
-| Git error | Read the returned Git diagnostic; verify Git PATH and trusted checkout ownership; do not globally disable Git ownership checks |
+| `OUTSIDE_ROOT` / `LINK_NOT_ALLOWED`            | Use the actual path within root; junction targets are not followed                                                                                                                    |
+| Search incomplete                              | Read `truncated`/skip counts; narrow the directory, glob, or query                                                                                                                    |
+| Git error                                      | Read the returned Git diagnostic; verify Git PATH and trusted checkout ownership; do not globally disable Git ownership checks                                                        |
 
 `npm start` by itself waits for an MCP client on stdin; that is expected. For manual protocol-independent startup only: `$env:WORKBRIDGE_ROOT = 'C:\work'; node .\dist\server.js`.
 
 ## Design and verified status
 
-All application code is new. Only the old `mcp2` README/package metadata were inspected for lessons; none of its code or architecture was copied. Direct tunnel-to-stdio support removes the need for a gateway/HTTP lifecycle. [Microsoft's ripgrep package](https://github.com/microsoft/vscode-ripgrep) supplies the platform binary through npm, without runtime downloads; [jsdiff](https://github.com/kpdecker/jsdiff) supplies bounded source diffs. Small modules separate paths/Git, text paging, changes/undo, search, jobs, and overview. See [validation evidence](docs/validation.md) for completed tests and hosted rollout status.
+All application code is new. Only the old `mcp2` README/package metadata were inspected for lessons; none of its code or architecture was copied. Browser access uses the direct tunnel-to-stdio connection. Shared-service mode uses the official MCP HTTP adapter for authenticated local CLI access to the same owner. [Microsoft's ripgrep package](https://github.com/microsoft/vscode-ripgrep) supplies the platform binary through npm, without runtime downloads; [jsdiff](https://github.com/kpdecker/jsdiff) supplies bounded source diffs. Small modules separate paths/Git, text paging, changes/undo, patches, search, jobs, and overview. See [deployment evidence](docs/wb011-deployment.md) for current tests and hosted rollout status.
 
 Requirements checked on **October 17, 2026**: [OpenAI Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels), [official tunnel onboarding](https://github.com/openai/tunnel-client/blob/master/docs/onboarding.md), and [MCP TypeScript SDK v2](https://github.com/modelcontextprotocol/typescript-sdk). Browser UI labels and account availability can differ; the installed CLI's help and current official documentation are the setup references.

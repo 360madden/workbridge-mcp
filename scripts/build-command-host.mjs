@@ -1,7 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+
+copyFileSync(
+  path.resolve('scripts/Local-Service-Descriptor.ps1'),
+  path.resolve('dist/Local-Service-Descriptor.ps1'),
+);
 
 if (process.platform === 'win32') {
   const windows = process.env.SystemRoot ?? 'C:\\Windows';

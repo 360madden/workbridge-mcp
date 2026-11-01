@@ -81,12 +81,45 @@ try {
             Start-Sleep -Milliseconds 500
         } while ($true)
     }
+    $checkIdle = {
+        # This query is read-only and does not consume a command slot. The
+        # updater's exclusive .local/updater.lock prevents fresh admissions.
+        $node = Assert-WBPath $request.nodePath
+        $cli = Get-WBChild $install 'scripts\workbridge-cli.mjs'
+        if (!(Test-Path -LiteralPath $node -PathType Leaf) -or !(Test-Path -LiteralPath $cli -PathType Leaf)) {
+            throw 'The local runtime diagnostics client is unavailable; refusing to stop Workbridge.'
+        }
+        $query = Get-WBChild $operation 'job-idle-query.json'
+        $output = Get-WBChild $operation 'job-idle-result.jsonl'
+        $errors = Get-WBChild $operation 'job-idle-stderr.log'
+        Write-WBJson $query @([pscustomobject]@{tool='diagnostics'; arguments=[pscustomobject]@{}})
+        $oldPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            & $node $cli --service-state (Get-WBChild $install '.local') --input $query --timeout 15 --json 1> $output 2> $errors
+            $exitCode = $LASTEXITCODE
+        } finally { $ErrorActionPreference = $oldPreference }
+        if ($exitCode -ne 0) { throw 'Live command diagnostics failed; inspect job-idle-stderr.log before retrying.' }
+        $report = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+        if (!$report -or $report.schemaVersion -ne 1 -or $report.index -ne 0 -or $report.tool -cne 'diagnostics' -or $report.ok -cne $true) {
+            throw 'Live command diagnostics returned an unexpected result; refusing to stop Workbridge.'
+        }
+        if ($report.result.jobs.inventory.complete -cne $true) {
+            throw 'Live command inventory is incomplete; refusing to stop Workbridge.'
+        }
+        $capacity = $report.result.jobs.capacity
+        if (!$capacity -or $capacity.schemaVersion -ne 1) { throw 'Live command capacity is unavailable; refusing to stop Workbridge.' }
+        if ($capacity.occupied -ne 0 -or $capacity.inProgress -ne 0 -or $capacity.retainedResults -ne 0 -or $capacity.closing -cne $false -or @($capacity.jobs).Count -ne 0) {
+            throw "Workbridge is not idle (occupied=$($capacity.occupied), inProgress=$($capacity.inProgress), retained=$($capacity.retainedResults), closing=$($capacity.closing)); refusing to stop the service."
+        }
+        return $true
+    }
     $currentVersion = ''
     if ($request.action -eq 'Apply' -and !(Test-Path -LiteralPath (Join-Path $operation 'journal.json'))) {
         if (!(& $probe '' $false)) { throw 'Cannot establish a healthy installed runtime version before update. Inspect probe.log and the service status.' }
         $currentVersion = (Read-WBJson (Join-Path $operation 'probe-state\release-probe.json')).version
     }
-    $result = Invoke-WBDeployment -InstallRoot $install -OperationId $OperationId -ReleasePath $request.releasePath -ExpectedReleaseDigest $request.releaseDigest -CurrentVersion $currentVersion -Action $request.action -StopService $stop -StartService $start -TestService $probe
+    $result = Invoke-WBDeployment -InstallRoot $install -OperationId $OperationId -ReleasePath $request.releasePath -ExpectedReleaseDigest $request.releaseDigest -CurrentVersion $currentVersion -Action $request.action -StopService $stop -StartService $start -TestService $probe -CheckIdle $checkIdle
     $result | ConvertTo-Json -Depth 12 | Write-Output
     if ($result.phase -notin @('completed','rolled_back')) { exit 1 }
 } catch {

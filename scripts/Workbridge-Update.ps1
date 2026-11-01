@@ -232,7 +232,7 @@ function Set-WBRuntime([string]$InstallRoot, [string]$Payload, [string]$Operatio
 }
 
 function Invoke-WBDeployment {
-    param([string]$InstallRoot, [string]$OperationId, [string]$ReleasePath, [string]$ExpectedReleaseDigest = '', [string]$CurrentVersion = '', [ValidateSet('Apply','Recover','Rollback')][string]$Action = 'Apply', [scriptblock]$StopService, [scriptblock]$StartService, [scriptblock]$TestService)
+    param([string]$InstallRoot, [string]$OperationId, [string]$ReleasePath, [string]$ExpectedReleaseDigest = '', [string]$CurrentVersion = '', [ValidateSet('Apply','Recover','Rollback')][string]$Action = 'Apply', [scriptblock]$StopService, [scriptblock]$StartService, [scriptblock]$TestService, [scriptblock]$CheckIdle)
     $install = Get-WBInstallation $InstallRoot ($Action -ne 'Apply')
     if ($OperationId -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$') { throw 'Invalid update operation ID.' }
     $operations = Get-WBChild $install '.local\update-operations'
@@ -302,6 +302,11 @@ function Invoke-WBDeployment {
                 Test-WBManifest $backupRuntime $backupFiles
                 Test-WBRuntime $install $backupFiles
                 if (!(& $TestService $record.previousVersion $false)) { throw 'Current installation failed the pre-update health check.' }
+                # The updater holds .local/updater.lock throughout this check and stop.
+                # Job admission must share that lock, so no new command can appear
+                # after the owner reports idle. Refuse Apply if the guard is absent.
+                if (!$CheckIdle) { throw 'Apply requires a live command-quiescence check.' }
+                if ((& $CheckIdle) -cne $true) { throw 'Workbridge command jobs are not verified idle; service was not stopped.' }
                 Set-WBPhase $record $journal 'prepared'
             } catch {
                 $record.error = $_.Exception.Message
