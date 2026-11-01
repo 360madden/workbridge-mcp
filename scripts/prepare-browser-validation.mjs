@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
 const root = process.env.WORKBRIDGE_ROOT ?? 'C:\\work';
-const directory = await mkdtemp(path.join(root, 'workbridge-validation-'));
+const fixtureRoot = path.join(repo, 'temp');
+await mkdir(fixtureRoot, { recursive: true });
+const directory = await mkdtemp(path.join(fixtureRoot, 'workbridge-validation-'));
 const project = path.relative(root, directory).split(path.sep).join('/');
 const git = (...args) =>
   execFileSync('git', args, { cwd: directory, windowsHide: true, encoding: 'utf8' }).trim();
