@@ -96,6 +96,18 @@ public partial class MainWindow : Window
                 CapacityText.Text = $"Slots: {capacity.GetProperty("occupied").GetInt32()} / {capacity.GetProperty("limit").GetInt32()} occupied";
                 JobsText.Text = "Running jobs: " + data.GetProperty("runningJobs").GetInt32();
                 SampleText.Text = "Last sample: " + data.GetProperty("sampledUtc").GetString();
+                var complete = data.GetProperty("inventoryComplete").GetBoolean();
+                InventoryText.Text = complete ? "Inventory: complete" : "Inventory: partial — results may be missing";
+                JobList.Items.Clear();
+                foreach (var job in data.GetProperty("jobs").EnumerateArray())
+                {
+                    var id = job.GetProperty("id").GetString();
+                    var project = job.GetProperty("project").GetString();
+                    var state = job.GetProperty("status").GetString();
+                    var kind = job.GetProperty("kind").GetString();
+                    JobList.Items.Add($"{state} | {kind} | {project} | {id}");
+                }
+                if (JobList.Items.Count == 0) JobList.Items.Add("No active or retained command jobs");
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
             catch (Exception)
@@ -105,6 +117,8 @@ public partial class MainWindow : Window
                 CapacityText.Text = "Slots: —";
                 JobsText.Text = "Running jobs: —";
                 SampleText.Text = "Last sample: unavailable";
+                InventoryText.Text = "Inventory: unavailable";
+                JobList.Items.Clear();
             }
             try { await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken); }
             catch (OperationCanceledException) { break; }

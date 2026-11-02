@@ -20,6 +20,9 @@
           <TextBlock x:Name="SampleText" Text="Last sample: —" Margin="0,8,0,0"/>
         </StackPanel>
       </Border>
+      <TextBlock Text="Active and retained command jobs" FontWeight="Bold" Margin="0,20,0,8"/>
+      <TextBlock x:Name="InventoryText" Text="Inventory: —" Foreground="Gray"/>
+      <ListBox x:Name="JobList" Height="175" Margin="0,8,0,0"/>
       <TextBlock Text="Closing this window hides it to the system tray. Workbridge runs independently."
                  Margin="0,24,0,0" TextWrapping="Wrap"/>
     </StackPanel>
