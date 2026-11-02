@@ -135,6 +135,7 @@ public partial class MainWindow : Window
                 SampleText.Text = "Last sample: unavailable";
                 InventoryText.Text = "Inventory: unavailable";
                 JobList.Items.Clear();
+                DetailsText.Text = "Workbridge disconnected; previously retrieved job details cleared.";
             }
             try { await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken); }
             catch (OperationCanceledException) { break; }
@@ -155,6 +156,12 @@ public partial class MainWindow : Window
         {
             using var json = await RunProbeAsync("desktop-job-detail.mjs", jobId, _stop.Token);
             var data = json.RootElement;
+            // Selection can change while an asynchronous MCP request is in flight.
+            if (((JobList.SelectedItem as ListBoxItem)?.Tag as string) != jobId)
+            {
+                DetailsText.Text = "Selection changed; choose View selected job details again.";
+                return;
+            }
             var state = data.GetProperty("status").GetString();
             var exit = data.GetProperty("exitCode");
             var exitLabel = exit.ValueKind == JsonValueKind.Null ? "pending" : exit.ToString();
