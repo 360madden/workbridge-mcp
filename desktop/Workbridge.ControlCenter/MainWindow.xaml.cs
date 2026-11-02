@@ -104,8 +104,11 @@ public partial class MainWindow : Window
                 var capacity = data.GetProperty("capacity");
                 ConnectionText.Text = "Connected · Tunnel ready: " + data.GetProperty("tunnelReady").GetBoolean();
                 VersionText.Text = "Version: " + data.GetProperty("version").GetString();
+                ControlPlaneText.Text = "Control plane: " + data.GetProperty("controlPlane").GetString();
                 CapacityText.Text = $"Slots: {capacity.GetProperty("occupied").GetInt32()} / {capacity.GetProperty("limit").GetInt32()} occupied";
                 JobsText.Text = "Running jobs: " + data.GetProperty("runningJobs").GetInt32();
+                var retained = capacity.GetProperty("retainedResults");
+                RetainedText.Text = "Retained results: " + (retained.ValueKind == JsonValueKind.Number ? retained.GetInt32().ToString() : "unavailable");
                 SampleText.Text = "Last sample: " + data.GetProperty("sampledUtc").GetString();
                 InventoryText.Text = data.GetProperty("inventoryComplete").GetBoolean()
                     ? "Inventory: complete" : "Inventory: partial — results may be missing";
@@ -130,8 +133,10 @@ public partial class MainWindow : Window
             {
                 ConnectionText.Text = "Disconnected / status unavailable";
                 VersionText.Text = "Version: —";
+                ControlPlaneText.Text = "Control plane: —";
                 CapacityText.Text = "Slots: —";
                 JobsText.Text = "Running jobs: —";
+                RetainedText.Text = "Retained results: —";
                 SampleText.Text = "Last sample: unavailable";
                 InventoryText.Text = "Inventory: unavailable";
                 JobList.Items.Clear();

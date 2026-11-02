@@ -16,8 +16,10 @@
             <TextBlock Text="Engine connection" FontWeight="Bold"/>
             <TextBlock x:Name="ConnectionText" Text="Connecting..." Margin="0,8,0,0"/>
             <TextBlock x:Name="VersionText" Text="Version: —" Margin="0,8,0,0"/>
+            <TextBlock x:Name="ControlPlaneText" Text="Control plane: —" Margin="0,8,0,0"/>
             <TextBlock x:Name="CapacityText" Text="Slots: —" Margin="0,8,0,0"/>
             <TextBlock x:Name="JobsText" Text="Running jobs: —" Margin="0,8,0,0"/>
+            <TextBlock x:Name="RetainedText" Text="Retained results: —" Margin="0,8,0,0"/>
             <TextBlock x:Name="SampleText" Text="Last sample: —" Margin="0,8,0,0"/>
           </StackPanel>
         </Border>

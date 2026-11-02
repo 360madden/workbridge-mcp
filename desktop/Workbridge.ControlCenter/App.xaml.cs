@@ -38,7 +38,21 @@ public partial class App : System.Windows.Application
         _restoreSignal = new EventWaitHandle(false, EventResetMode.AutoReset,
             @"Local\Workbridge.ControlCenter.Restore");
         _restoreRegistration = ThreadPool.RegisterWaitForSingleObject(_restoreSignal,
-            (_, _) => Dispatcher.BeginInvoke(() => _mainWindow?.RestoreFromSecondInstance()),
+            (_, _) =>
+            {
+                if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
+                try
+                {
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        if (!Dispatcher.HasShutdownStarted) _mainWindow?.RestoreFromSecondInstance();
+                    });
+                }
+                catch (InvalidOperationException)
+                {
+                    // The dispatcher may exit between checking and enqueuing.
+                }
+            },
             null, Timeout.Infinite, false);
         if (!Array.Exists(e.Args, arg => string.Equals(arg, "--tray", StringComparison.OrdinalIgnoreCase)))
             _mainWindow.Show();
