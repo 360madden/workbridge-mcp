@@ -51,10 +51,10 @@ Gate: dotnet build passed again (wbdesktop-build-20261102-03, 0 warnings/errors)
 
 ### M2 — Read-only live monitoring
 - [x] Implement initial read-only scripts/desktop-status.mjs using existing connectService; verified job wbdesktop-status-test-20261102 (exit 0, version 0.16.4-dev, tunnel ready, 36 capacity). WPF integration pending.
-- [ ] Version, tunnel/control-plane health, 36-slot capacity, active/retained jobs, assignment status.
-- [ ] Distinct counters, offline/stale states, cancellation and timeout handling.
+- [x] Initial WPF read-only view: version, tunnel readiness, slot occupancy and running jobs via existing authenticated Node probe (build passed wbdesktop-live-build-20261102). Control-plane and assignment/retained-job views remain pending.
+- [x] Initial separate slot/job counters, disconnected state and bounded probe cancellation/timeout; interactive disconnect/reconnect testing pending.
 - [ ] Logs with bounded paging, no credential display.
-Gate: probe response verified against live diagnostics schema; WPF binding and disconnect/reconnect test pending. Note: probe launched through Workbridge terminal_run temporarily occupies one command slot, so its 1 occupied/35 available sample is expected.
+Gate: WPF view compiled with zero errors/warnings; no interactive GUI or disconnect/reconnect acceptance yet. Probe run through Workbridge terminal_run temporarily occupies one slot, so its 1 occupied/35 available sample is expected. Review concern: process-per-poll adds startup overhead; profile before optimizing.
 
 ### M3 — Job controls
 - [ ] Expose only existing supported cancel/status/retry actions.

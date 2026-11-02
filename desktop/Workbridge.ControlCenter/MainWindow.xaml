@@ -7,21 +7,21 @@
   <DockPanel Margin="20">
     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,18">
       <TextBlock Text="Workbridge Control Center" FontSize="26" FontWeight="SemiBold"/>
-      <TextBlock Text="Desktop shell · Live MCP integration is the next milestone" Margin="0,8,0,0" Foreground="Gray"/>
+      <TextBlock Text="Live local engine monitoring · Read-only" Margin="0,8,0,0" Foreground="Gray"/>
     </StackPanel>
-    <Grid>
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="*"/>
-      </Grid.RowDefinitions>
+    <StackPanel>
       <Border Padding="16" CornerRadius="8" Background="#FFEAEFF4">
         <StackPanel>
           <TextBlock Text="Engine connection" FontWeight="Bold"/>
-          <TextBlock Text="Not connected — desktop shell only" Margin="0,8,0,0"/>
+          <TextBlock x:Name="ConnectionText" Text="Connecting..." Margin="0,8,0,0"/>
+          <TextBlock x:Name="VersionText" Text="Version: —" Margin="0,8,0,0"/>
+          <TextBlock x:Name="CapacityText" Text="Slots: —" Margin="0,8,0,0"/>
+          <TextBlock x:Name="JobsText" Text="Running jobs: —" Margin="0,8,0,0"/>
+          <TextBlock x:Name="SampleText" Text="Last sample: —" Margin="0,8,0,0"/>
         </StackPanel>
       </Border>
-      <TextBlock Grid.Row="1" Text="Workbridge continues independently when this window is hidden or closed."
-                 VerticalAlignment="Center" HorizontalAlignment="Center" TextWrapping="Wrap"/>
-    </Grid>
+      <TextBlock Text="Closing this window hides it to the system tray. Workbridge runs independently."
+                 Margin="0,24,0,0" TextWrapping="Wrap"/>
+    </StackPanel>
   </DockPanel>
 </Window>
