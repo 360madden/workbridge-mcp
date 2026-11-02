@@ -37,7 +37,7 @@ These are proposed roles. Workbridge agent assignments alone do not launch AI re
 - [x] Inspect live workspace/version/capacity and current Git state.
 - [x] Inspect README, AGENTS.md, autostart scripts, local CLI and local-service implementation.
 - [x] Confirm WPF/WinForms NotifyIcon support in Microsoft documentation.
-- [ ] Inspect private local descriptor authentication and current client connection lifecycle in detail.
+- [x] Inspect private DPAPI descriptor and authenticated connectService lifecycle (src/local-service.ts lines 450-499). Verified existing client transport, owner identity and ready endpoint checks.
 - [ ] Verify installed scheduled-task action and observed console process source.
 - [ ] Record reviewer findings and resolve critical architecture concerns.
 Gate: explicit data-flow, trust-boundary and process-lifecycle review.
@@ -50,11 +50,11 @@ Gate: explicit data-flow, trust-boundary and process-lifecycle review.
 Gate: dotnet build passed again (wbdesktop-build-20261102-03, 0 warnings/errors). Prior missing second-instance restore addressed in source; interactive smoke test still required before M1 completion.
 
 ### M2 — Read-only live monitoring
-- [ ] Authenticated local MCP connection using existing supported mechanism.
+- [x] Implement initial read-only scripts/desktop-status.mjs using existing connectService; verified job wbdesktop-status-test-20261102 (exit 0, version 0.16.4-dev, tunnel ready, 36 capacity). WPF integration pending.
 - [ ] Version, tunnel/control-plane health, 36-slot capacity, active/retained jobs, assignment status.
 - [ ] Distinct counters, offline/stale states, cancellation and timeout handling.
 - [ ] Logs with bounded paging, no credential display.
-Gate: values cross-checked against live diagnostics; disconnect/reconnect test.
+Gate: probe response verified against live diagnostics schema; WPF binding and disconnect/reconnect test pending. Note: probe launched through Workbridge terminal_run temporarily occupies one command slot, so its 1 occupied/35 available sample is expected.
 
 ### M3 — Job controls
 - [ ] Expose only existing supported cancel/status/retry actions.
