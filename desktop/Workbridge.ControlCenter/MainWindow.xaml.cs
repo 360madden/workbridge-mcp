@@ -93,60 +93,112 @@ public partial class MainWindow : Window
         throw new InvalidOperationException("Workbridge probe returned an error.");
     }
 
+    // A single long-lived Node client streams bounded read-only diagnostics.
+    // If it crashes, the GUI shows offline and starts a new client after a delay.
     private async Task PollStatusAsync(CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
+            Process? monitor = null;
             try
             {
-                using var json = await RunProbeAsync("desktop-status.mjs", null, cancellationToken);
-                if (_exiting || cancellationToken.IsCancellationRequested) break;
-                var data = json.RootElement;
-                var capacity = data.GetProperty("capacity");
-                ConnectionText.Text = "Connected · Tunnel ready: " + data.GetProperty("tunnelReady").GetBoolean();
-                VersionText.Text = "Version: " + data.GetProperty("version").GetString();
-                ControlPlaneText.Text = "Control plane: " + data.GetProperty("controlPlane").GetString();
-                CapacityText.Text = $"Slots: {capacity.GetProperty("occupied").GetInt32()} / {capacity.GetProperty("limit").GetInt32()} occupied";
-                JobsText.Text = "Running jobs: " + data.GetProperty("runningJobs").GetInt32();
-                var retained = capacity.GetProperty("retainedResults");
-                RetainedText.Text = "Retained results: " + (retained.ValueKind == JsonValueKind.Number ? retained.GetInt32().ToString() : "unavailable");
-                SampleText.Text = "Last sample: " + data.GetProperty("sampledUtc").GetString();
-                InventoryText.Text = data.GetProperty("inventoryComplete").GetBoolean()
-                    ? "Inventory: complete" : "Inventory: partial — results may be missing";
-                var selectedId = (JobList.SelectedItem as ListBoxItem)?.Tag as string;
-                JobList.Items.Clear();
-                ListBoxItem? selection = null;
-                foreach (var job in data.GetProperty("jobs").EnumerateArray())
+                var root = RepoRoot();
+                var script = Path.Combine(root, "scripts", "desktop-monitor.mjs");
+                if (!File.Exists(script)) throw new FileNotFoundException("Monitor script unavailable.");
+                monitor = new Process
                 {
-                    var id = job.GetProperty("id").GetString() ?? "";
-                    var project = job.GetProperty("project").GetString() ?? "";
-                    var state = job.GetProperty("status").GetString() ?? "";
-                    var kind = job.GetProperty("kind").GetString() ?? "";
-                    var item = new ListBoxItem { Content = $"{state} | {kind} | {project} | {id}", Tag = id };
-                    JobList.Items.Add(item);
-                    if (id == selectedId) selection = item;
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "node.exe",
+                        WorkingDirectory = root,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardInput = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = false
+                    }
+                };
+                monitor.StartInfo.Environment["WORKBRIDGE_DESKTOP_PARENT_PIPE"] = "1";
+                monitor.StartInfo.ArgumentList.Add(script);
+                monitor.Start();
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    var line = await monitor.StandardOutput.ReadLineAsync(cancellationToken);
+                    if (line is null) throw new IOException("Monitor exited.");
+                    if (line.Length > 64_000) throw new InvalidDataException("Monitor output too long.");
+                    using var json = JsonDocument.Parse(line);
+                    if (_exiting || cancellationToken.IsCancellationRequested) break;
+                    if (json.RootElement.TryGetProperty("ok", out var ok) && ok.GetBoolean())
+                        ApplyStatus(json.RootElement);
+                    else
+                        ShowOffline();
                 }
-                JobList.SelectedItem = selection;
-                if (JobList.Items.Count == 0) JobList.Items.Add("No active or retained command jobs");
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
             catch (Exception)
             {
-                if (_exiting || cancellationToken.IsCancellationRequested) break;
-                ConnectionText.Text = "Disconnected / status unavailable";
-                VersionText.Text = "Version: —";
-                ControlPlaneText.Text = "Control plane: —";
-                CapacityText.Text = "Slots: —";
-                JobsText.Text = "Running jobs: —";
-                RetainedText.Text = "Retained results: —";
-                SampleText.Text = "Last sample: unavailable";
-                InventoryText.Text = "Inventory: unavailable";
-                JobList.Items.Clear();
-                DetailsText.Text = "Workbridge disconnected; previously retrieved job details cleared.";
+                if (!_exiting && !cancellationToken.IsCancellationRequested) ShowOffline();
             }
-            try { await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken); }
+            finally
+            {
+                if (monitor is not null)
+                {
+                    try
+                    {
+                        if (!monitor.HasExited) monitor.Kill(entireProcessTree: true);
+                    }
+                    catch (InvalidOperationException) { }
+                    catch (Win32Exception) { }
+                    monitor.Dispose();
+                }
+            }
+            try { await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken); }
             catch (OperationCanceledException) { break; }
         }
+    }
+
+    private void ApplyStatus(JsonElement data)
+    {
+        var capacity = data.GetProperty("capacity");
+        ConnectionText.Text = "Connected · Tunnel ready: " + data.GetProperty("tunnelReady").GetBoolean();
+        VersionText.Text = "Version: " + data.GetProperty("version").GetString();
+        ControlPlaneText.Text = "Control plane: " + data.GetProperty("controlPlane").GetString();
+        CapacityText.Text = $"Slots: {capacity.GetProperty("occupied").GetInt32()} / {capacity.GetProperty("limit").GetInt32()} occupied";
+        JobsText.Text = "Running jobs: " + data.GetProperty("runningJobs").GetInt32();
+        var retained = capacity.GetProperty("retainedResults");
+        RetainedText.Text = "Retained results: " + (retained.ValueKind == JsonValueKind.Number ? retained.GetInt32().ToString() : "unavailable");
+        SampleText.Text = "Last sample: " + data.GetProperty("sampledUtc").GetString();
+        InventoryText.Text = data.GetProperty("inventoryComplete").GetBoolean()
+            ? "Inventory: complete" : "Inventory: partial — results may be missing";
+        var selectedId = (JobList.SelectedItem as ListBoxItem)?.Tag as string;
+        JobList.Items.Clear();
+        ListBoxItem? selection = null;
+        foreach (var job in data.GetProperty("jobs").EnumerateArray())
+        {
+            var id = job.GetProperty("id").GetString() ?? "";
+            var project = job.GetProperty("project").GetString() ?? "";
+            var state = job.GetProperty("status").GetString() ?? "";
+            var kind = job.GetProperty("kind").GetString() ?? "";
+            var item = new ListBoxItem { Content = $"{state} | {kind} | {project} | {id}", Tag = id };
+            JobList.Items.Add(item);
+            if (id == selectedId) selection = item;
+        }
+        JobList.SelectedItem = selection;
+        if (JobList.Items.Count == 0) JobList.Items.Add("No active or retained command jobs");
+    }
+
+    private void ShowOffline()
+    {
+        ConnectionText.Text = "Disconnected / status unavailable";
+        VersionText.Text = "Version: —";
+        ControlPlaneText.Text = "Control plane: —";
+        CapacityText.Text = "Slots: —";
+        JobsText.Text = "Running jobs: —";
+        RetainedText.Text = "Retained results: —";
+        SampleText.Text = "Last sample: unavailable";
+        InventoryText.Text = "Inventory: unavailable";
+        JobList.Items.Clear();
+        DetailsText.Text = "Workbridge disconnected; previously retrieved job details cleared.";
     }
 
     private async void DetailsButton_Click(object sender, RoutedEventArgs e)
