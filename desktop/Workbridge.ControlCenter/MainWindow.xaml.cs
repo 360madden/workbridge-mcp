@@ -64,7 +64,7 @@ public partial class MainWindow : Window
                         UseShellExecute = false,
                         CreateNoWindow = true,
                         RedirectStandardOutput = true,
-                        RedirectStandardError = true
+                        RedirectStandardError = false
                     }
                 };
                 process.Start();
@@ -78,7 +78,12 @@ public partial class MainWindow : Window
                 }
                 catch (OperationCanceledException)
                 {
-                    if (!process.HasExited) process.Kill(entireProcessTree: true);
+                    try
+                    {
+                        if (!process.HasExited) process.Kill(entireProcessTree: true);
+                    }
+                    catch (InvalidOperationException) { /* Process already exited. */ }
+                    catch (System.ComponentModel.Win32Exception) { /* Process already exited or inaccessible. */ }
                     throw;
                 }
                 if (process.ExitCode != 0) throw new InvalidOperationException("Local Workbridge status unavailable.");
@@ -136,6 +141,7 @@ public partial class MainWindow : Window
         _trayIcon.Visible = false;
         _trayIcon.ContextMenuStrip?.Dispose();
         _trayIcon.Dispose();
-        _stop.Dispose();
+        // The asynchronous poll loop may still be unwinding; dispose its token source
+        // only after it has finished, rather than racing cancellation callbacks.
     }
 }
