@@ -100,6 +100,7 @@ public partial class MainWindow : Window
             try
             {
                 using var json = await RunProbeAsync("desktop-status.mjs", null, cancellationToken);
+                if (_exiting || cancellationToken.IsCancellationRequested) break;
                 var data = json.RootElement;
                 var capacity = data.GetProperty("capacity");
                 ConnectionText.Text = "Connected · Tunnel ready: " + data.GetProperty("tunnelReady").GetBoolean();
@@ -131,6 +132,7 @@ public partial class MainWindow : Window
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
             catch (Exception)
             {
+                if (_exiting || cancellationToken.IsCancellationRequested) break;
                 ConnectionText.Text = "Disconnected / status unavailable";
                 VersionText.Text = "Version: —";
                 ControlPlaneText.Text = "Control plane: —";
