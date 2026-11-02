@@ -38,7 +38,7 @@ These are proposed roles. Workbridge agent assignments alone do not launch AI re
 - [x] Inspect README, AGENTS.md, autostart scripts, local CLI and local-service implementation.
 - [x] Confirm WPF/WinForms NotifyIcon support in Microsoft documentation.
 - [x] Inspect private DPAPI descriptor and authenticated connectService lifecycle (src/local-service.ts lines 450-499). Verified existing client transport, owner identity and ready endpoint checks.
-- [ ] Verify installed scheduled-task action and observed console process source.
+- [x] Verify installed `Workbridge MCP` scheduled-task action (wbdesktop-startup-audit-20261102-v1, exit 0): state Running, powershell.exe, Start-BackgroundTunnel.ps1, -WindowStyle Hidden, PT20S delay, Limited run level. Source of observed sign-in console flash NOT independently captured; keep this distinct.
 - [ ] Record reviewer findings and resolve critical architecture concerns.
 Gate: explicit data-flow, trust-boundary and process-lifecycle review.
 
@@ -81,6 +81,7 @@ Gate: no unresolved critical regressions.
 3. Single-instance/tray lifecycle: avoid process ownership of backend and avoid disposing tray icon while hidden.
 4. Dashboard accuracy: 36 slots are command capacity, not 36 genuine AI reasoning agents.
 5. Deployment: source changes do not deploy automatically. Never restart live server as part of desktop scaffolding.
+6. Shared desktop lease: capture wbdesktop-tray-presmoke-20261102-v1 returned UI_TURN_BUSY. Recheck when other desktop workflows are idle; do not route around the reservation.
 
 ## Next executable task
 Complete isolated tray hide/restore and selected-job detail button UI tests; test offline/reconnection behavior and then obtain genuinely independent code review before M1/M2 acceptance. Current GUI test process has been removed; leave live startup/runtime unchanged.
