@@ -160,6 +160,7 @@ public partial class MainWindow : Window
         try
         {
             using var json = await RunProbeAsync("desktop-job-detail.mjs", jobId, _stop.Token);
+            if (_exiting || _stop.IsCancellationRequested) return;
             var data = json.RootElement;
             // Selection can change while an asynchronous MCP request is in flight.
             if (((JobList.SelectedItem as ListBoxItem)?.Tag as string) != jobId)
@@ -177,11 +178,12 @@ public partial class MainWindow : Window
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
         catch (Exception)
         {
-            DetailsText.Text = "Job details unavailable. The job may have expired or Workbridge may be disconnected.";
+            if (!_exiting && !_stop.IsCancellationRequested)
+                DetailsText.Text = "Job details unavailable. The job may have expired or Workbridge may be disconnected.";
         }
         finally
         {
-            DetailsButton.IsEnabled = true;
+            if (!_exiting && !_stop.IsCancellationRequested) DetailsButton.IsEnabled = true;
         }
     }
 
