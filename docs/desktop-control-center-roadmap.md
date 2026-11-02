@@ -44,17 +44,17 @@ Gate: explicit data-flow, trust-boundary and process-lifecycle review.
 
 ### M1 — Desktop shell
 - [x] Create desktop/Workbridge.ControlCenter WPF .NET 10 project; dotnet build passed with zero warnings/errors (job wbdesktop-build-20261102-02).
-- [x] Implement single-instance mutex plus named auto-reset restore event; second process signals existing window. Compiled; interactive verification pending.
+- [x] Implement single-instance mutex plus named auto-reset restore event. Interactive verification passed 2026-11-02: second launch wbdesktop-second-launch-smoke-20261102-v1 exited 0; desktop_windows observed exactly one original window and it became foreground.
 - [x] Implement tray icon, double-click restore, close-to-tray, explicit Exit GUI (compiled; interactive smoke test pending).
 - [x] No service termination from UI: shell has no backend process control code.
-Gate: dotnet build passed again (wbdesktop-build-20261102-03, 0 warnings/errors). Prior missing second-instance restore addressed in source; interactive smoke test still required before M1 completion.
+Gate: build passed (zero warnings/errors). Actual Windows launch wbdesktop-ui-smoke-20261102-v1 yielded one 900×740 WPF window with healthy live readings, confirmed via desktop_inspect UIA. Test command cancelled intentionally; desktop_windows confirmed zero remaining windows. Second-instance restore passed. Close-to-tray and tray menu remain untested; do not mark M1 fully accepted.
 
 ### M2 — Read-only live monitoring
 - [x] Implement initial read-only scripts/desktop-status.mjs using existing connectService; verified job wbdesktop-status-test-20261102 (exit 0, version 0.16.4-dev, tunnel ready, 36 capacity). WPF integration pending.
 - [x] Initial WPF read-only view: version, tunnel readiness, slot occupancy and running jobs via existing authenticated Node probe (build passed wbdesktop-live-build-20261102). Added bounded active/retained command-job inventory with completeness indicator (probe wbdesktop-jobs-probe-20261102, build wbdesktop-jobs-build-20261102). Assignment view remains pending.
 - [x] Initial separate slot/job counters, disconnected state and bounded probe cancellation/timeout; interactive disconnect/reconnect testing pending.
 - [x] Initial read-only on-demand job details and bounded output tail (4,000 chars), with job-ID validation; test jobs wbdesktop-detail-test-0-20261102 passed and wbdesktop-detail-test-1-20261102 rejected invalid input. Output may contain command secrets; GUI warns operator and does not save it. Paging beyond tail remains optional.
-Gate: WPF detail view built successfully (wbdesktop-detail-build-20261102-v1; zero errors/warnings); Node syntax and positive/negative query tests passed. No interactive GUI or disconnect/reconnect acceptance yet. Probe run through Workbridge terminal_run temporarily occupies one slot, so its 1 occupied/35 available sample is expected. Review concern: process-per-poll adds startup overhead; profile before optimizing.
+Gate: WPF detail view built successfully (wbdesktop-detail-build-20261102-v1; zero errors/warnings); Node syntax and positive/negative query tests passed. Live UIA inspection confirmed engine version, slot occupancy, running job list and inventory completeness in the actual window; on-demand detail button and offline/reconnect acceptance remain pending. Probe run through Workbridge terminal_run temporarily occupies one slot, so its 1 occupied/35 available sample is expected. Review concern: process-per-poll adds startup overhead; profile before optimizing.
 
 ### M3 — Job controls
 - [ ] Expose only existing supported cancel/status/retry actions.
@@ -83,4 +83,4 @@ Gate: no unresolved critical regressions.
 5. Deployment: source changes do not deploy automatically. Never restart live server as part of desktop scaffolding.
 
 ## Next executable task
-Run an interactive Windows desktop smoke test (tray hide/restore, second launch, job selection/detail), test offline/reconnection behavior, then independently review UI lifecycle/concurrency before M1/M2 acceptance. Preserve live startup/runtime.
+Complete isolated tray hide/restore and selected-job detail button UI tests; test offline/reconnection behavior and then obtain genuinely independent code review before M1/M2 acceptance. Current GUI test process has been removed; leave live startup/runtime unchanged.
