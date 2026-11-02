@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using Forms = System.Windows.Forms;
 
 namespace Workbridge.ControlCenter;
@@ -36,8 +37,6 @@ public partial class MainWindow : Window
 
     private static string RepoRoot()
     {
-        // Executable is normally desktop/Workbridge.ControlCenter/bin/{configuration}/net10.0-windows.
-        // Walk upwards to locate the checked-in probe; do not infer a fixed drive or user profile.
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
@@ -45,7 +44,53 @@ public partial class MainWindow : Window
                 return directory.FullName;
             directory = directory.Parent;
         }
-        throw new FileNotFoundException("Workbridge desktop-status.mjs was not found in an ancestor directory.");
+        throw new FileNotFoundException("Workbridge probe scripts were not found in an ancestor directory.");
+    }
+
+    private static async Task<JsonDocument> RunProbeAsync(string scriptName, string? jobId,
+        CancellationToken cancellationToken)
+    {
+        var root = RepoRoot();
+        var script = Path.Combine(root, "scripts", scriptName);
+        if (!File.Exists(script)) throw new FileNotFoundException("Required Workbridge probe not found.");
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "node.exe",
+                WorkingDirectory = root,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = false
+            }
+        };
+        process.StartInfo.ArgumentList.Add(script);
+        if (jobId is not null) process.StartInfo.ArgumentList.Add(jobId);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(15));
+        process.Start();
+        string output;
+        try
+        {
+            output = await process.StandardOutput.ReadToEndAsync(timeout.Token);
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException) { }
+            catch (Win32Exception) { }
+            throw;
+        }
+        if (process.ExitCode != 0) throw new InvalidOperationException("Workbridge probe failed.");
+        var json = JsonDocument.Parse(output);
+        if (json.RootElement.GetProperty("ok").GetBoolean()) return json;
+        json.Dispose();
+        throw new InvalidOperationException("Workbridge probe returned an error.");
     }
 
     private async Task PollStatusAsync(CancellationToken cancellationToken)
@@ -54,59 +99,30 @@ public partial class MainWindow : Window
         {
             try
             {
-                using var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "node.exe",
-                        WorkingDirectory = RepoRoot(),
-                        Arguments = "scripts/desktop-status.mjs",
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = false
-                    }
-                };
-                process.Start();
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeout.CancelAfter(TimeSpan.FromSeconds(15));
-                string output;
-                try
-                {
-                    output = await process.StandardOutput.ReadToEndAsync(timeout.Token);
-                    await process.WaitForExitAsync(timeout.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    try
-                    {
-                        if (!process.HasExited) process.Kill(entireProcessTree: true);
-                    }
-                    catch (InvalidOperationException) { /* Process already exited. */ }
-                    catch (System.ComponentModel.Win32Exception) { /* Process already exited or inaccessible. */ }
-                    throw;
-                }
-                if (process.ExitCode != 0) throw new InvalidOperationException("Local Workbridge status unavailable.");
-                using var json = JsonDocument.Parse(output);
+                using var json = await RunProbeAsync("desktop-status.mjs", null, cancellationToken);
                 var data = json.RootElement;
-                if (!data.GetProperty("ok").GetBoolean()) throw new InvalidOperationException("Local Workbridge status unavailable.");
                 var capacity = data.GetProperty("capacity");
                 ConnectionText.Text = "Connected · Tunnel ready: " + data.GetProperty("tunnelReady").GetBoolean();
                 VersionText.Text = "Version: " + data.GetProperty("version").GetString();
                 CapacityText.Text = $"Slots: {capacity.GetProperty("occupied").GetInt32()} / {capacity.GetProperty("limit").GetInt32()} occupied";
                 JobsText.Text = "Running jobs: " + data.GetProperty("runningJobs").GetInt32();
                 SampleText.Text = "Last sample: " + data.GetProperty("sampledUtc").GetString();
-                var complete = data.GetProperty("inventoryComplete").GetBoolean();
-                InventoryText.Text = complete ? "Inventory: complete" : "Inventory: partial — results may be missing";
+                InventoryText.Text = data.GetProperty("inventoryComplete").GetBoolean()
+                    ? "Inventory: complete" : "Inventory: partial — results may be missing";
+                var selectedId = (JobList.SelectedItem as ListBoxItem)?.Tag as string;
                 JobList.Items.Clear();
+                ListBoxItem? selection = null;
                 foreach (var job in data.GetProperty("jobs").EnumerateArray())
                 {
-                    var id = job.GetProperty("id").GetString();
-                    var project = job.GetProperty("project").GetString();
-                    var state = job.GetProperty("status").GetString();
-                    var kind = job.GetProperty("kind").GetString();
-                    JobList.Items.Add($"{state} | {kind} | {project} | {id}");
+                    var id = job.GetProperty("id").GetString() ?? "";
+                    var project = job.GetProperty("project").GetString() ?? "";
+                    var state = job.GetProperty("status").GetString() ?? "";
+                    var kind = job.GetProperty("kind").GetString() ?? "";
+                    var item = new ListBoxItem { Content = $"{state} | {kind} | {project} | {id}", Tag = id };
+                    JobList.Items.Add(item);
+                    if (id == selectedId) selection = item;
                 }
+                JobList.SelectedItem = selection;
                 if (JobList.Items.Count == 0) JobList.Items.Add("No active or retained command jobs");
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
@@ -125,8 +141,39 @@ public partial class MainWindow : Window
         }
     }
 
-    internal void RestoreFromSecondInstance() => RestoreWindow();
+    private async void DetailsButton_Click(object sender, RoutedEventArgs e)
+    {
+        var jobId = (JobList.SelectedItem as ListBoxItem)?.Tag as string;
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            DetailsText.Text = "Select an actual job record first.";
+            return;
+        }
+        DetailsButton.IsEnabled = false;
+        DetailsText.Text = "Loading job details...";
+        try
+        {
+            using var json = await RunProbeAsync("desktop-job-detail.mjs", jobId, _stop.Token);
+            var data = json.RootElement;
+            var state = data.GetProperty("status").GetString();
+            var exit = data.GetProperty("exitCode");
+            var exitLabel = exit.ValueKind == JsonValueKind.Null ? "pending" : exit.ToString();
+            var truncated = data.GetProperty("outputTruncated").GetBoolean();
+            DetailsText.Text = $"Job: {jobId}\nStatus: {state}\nExit code: {exitLabel}\n" +
+                $"Captured output truncated: {truncated}\n\n" + data.GetProperty("log").GetString();
+        }
+        catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
+        catch (Exception)
+        {
+            DetailsText.Text = "Job details unavailable. The job may have expired or Workbridge may be disconnected.";
+        }
+        finally
+        {
+            DetailsButton.IsEnabled = true;
+        }
+    }
 
+    internal void RestoreFromSecondInstance() => RestoreWindow();
     private void RestoreWindow()
     {
         Show();
@@ -155,7 +202,5 @@ public partial class MainWindow : Window
         _trayIcon.Visible = false;
         _trayIcon.ContextMenuStrip?.Dispose();
         _trayIcon.Dispose();
-        // The asynchronous poll loop may still be unwinding; dispose its token source
-        // only after it has finished, rather than racing cancellation callbacks.
     }
 }
