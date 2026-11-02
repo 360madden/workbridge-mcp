@@ -20,8 +20,9 @@ Deliver a WPF/.NET 10 desktop GUI as Workbridge's primary human interface, with 
 - GUI: C# WPF targeting net10.0-windows, with UseWindowsForms for NotifyIcon; Windows desktop subsystem (no console).
 - Integration: connect as a client to the existing authenticated local MCP endpoint using its documented private descriptor/CLI authentication path; do not assume the HTTP port alone grants access.
 - Backend: existing Node.js MCP server and local CLI remain authoritative. No duplicate scheduler, persistence database, or ASP.NET server.
-- GUI operations: read-only initially. Poll diagnostics with cancellation/timeouts and stale/offline states; introduce push only if profiling justifies it.
+- GUI operations: read-only initially. A persistent Node MCP client streams read-only diagnostic samples every five seconds to WPF, with bounded output, reconnect handling, parent-pipe shutdown and stale/offline states. On-demand job details remain separately bounded.
 - Startup: existing sign-in scheduled task remains unchanged until a separately validated windowless-launcher milestone.
+- Desktop installation path: workbridge-control-center.json is copied alongside the executable and identifies the existing Workbridge repository root. Validate the absolute path and monitor script; retain ancestor discovery only when no configuration is present (development).
 - No Windows service conversion by default; existing user-bound credentials and interactive desktop workflows favor the current user-session architecture.
 
 ## Workstreams for parallel independent investigation
@@ -73,6 +74,7 @@ Gate: repeated real sign-in acceptance, no console flash, no orphan processes.
 - [ ] Independent review, focused tests, clean Git commit.
 - [ ] Staged release through documented WB-001 process where backend/runtime changes are needed.
 - [ ] Verify hosted MCP after deployment; document user-facing startup behavior.
+- [x] Separate-directory GUI launch passed: wbdesktop-external-path-smoke-20261102-v1 (exit 0), copied compiled output with workbridge-control-center.json to a disposable C:\\work directory outside the checkout; UIA confirmed live version 0.16.4-dev. Test copy cleaned up.
 Gate: no unresolved critical regressions.
 
 ## Risks / decisions
@@ -83,6 +85,7 @@ Gate: no unresolved critical regressions.
 5. Deployment: source changes do not deploy automatically. Never restart live server as part of desktop scaffolding.
 6. Shared desktop lease: capture wbdesktop-tray-presmoke-20261102-v1 returned UI_TURN_BUSY. Recheck when other desktop workflows are idle; do not route around the reservation.
 7. Persistent monitor lifecycle: WPF owns one Node read-only streaming client; stdout is bounded per line, parent stdin EOF requests shutdown, and WPF can restart a crashed client. A detached monitor must never persist after GUI exit.
+8. Installed desktop configuration: update repositoryRoot in workbridge-control-center.json if the Workbridge checkout moves. Invalid configuration reports unavailable rather than silently connecting to another installation.
 
 ## Next executable task
-Test actual Windows notification-area icon double-click and Exit context menu, obtain genuine independent code review, then consider M1/M2 acceptance. Performance benchmark and persistent-client optimization are implemented and tested; do not repeat one-shot process polling in the default GUI. Targeted close-to-tray, selected-job UI button, and synthetic offline/reconnect tests passed. Current code has extra control-plane/retained-result labels and dispatcher shutdown guard, verified by build and live read-only UIA. Current GUI test process has been removed; leave live startup/runtime unchanged.
+Test actual Windows notification-area icon double-click and Exit context menu, obtain genuine independent code review, and then consider M1/M2 acceptance. Read-only Shell_TrayWnd UIA discovery returned no exact matching Workbridge notification icon; do not assert menu behavior from that probe. Performance benchmark and persistent-client optimization are implemented and tested; do not repeat one-shot process polling in the default GUI. Targeted close-to-tray, selected-job UI button, and synthetic offline/reconnect tests passed. Current code has extra control-plane/retained-result labels and dispatcher shutdown guard, verified by build and live read-only UIA. Current GUI test process has been removed; leave live startup/runtime unchanged.

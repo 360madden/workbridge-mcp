@@ -37,6 +37,21 @@ public partial class MainWindow : Window
 
     private static string RepoRoot()
     {
+        // A distributed executable need not be inside the Workbridge checkout.
+        // An explicit local config takes priority; ancestor discovery remains useful
+        // for development checkouts and isolated fixtures without a config file.
+        var config = Path.Combine(AppContext.BaseDirectory, "workbridge-control-center.json");
+        if (File.Exists(config))
+        {
+            using var json = JsonDocument.Parse(File.ReadAllText(config));
+            var configuredRoot = json.RootElement.GetProperty("repositoryRoot").GetString();
+            if (string.IsNullOrWhiteSpace(configuredRoot) || !Path.IsPathFullyQualified(configuredRoot))
+                throw new InvalidDataException("Workbridge installation path must be absolute.");
+            var root = Path.GetFullPath(configuredRoot);
+            if (!File.Exists(Path.Combine(root, "scripts", "desktop-monitor.mjs")))
+                throw new DirectoryNotFoundException("Configured Workbridge installation does not contain its monitor script.");
+            return root;
+        }
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {

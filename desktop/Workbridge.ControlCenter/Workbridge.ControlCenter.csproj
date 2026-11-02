@@ -8,4 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Workbridge.ControlCenter</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <None Update="workbridge-control-center.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
