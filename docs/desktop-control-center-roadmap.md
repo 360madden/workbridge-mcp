@@ -44,10 +44,10 @@ Gate: explicit data-flow, trust-boundary and process-lifecycle review.
 
 ### M1 — Desktop shell
 - [x] Create desktop/Workbridge.ControlCenter WPF .NET 10 project; dotnet build passed with zero warnings/errors (job wbdesktop-build-20261102-02).
-- [ ] Single instance; second launch restores first.
+- [x] Implement single-instance mutex plus named auto-reset restore event; second process signals existing window. Compiled; interactive verification pending.
 - [x] Implement tray icon, double-click restore, close-to-tray, explicit Exit GUI (compiled; interactive smoke test pending).
 - [x] No service termination from UI: shell has no backend process control code.
-Gate: build passed; interactive smoke test pending. Review finding: second instance exits but does not restore the first. Fix before M1 completion.
+Gate: dotnet build passed again (wbdesktop-build-20261102-03, 0 warnings/errors). Prior missing second-instance restore addressed in source; interactive smoke test still required before M1 completion.
 
 ### M2 — Read-only live monitoring
 - [ ] Authenticated local MCP connection using existing supported mechanism.

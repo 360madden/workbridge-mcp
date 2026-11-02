@@ -28,6 +28,8 @@ public partial class MainWindow : Window
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(RestoreWindow);
     }
 
+    internal void RestoreFromSecondInstance() => RestoreWindow();
+
     private void RestoreWindow()
     {
         Show();
