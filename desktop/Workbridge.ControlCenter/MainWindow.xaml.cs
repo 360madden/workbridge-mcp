@@ -173,7 +173,13 @@ public partial class MainWindow : Window
                 var boundedOutput = new BoundedLineReader(monitor.StandardOutput, 64_000);
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var line = await boundedOutput.ReadLineAsync(cancellationToken);
+                    // A live child can stop producing output without exiting.
+                    // Require a heartbeat within 25 seconds; otherwise the outer
+                    // recovery loop marks the dashboard offline and replaces only
+                    // its own monitor process.
+                    using var heartbeat = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    heartbeat.CancelAfter(TimeSpan.FromSeconds(25));
+                    var line = await boundedOutput.ReadLineAsync(heartbeat.Token);
                     if (line is null) throw new IOException("Monitor exited.");
                     using var json = JsonDocument.Parse(line);
                     if (_exiting || cancellationToken.IsCancellationRequested) break;

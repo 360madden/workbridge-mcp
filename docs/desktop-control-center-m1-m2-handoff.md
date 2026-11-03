@@ -51,6 +51,12 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - Explorer icon registration was independently checked using the read-only `Shell_NotifyIconGetRect` API: `wbdesktop-shell-tray-registration-20261102-v2` found uID=1 for the owned notification HWND. The repeatable tray harness now includes registration verification; `wbdesktop-tray-shell-combined-20261102-v1` passed all checks with exit 0.
 - This test is synthetic and targets only our process. **The physical Windows taskbar icon or overflow interaction is still unverified.** No shared desktop mouse/keyboard input was injected.
 
+## Monitor heartbeat recovery checkpoint (2026-11-02)
+- Fixed a stale-health failure: a live Node monitor with permanently silent stdout could previously leave the GUI displaying the last healthy status. WPF now links a per-message 25-second cancellation timeout; after the timeout it marks the connection offline and kills/restarts **only its own monitor child**.
+- `wbdesktop-heartbeat-fixture-20261102-v1` passed the disposable silent-monitor fixture: initial healthy sample, stalled process identified as offline, automatic monitor restart and recovery, test-owned process/fixture cleanup (exit 0). No live service changes.
+- `wbdesktop-heartbeat-build-20261102` passed with zero warnings/errors, `wbdesktop-heartbeat-reader-unit-20261102` passed 15/15 assertions, and both `wbdesktop-heartbeat-tray-regression-20261102` and `wbdesktop-heartbeat-full-smoke-20261102` passed (exit 0).
+- Independent reviewer sign-off and physical Windows taskbar click remain unverified.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.
