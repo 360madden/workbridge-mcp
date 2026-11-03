@@ -73,6 +73,11 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - WPF build `wbdesktop-job-selection-build-20261102` passed without errors/warnings, unit tests `wbdesktop-selection-regress-unit-20261102` passed 15 assertions, tray test `wbdesktop-selection-regress-tray-20261102` passed, full live GUI test `wbdesktop-selection-full-smoke-20261102` passed. No Workbridge service or startup changes.
 - Independent reviewer sign-off and physical taskbar acceptance remain open.
 
+## Asynchronous job-detail ABA race checkpoint (2026-11-02)
+- A job request for A could still return late after the user selected A -> B -> A. The old job-ID comparison would mistakenly accept A's obsolete response because the ID matched again. WPF now tracks a monotonically increasing selection revision and refuses responses from earlier revisions, including across disconnect/reconnect.
+- The expanded `desktop/tests/Run-JobSelectionFixture.ps1` now delays A's result and asserts that an A -> B -> A sequence cannot display that stale output. Job `wbdesktop-aba-selection-fixture-20261102` passed (`staleAbaResponseRejected=true`, exit 0). Previous selection tests also passed.
+- Build `wbdesktop-aba-build-20261102` passed 0 errors/warnings; `wbdesktop-aba-tray-regression-20261102` and `wbdesktop-aba-full-smoke-20261102` passed. The live service and other Windows workflows remained unchanged.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.

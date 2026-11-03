@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly CancellationTokenSource _stop = new();
     private bool _exiting;
     private bool _refreshingJobs;
+    private long _selectionRevision;
     private string? _detailsForJobId;
 
     public MainWindow()
@@ -264,7 +265,9 @@ public partial class MainWindow : Window
 
     private void JobList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_refreshingJobs) ClearDetailsIfSelectionChanged();
+        if (_refreshingJobs) return;
+        _selectionRevision++;
+        ClearDetailsIfSelectionChanged();
     }
 
     private void ShowOffline()
@@ -277,6 +280,7 @@ public partial class MainWindow : Window
         RetainedText.Text = "Retained results: —";
         SampleText.Text = "Last sample: unavailable";
         InventoryText.Text = "Inventory: unavailable";
+        _selectionRevision++; // Invalidate in-flight details even if the same ID returns later.
         _detailsForJobId = null;
         JobList.Items.Clear();
         DetailsText.Text = "Workbridge disconnected; previously retrieved job details cleared.";
@@ -292,6 +296,7 @@ public partial class MainWindow : Window
             DetailsText.Text = "Select an actual job record first.";
             return;
         }
+        var selectionRevision = _selectionRevision;
         _detailsForJobId = jobId;
         DetailsButton.IsEnabled = false;
         DetailsText.Text = "Loading job details...";
@@ -301,9 +306,11 @@ public partial class MainWindow : Window
             if (_exiting || _stop.IsCancellationRequested) return;
             var data = json.RootElement;
             // Selection can change while an asynchronous MCP request is in flight.
-            if (((JobList.SelectedItem as ListBoxItem)?.Tag as string) != jobId)
+            if (_selectionRevision != selectionRevision ||
+                ((JobList.SelectedItem as ListBoxItem)?.Tag as string) != jobId)
             {
-                DetailsText.Text = "Selection changed; choose View selected job details again.";
+                // A -> B -> A must not accept A's earlier, now-stale response.
+                // The selection handler already cleared the old output.
                 return;
             }
             var state = data.GetProperty("status").GetString();
@@ -316,7 +323,7 @@ public partial class MainWindow : Window
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
         catch (Exception)
         {
-            if (!_exiting && !_stop.IsCancellationRequested)
+            if (!_exiting && !_stop.IsCancellationRequested && _selectionRevision == selectionRevision)
                 DetailsText.Text = "Job details unavailable. The job may have expired or Workbridge may be disconnected.";
         }
         finally

@@ -19,6 +19,7 @@ $receipt = [ordered]@{
     sameJobSurvivesRefresh = $false
     staleDetailsClearedOnSelection = $false
     jobBDetailsDisplayed = $false
+    staleAbaResponseRejected = $false
     cleanedUp = $false
 }
 function UIElement([IntPtr]$hwnd, [string]$id) {
@@ -76,7 +77,11 @@ emit();
 setInterval(emit,350);
 '@
     $fakeDetails = @'
+import fs from 'node:fs';
 const id=process.argv[2];
+if (id==='fixture_job_a' && fs.existsSync(new URL('../delay-A.flag', import.meta.url))) {
+    await new Promise(resolve => setTimeout(resolve, 1800));
+}
 process.stdout.write(JSON.stringify({
  ok:true,status:'running',exitCode:null,outputTruncated:false,
  log:id==='fixture_job_a'?'CONFIDENTIAL_A_ONLY':'JOB_B_OUTPUT'
@@ -125,6 +130,20 @@ process.stdout.write(JSON.stringify({
         }
     }
     if (-not $receipt.jobBDetailsDisplayed) { throw 'Job B details not displayed.' }
+    # Reproduce the A -> B -> A race with a deliberately delayed A result.
+    # The original ID-only guard would accept that stale A response.
+    New-Item -ItemType File -Path (Join-Path $fixture 'delay-A.flag') | Out-Null
+    SelectJob $hwnd 'fixture_job_a'
+    InvokeDetails $hwnd
+    SelectJob $hwnd 'fixture_job_b'
+    SelectJob $hwnd 'fixture_job_a'
+    Start-Sleep -Milliseconds 2500
+    $abaResult = Details $hwnd
+    $receipt.staleAbaResponseRejected = $abaResult -notlike '*CONFIDENTIAL_A_ONLY*' -and
+        $abaResult -like 'Selection changed*'
+    if (-not $receipt.staleAbaResponseRejected) {
+        throw 'Outdated A response appeared after A -> B -> A selection cycle.'
+    }
 }
 finally {
     if ($null -ne $owner) { Stop-Process -Id $owner.Id -ErrorAction SilentlyContinue }
@@ -136,6 +155,7 @@ finally {
     $receipt | ConvertTo-Json -Compress
 }
 if (-not ($receipt.jobADetailsDisplayed -and $receipt.sameJobSurvivesRefresh -and
-    $receipt.staleDetailsClearedOnSelection -and $receipt.jobBDetailsDisplayed -and $receipt.cleanedUp)) {
+    $receipt.staleDetailsClearedOnSelection -and $receipt.jobBDetailsDisplayed -and
+    $receipt.staleAbaResponseRejected -and $receipt.cleanedUp)) {
     exit 2
 }
