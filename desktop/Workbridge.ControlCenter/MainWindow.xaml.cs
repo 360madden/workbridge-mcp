@@ -22,8 +22,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("Open dashboard", null, (_, _) => Dispatcher.Invoke(RestoreWindow));
-        menu.Items.Add("Exit Control Center", null, (_, _) => Dispatcher.Invoke(ExitGui));
+        menu.Items.Add("Open dashboard", null, (_, _) => DispatchTrayAction(RestoreWindow));
+        menu.Items.Add("Exit Control Center", null, (_, _) => DispatchTrayAction(ExitGui));
         _trayIcon = new Forms.NotifyIcon
         {
             Text = "Workbridge Control Center",
@@ -31,8 +31,32 @@ public partial class MainWindow : Window
             ContextMenuStrip = menu,
             Visible = true
         };
-        _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(RestoreWindow);
+        _trayIcon.DoubleClick += (_, _) => DispatchTrayAction(RestoreWindow);
         _ = PollStatusAsync(_stop.Token);
+    }
+
+    private void DispatchTrayAction(Action action)
+    {
+        if (_exiting || Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
+        try
+        {
+            if (Dispatcher.CheckAccess())
+            {
+                action();
+            }
+            else
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!_exiting && !Dispatcher.HasShutdownStarted) action();
+                }));
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // A queued tray event can race GUI shutdown; it must not resurrect
+            // or invoke disposed WPF controls.
+        }
     }
 
     private static string RepoRoot()

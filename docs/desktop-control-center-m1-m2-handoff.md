@@ -44,6 +44,12 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - Follow-up: on-demand job and assignment probes now consume at most one 64,000-character JSON line using the same bounded reader and terminate their child process on all read/limit errors. `wbdesktop-ondemand-build-20261102` (0 warnings/errors), `wbdesktop-ondemand-unit-20261102` (15 assertions), and `wbdesktop-ondemand-smoke-20261102` (full GUI acceptance, exit 0) passed.
 - Test scripts/documentation are committed with the source change; independent code review and actual tray icon/menu interactions remain pending.
 
+## Tray callback acceptance checkpoint (2026-11-02)
+- Enumerated the hidden WinForms notification-window HWND **inside the owned Control Center process**. Synthetic `WM_USER+1024` / `WM_LBUTTONDBLCLK` restored a hidden dashboard. A synthetic right-button notification exposed the actual context menu; UI Automation invoked its `Exit Control Center` item and observed the GUI exit.
+- The first exploratory menu test returned exit 1 after the GUI had exited successfully, apparently due cleanup of an already-exited PID. The repeatable `desktop/tests/Run-TrayCallbackSmoke.ps1` fixes that cleanup path; `wbdesktop-tray-synthetic-full-20261102-v1` completed exit 0, with all tests passed.
+- MainWindow tray handler now guards against UI dispatcher shutdown races. `wbdesktop-tray-handler-build-20261102` passed with zero errors/warnings, `wbdesktop-tray-handler-unit-20261102` passed 15 assertions, `wbdesktop-tray-postfix-menu-20261102-v1` passed the synthetic callback/menu/Exit test, and `wbdesktop-tray-postfix-full-smoke-20261102-v1` passed complete live GUI smoke.
+- This test is synthetic and targets only our process. **The physical Windows taskbar icon or overflow interaction is still unverified.** No shared desktop mouse/keyboard input was injected.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.

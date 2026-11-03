@@ -16,6 +16,7 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 - `scripts/desktop-status.mjs`
 - `scripts/desktop-job-detail.mjs`
 - `scripts/desktop-assignments.mjs`
+- `desktop/tests/Run-TrayCallbackSmoke.ps1`
 - `desktop/tests/Run-DesktopSmoke.ps1`
 - `desktop/tests/BoundedLineReaderTests.cs`
 - `desktop/tests/BoundedLineReaderTests.csproj`
@@ -24,7 +25,7 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 ## Required review questions
 
 1. **Single-instance correctness:** Inspect mutex and restore-event initialization, concurrent startup, dispatcher shutdown, and the 15-attempt retry boundary. Check for potential lost activations or exceptions.
-2. **Tray lifecycle:** Examine hide-on-X, notification icon creation/disposal, restore on double-click, and explicit Exit GUI. The actual notification-area click/menu path is *not yet runtime-verified*.
+2. **Tray lifecycle:** Examine hide-on-X, icon creation/disposal, double-click restore, ContextMenuStrip Exit, and new dispatcher-shutdown guard. A PID-targeted synthetic WinForms notification-callback test now exercises both DoubleClick and the actual Exit menu item; physical Explorer notification-area clicks remain unverified.
 3. **Background monitoring:** Check whether the long-lived Node.js monitor can survive unexpected GUI death, hang on a stalled MCP connection, leak processes, or retry too aggressively.
 4. **Streaming bounds:** Review `BoundedLineReader.cs` and deterministic tests. Confirm the 64,000-character ceiling is enforced **while reading**, including CRLF, EOF, buffered subsequent lines, cancellation and exceptional output. Verify the on-demand probes accept at most one 64K line and terminate the owned child for oversized or malformed output. Check for any remaining unbounded streams, malformed JSON handling, stdout backpressure, and child cleanup.
 5. **UI correctness:** Review live/offline state, inventory-completeness label, selection restoration during five-second refreshes, stale job-detail response rejection, and on-demand per-repository coordination assignments. Ensure assignment state counts are never described as independently reasoning AI agents.
@@ -43,7 +44,7 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 - Isolated offline/online/offline fixture tests passed without stopping the real server.
 - Read-only Shell_TrayWnd UI Automation found 'Show Hidden Icons' but not the Workbridge icon while the overflow window was closed; **do not infer actual icon/menu usability from that check**.
 - On-demand assignment lookup and WPF interaction passed in `wbdesktop-assignments-ui-smoke-20261102-v1`. A lookup outside configured roots (`C:\Windows`) was refused.
-- Bounded streaming checkpoint: `wbdesktop-bounded-reader-unit-20261102` passed 15 assertions, `wbdesktop-bounded-reader-wpf-build-20261102` passed 0 warnings/errors, `wbdesktop-bounded-wpf-smoke-20261102` passed full GUI smoke, and `wbdesktop-oversize-fixture-run-20261102` passed oversize/offline/recovered/offline fixture with cleanup. Follow-up `wbdesktop-ondemand-build-20261102`, `wbdesktop-ondemand-unit-20261102`, and `wbdesktop-ondemand-smoke-20261102` passed after extending bounds to on-demand calls. These are developer-run tests, not independent reviewer sign-off.
+- Bounded streaming checkpoint: `wbdesktop-bounded-reader-unit-20261102` passed 15 assertions, `wbdesktop-bounded-reader-wpf-build-20261102` passed 0 warnings/errors, `wbdesktop-bounded-wpf-smoke-20261102` passed full GUI smoke, and `wbdesktop-oversize-fixture-run-20261102` passed oversize/offline/recovered/offline fixture with cleanup. Follow-up `wbdesktop-ondemand-build-20261102`, `wbdesktop-ondemand-unit-20261102`, and `wbdesktop-ondemand-smoke-20261102` passed after extending bounds to on-demand calls. Tray callback tests `wbdesktop-tray-synthetic-full-20261102-v1` and `wbdesktop-tray-postfix-menu-20261102-v1` passed via owned WinForms HWND, with no global mouse input; `wbdesktop-tray-postfix-full-smoke-20261102-v1` passed complete GUI checks. These are developer-run tests, not independent reviewer sign-off.
 
 ## Output contract for independent review
 

@@ -38,6 +38,18 @@ dotnet run --project .\\desktop\\tests\\BoundedLineReaderTests.csproj -c Release
 
 The unit harness tests the incremental 64,000-character line limit, CRLF, EOF, cancellation and oversized messages. The integration fixture creates a new disposable folder under the repository's `temp` directory, copies the already-built GUI there, configures that copy to use its own fake monitor, and verifies oversized output -> offline -> recovery -> offline. It refuses to run when the dashboard already exists, cleans up only its own fixture/process, and **does not stop the live MCP server**. Test success is not independent code-review sign-off.
 
+## Synthetic tray callback regression
+
+From `C:\work\workbridge-mcp` in Windows PowerShell, after building the desktop application:
+
+```powershell
+.\desktop\tests\Run-TrayCallbackSmoke.ps1
+```
+
+This test refuses to run over an existing Control Center instance. It starts an isolated `--tray` process, enumerates **only windows owned by that process**, sends simulated WinForms notification callback messages to its hidden notification window, verifies double-click restoration and close-to-tray behavior, then opens its context menu and invokes **Exit Control Center** through UI Automation. It verifies shutdown and removes only the owned process. No global mouse/keyboard input is sent.
+
+**Scope limitation:** This proves the application's notification callbacks and actual WinForms context-menu item work. It does **not** prove that clicking the icon through Windows Explorer's taskbar or overflow UI works. That remains a separate M1 acceptance gate.
+
 ## Acceptance checks
 
 - Displays a live authenticated version/status.
