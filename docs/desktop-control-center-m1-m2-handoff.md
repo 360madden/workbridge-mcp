@@ -110,6 +110,11 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - Created `docs/desktop-control-center-independent-chat-review-prompt.md` for an actual **different ChatGPT Chat conversation** to inspect source read-only and return severity-ranked findings. Preparing a prompt is not independent reviewer sign-off. No Ollama/Codex used.
 - Real tray attempt `wbdesktop-physical-tray-real-attempt-20261102` returned exit 2: Explorer icon registered, but no physical double-click was observed; cleanup succeeded. M1 physical click still pending.
 
+## Freebuff independent review pilot and CRLF boundary fix (2026-11-02)
+- User-requested Freebuff delegation now completed one actual bounded read-only AI review through a Windows ConPTY bridge in a disposable copied-source workspace, with generated completion marker and final answer captured before terminal shutdown. Separate review findings, model uncertainty and receipts: `docs/freebuff-review-bounded-reader-20261102.md`.
+- Freebuff identified that exact maximum content length followed by CRLF was rejected because the final CR was counted too early. Added targeted tests first; `wb-freebuff-reader-crlf-baseline-fail-20261102` reproduced the bug. Source fix permits at most one pending CR while awaiting LF, then enforces the original returned-length limit. `wb-freebuff-reader-crlf-units-postfix-20261102` passed 20 assertions, `wb-freebuff-reader-crlf-build-postfix-20261102` passed zero errors/warnings, and full GUI/tray/oversized-monitor regressions passed.
+- This is a completed **narrow independent review pilot**, not full Control Center M0/M2 sign-off. A genuinely independent review must still inspect the entire scope listed in `docs/desktop-control-center-review-brief.md`. M1 physical Explorer tray interaction remains unverified.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.

@@ -42,6 +42,20 @@ async Task ShouldReject(string content, int maxLength, string label)
 await ShouldReject(new string('b', 65) + "\n", 64, "one char over boundary");
 await ShouldReject(new string('b', 65), 64, "unterminated over boundary");
 {
+    var reader = new BoundedLineReader(new StringReader(new string('a', 64) + "\r\n"), 64);
+    Check(await reader.ReadLineAsync(CancellationToken.None) == new string('a', 64),
+        "exact content boundary with CRLF");
+}
+{
+    var reader = new BoundedLineReader(new StringReader(new string('x', 4096) + "\r\nNEXT"), 4096);
+    Check(await reader.ReadLineAsync(CancellationToken.None) == new string('x', 4096),
+        "CRLF boundary split across reads");
+    Check(await reader.ReadLineAsync(CancellationToken.None) == "NEXT",
+        "buffered line after split boundary CRLF");
+}
+await ShouldReject(new string('a', 64) + "\r", 64, "unterminated CR is content");
+await ShouldReject(new string('a', 64) + "\rX\n", 64, "CR followed by data is over boundary");
+{
     var reader = new BoundedLineReader(new StringReader(new string('x', 4095) + "\r\nNEXT"), 4096);
     Check(await reader.ReadLineAsync(CancellationToken.None) == new string('x', 4095), "split CRLF boundary");
     Check(await reader.ReadLineAsync(CancellationToken.None) == "NEXT", "preserve buffered next line");

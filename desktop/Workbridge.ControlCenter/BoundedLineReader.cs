@@ -37,13 +37,21 @@ internal sealed class BoundedLineReader
             {
                 _count = await _source.ReadAsync(_buffer.AsMemory(), cancellationToken);
                 _offset = 0;
-                if (_count == 0) return result.Length == 0 ? null : result.ToString();
+                if (_count == 0)
+                {
+                    // A final CR without LF is content, not a CRLF terminator.
+                    if (result.Length > _maxLength)
+                        throw new InvalidDataException($"Monitor message exceeded {_maxLength} characters.");
+                    return result.Length == 0 ? null : result.ToString();
+                }
             }
 
             var remaining = _buffer.AsSpan(_offset, _count - _offset);
             var newline = remaining.IndexOf('\n');
             var length = newline >= 0 ? newline : remaining.Length;
-            if (length > _maxLength - result.Length)
+            // Allow one extra pending CR while deciding whether the next
+            // character is LF. The returned content still has the strict limit.
+            if (length > (long)_maxLength + 1 - result.Length)
                 throw new InvalidDataException($"Monitor message exceeded {_maxLength} characters.");
 
             result.Append(_buffer, _offset, length);
@@ -53,8 +61,12 @@ internal sealed class BoundedLineReader
                 _offset++; // Consume newline; preserve bytes after it for the next call.
                 if (result.Length > 0 && result[result.Length - 1] == '\r')
                     result.Length--;
+                if (result.Length > _maxLength)
+                    throw new InvalidDataException($"Monitor message exceeded {_maxLength} characters.");
                 return result.ToString();
             }
+            if (result.Length > _maxLength && result[result.Length - 1] != '\r')
+                throw new InvalidDataException($"Monitor message exceeded {_maxLength} characters.");
         }
     }
 }
