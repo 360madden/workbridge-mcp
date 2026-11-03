@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private bool _refreshingJobs;
     private long _selectionRevision;
     private long _statusRevision;
+    private long _assignmentInputRevision;
     private string? _detailsForJobId;
 
     public MainWindow()
@@ -334,6 +335,15 @@ public partial class MainWindow : Window
         }
     }
 
+    private void AssignmentsProjectText_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _assignmentInputRevision++;
+        // XAML initialization may fire this event before the other fields exist.
+        if (AssignmentsSummary is null || AssignmentsList is null) return;
+        AssignmentsList.Items.Clear();
+        AssignmentsSummary.Text = "Repository changed; choose Load assignments for the current repository.";
+    }
+
     private async void AssignmentsButton_Click(object sender, RoutedEventArgs e)
     {
         var project = AssignmentsProjectText.Text.Trim();
@@ -343,13 +353,15 @@ public partial class MainWindow : Window
             return;
         }
         var statusRevision = _statusRevision;
+        var inputRevision = _assignmentInputRevision;
         AssignmentsButton.IsEnabled = false;
         AssignmentsSummary.Text = "Loading recorded assignments...";
         AssignmentsList.Items.Clear();
         try
         {
             using var json = await RunProbeAsync("desktop-assignments.mjs", project, _stop.Token);
-            if (_exiting || _stop.IsCancellationRequested || _statusRevision != statusRevision) return;
+            if (_exiting || _stop.IsCancellationRequested || _statusRevision != statusRevision ||
+                _assignmentInputRevision != inputRevision) return;
             if (!string.Equals(AssignmentsProjectText.Text.Trim(), project, StringComparison.Ordinal))
             {
                 AssignmentsSummary.Text = "Repository selection changed. Load assignments again.";
@@ -379,7 +391,8 @@ public partial class MainWindow : Window
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
         catch (Exception)
         {
-            if (!_exiting && !_stop.IsCancellationRequested && _statusRevision == statusRevision)
+            if (!_exiting && !_stop.IsCancellationRequested && _statusRevision == statusRevision &&
+                _assignmentInputRevision == inputRevision)
             {
                 AssignmentsList.Items.Clear();
                 AssignmentsSummary.Text = "Assignment lookup unavailable. Verify the repository path and Workbridge connection.";

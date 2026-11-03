@@ -83,6 +83,11 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - Isolated `desktop/tests/Run-AssignmentDisconnectFixture.ps1` job `wbdesktop-assignment-disconnect-fixture-20261102` passed all five checks (exit 0): healthy status, offline during delayed assignment query, rejection of old reply, new post-reconnect query works, and fixture/owned-process cleanup.
 - Build `wbdesktop-assignment-disconnect-build-20261102` (0 warnings/errors), reader tests `wbdesktop-assignment-disconnect-units-20261102` (15/15), tray `wbdesktop-assignment-disconnect-tray-20261102` (exit 0), full GUI `wbdesktop-assignment-disconnect-fullsmoke-20261102` (exit 0), and test script syntax all passed. No MCP server/VM changes.
 
+## Repository input A -> B -> A checkpoint (2026-11-02)
+- Fixed a second stale-assignment scenario: a request for repository A could be accepted after the field changed A -> B -> A because only final string equality was checked. TextChanged now increments `_assignmentInputRevision`, clears old visible results, and invalidates any earlier request even if the repository name matches again.
+- Extended `desktop/tests/Run-AssignmentDisconnectFixture.ps1` passed (`wbdesktop-assignment-input-aba-fixture-20261102`, exit 0), verifying prior offline/reconnect cases plus project-change clearing, delayed A -> B -> A result rejection, subsequent successful lookup and cleanup. Build `wbdesktop-assignment-input-aba-build-20261102` passed with no warnings/errors. Tray and full desktop regressions passed (`wbdesktop-input-aba-tray-regression-20261102`, `wbdesktop-input-aba-full-smoke-20261102`).
+- Independent reviewer and physical Explorer tray-click acceptance still outstanding.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.

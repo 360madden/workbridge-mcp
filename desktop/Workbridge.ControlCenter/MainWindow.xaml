@@ -40,7 +40,7 @@
                    Margin="0,18,0,8"/>
         <StackPanel Orientation="Horizontal">
           <TextBox x:Name="AssignmentsProjectText" Text="workbridge-mcp"
-                   Width="260" MaxLength="512"/>
+                   Width="260" MaxLength="512" TextChanged="AssignmentsProjectText_TextChanged"/>
           <Button x:Name="AssignmentsButton" Content="Load assignments" Width="145"
                   Margin="10,0,0,0" Click="AssignmentsButton_Click"/>
         </StackPanel>

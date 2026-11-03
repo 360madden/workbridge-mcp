@@ -20,6 +20,9 @@ $result = [ordered]@{
     offlineDuringLookup = $false
     staleResponseRejected = $false
     lookupAfterReconnect = $false
+    changedProjectClearsOldData = $false
+    projectAbaResponseRejected = $false
+    lookupAfterProjectAba = $false
     cleanup = $false
 }
 function UI([IntPtr]$hwnd, [string]$id) {
@@ -32,6 +35,12 @@ function ReadText([IntPtr]$hwnd, [string]$id) {
     $item = UI $hwnd $id
     if ($null -eq $item) { return '' }
     return [string]$item.Current.Name
+}
+function SetProject([IntPtr]$hwnd, [string]$name) {
+    $entry = UI $hwnd 'AssignmentsProjectText'
+    $pattern = [System.Windows.Automation.ValuePattern]$entry.GetCurrentPattern(
+        [System.Windows.Automation.ValuePattern]::Pattern)
+    $pattern.SetValue($name)
 }
 function RequestAssignments([IntPtr]$hwnd) {
     $button = UI $hwnd 'AssignmentsButton'
@@ -124,6 +133,30 @@ process.stdout.write(JSON.stringify({
         }
     }
     if (-not $result.lookupAfterReconnect) { throw 'New post-reconnect assignment lookup failed.' }
+    SetProject $hwnd 'other-repository'
+    $changed = ReadText $hwnd 'AssignmentsSummary'
+    $result.changedProjectClearsOldData = $changed -like 'Repository changed*'
+    if (-not $result.changedProjectClearsOldData) { throw 'Old assignment data remained after editing repository.' }
+    SetProject $hwnd 'workbridge-mcp'
+    RequestAssignments $hwnd
+    Start-Sleep -Milliseconds 175
+    SetProject $hwnd 'other-repository'
+    SetProject $hwnd 'workbridge-mcp'
+    Start-Sleep -Milliseconds 1950
+    $oldResult = ReadText $hwnd 'AssignmentsSummary'
+    $result.projectAbaResponseRejected = $oldResult -like 'Repository changed*' -and
+        $oldResult -notlike 'Project: workbridge-mcp*'
+    if (-not $result.projectAbaResponseRejected) {
+        throw "Obsolete project A -> B -> A response was accepted: $oldResult"
+    }
+    RequestAssignments $hwnd
+    while ([DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 150
+        if ((ReadText $hwnd 'AssignmentsSummary') -like 'Project: workbridge-mcp*') {
+            $result.lookupAfterProjectAba = $true;break
+        }
+    }
+    if (-not $result.lookupAfterProjectAba) { throw 'Fresh lookup after project A -> B -> A did not complete.' }
 }
 finally {
     if ($null -ne $owner) { Stop-Process -Id $owner.Id -ErrorAction SilentlyContinue }
@@ -134,6 +167,8 @@ finally {
     $result | ConvertTo-Json -Compress
 }
 if (-not ($result.healthyInitially -and $result.offlineDuringLookup -and
-    $result.staleResponseRejected -and $result.lookupAfterReconnect -and $result.cleanup)) {
+    $result.staleResponseRejected -and $result.lookupAfterReconnect -and
+    $result.changedProjectClearsOldData -and $result.projectAbaResponseRejected -and
+    $result.lookupAfterProjectAba -and $result.cleanup)) {
     exit 2
 }
