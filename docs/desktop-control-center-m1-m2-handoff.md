@@ -105,6 +105,11 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - WPF `wbdesktop-null-count-build-20261102` built with zero warnings/errors, Node format tests `wbdesktop-null-count-node-contract-20261102` passed 28 assertions, bounded-line tests `wbdesktop-null-count-reader-20261102` passed 15; full live GUI `wbdesktop-null-counts-full-smoke-20261102` and synthetic tray `wbdesktop-null-counts-tray-20261102` passed. Live MCP server, scheduled task and VMs unchanged.
 - Physical Explorer tray clicks and independent reviewer acceptance remain pending.
 
+## Bounded second-instance acceptance harness and reviewer handoff (2026-11-02)
+- `desktop/tests/Run-DesktopSmoke.ps1` now has a six-second bound for the second launch instead of `Start-Process -Wait` and attempts cleanup of only its own second child on failure. Syntax check `wbdesktop-second-launch-guard-syntax-20261102b` passed, WPF `wbdesktop-second-launch-guard-build-20261102b` passed 0 warnings/errors, complete GUI `wbdesktop-second-launch-guard-smoke-20261102b` and tray `wbdesktop-second-launch-guard-tray-20261102b` passed exit 0, bounded reader `wbdesktop-second-launch-reader-20261102b` passed 15 assertions. These are not physical tray acceptance.
+- Created `docs/desktop-control-center-independent-chat-review-prompt.md` for an actual **different ChatGPT Chat conversation** to inspect source read-only and return severity-ranked findings. Preparing a prompt is not independent reviewer sign-off. No Ollama/Codex used.
+- Real tray attempt `wbdesktop-physical-tray-real-attempt-20261102` returned exit 2: Explorer icon registered, but no physical double-click was observed; cleanup succeeded. M1 physical click still pending.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.

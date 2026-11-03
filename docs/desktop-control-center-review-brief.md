@@ -40,7 +40,7 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 6. **Local authorization:** The service endpoint requires an authenticated DPAPI-protected descriptor. Confirm the GUI uses the existing `connectService` path and never logs or exposes its credential.
 7. **Safety of displayed output:** Job logs can contain secrets. Confirm that sensitive output remains local and bounded; suggest appropriate operator-facing behavior without silently sending it elsewhere.
 8. **Root/package behavior:** Review `workbridge-control-center.json` absolute root resolution when installed outside the repository, including malformed paths and fallback behavior.
-9. **Automated test quality:** Confirm smoke scripts and the new physical-observation harness refuse existing Control Center instances, use only their owned HWND/PID, and clean up on failure. `Run-PhysicalTrayAcceptance.ps1 -ValidateOnly` passed icon-registration validation; actual user input was not tested. Identify missing negative tests.
+9. **Automated test quality:** Confirm smoke scripts and the physical-observation harness refuse existing Control Center instances, use only their owned HWND/PID, enforce a six-second deadline for second-instance termination, and clean up on failure. `Run-PhysicalTrayAcceptance.ps1 -ValidateOnly` passed icon-registration validation; actual user input was not tested. Identify missing negative tests.
 10. **Scope and rollback:** No backend/service task updates should occur during desktop source tests. Preserve Workbridge v0.16.4-dev, 36 command slots, and the WB-001 updater.
 
 ## Verification baseline

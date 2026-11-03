@@ -35,6 +35,7 @@ function Get-UIElement([IntPtr]$hwnd, [string]$id) {
     return $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
 }
 $owner = $null
+$second = $null
 $receipt = [ordered]@{
     schemaVersion = 1
     test = 'Workbridge WPF desktop isolated smoke'
@@ -151,7 +152,15 @@ try {
     if (-not $hidden) { throw 'The window did not hide while its process stayed alive.' }
     $receipt.closeToTray = $true
 
-    $second = Start-Process -FilePath $exe -PassThru -Wait
+    $second = Start-Process -FilePath $exe -PassThru
+    $secondDeadline = [DateTime]::UtcNow.AddSeconds(6)
+    while ([DateTime]::UtcNow -lt $secondDeadline) {
+        Start-Sleep -Milliseconds 100
+        $second.Refresh()
+        if ($second.HasExited) { break }
+    }
+    $second.Refresh()
+    if (-not $second.HasExited) { throw 'Second instance did not exit within six seconds.' }
     if ($second.ExitCode -ne 0) { throw 'Second instance returned an error.' }
     $restored = [IntPtr]::Zero
     $restoreDeadline = [DateTime]::UtcNow.AddSeconds(6)
@@ -167,6 +176,13 @@ try {
     $receipt.singleInstanceRestore = $true
 }
 finally {
+    if ($null -ne $second) {
+        try {
+            $second.Refresh()
+            if (-not $second.HasExited) { Stop-Process -Id $second.Id -ErrorAction Stop }
+        }
+        catch { $receipt.secondInstanceCleanupError = $_.Exception.Message }
+    }
     if ($null -ne $owner) {
         Stop-Process -Id $owner.Id -ErrorAction SilentlyContinue
     }

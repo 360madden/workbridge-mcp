@@ -1,6 +1,6 @@
 # Desktop smoke-test instructions
 
-The repeatable acceptance script is `Run-DesktopSmoke.ps1`.
+The repeatable acceptance script is `Run-DesktopSmoke.ps1`. Its second-instance restore check uses a six-second process-exit deadline rather than an unbounded wait, and it cleans up only test-owned GUI processes.
 
 It tests the real WPF window using Windows UI Automation and a targeted `WM_CLOSE` message. It does **not** modify the Workbridge MCP server, Windows scheduled task, VMware, or project files.
 
