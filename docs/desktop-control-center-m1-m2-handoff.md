@@ -88,6 +88,12 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - Extended `desktop/tests/Run-AssignmentDisconnectFixture.ps1` passed (`wbdesktop-assignment-input-aba-fixture-20261102`, exit 0), verifying prior offline/reconnect cases plus project-change clearing, delayed A -> B -> A result rejection, subsequent successful lookup and cleanup. Build `wbdesktop-assignment-input-aba-build-20261102` passed with no warnings/errors. Tray and full desktop regressions passed (`wbdesktop-input-aba-tray-regression-20261102`, `wbdesktop-input-aba-full-smoke-20261102`).
 - Independent reviewer and physical Explorer tray-click acceptance still outstanding.
 
+## Parent-EOF orphan prevention checkpoint (2026-11-02)
+- Coordinator lifecycle inspection found that parent stdin EOF could abort the monitor but leave Node alive when an MCP call or `client.close()` never resolves. `scripts/desktop-monitor.mjs` now arms an unref'd 2-second forced-exit fallback *only after shutdown is requested*; ordinary diagnostics cadence is unchanged.
+- New `desktop/tests/desktop-monitor-parent-eof.test.mjs` copies the real monitor source into an isolated temporary fixture, replaces imported MCP client/service with stubs, intentionally stalls `diagnostics` with an active event-loop handle and closes actual parent stdin. `wbdesktop-eof-parent-fixture-20261102` passed exit 0: monitor self-terminated cleanly in 2,024 ms despite the hanging client. Node syntax `wbdesktop-eof-node-syntax-20261102` passed.
+- Real read-only client `wbdesktop-eof-live-status-20261102` passed with v0.16.4-dev, healthy tunnel and 36-slot capacity. WPF `-warnaserror` build, 15 reader assertions, tray callback regression and full GUI smoke all passed (`wbdesktop-eof-build-20261102`, `wbdesktop-eof-reader-unit-20261102`, `wbdesktop-eof-tray-smoke-20261102`, `wbdesktop-eof-fullsmoke-20261102`). Live owner/VM and startup task unchanged.
+- Independent reviewer sign-off and actual Explorer notification-icon click remain open.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.

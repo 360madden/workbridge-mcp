@@ -13,16 +13,27 @@ const lifecycle = new AbortController();
 const intervalMs = 5000;
 let client = null;
 
+// A stalled client.close() or an uncooperative transport can otherwise keep
+// a monitor alive after its parent disappears. The deadline is intentionally
+// reserved for shutdown; normal status calls are never cut short by it.
+let shutdownRequested = false;
+function requestShutdown() {
+  if (shutdownRequested) return;
+  shutdownRequested = true;
+  lifecycle.abort();
+  const forcedExit = setTimeout(() => process.exit(0), 2000);
+  forcedExit.unref();
+}
 for (const signal of ['SIGINT', 'SIGTERM']) {
-  process.once(signal, () => lifecycle.abort());
+  process.once(signal, requestShutdown);
 }
 
 // The WPF parent keeps an inherited stdin pipe open. If it crashes, EOF
-// closes this monitor rather than leaving an orphaned background process.
+// shuts down the monitor even when its MCP transport refuses to close.
 if (process.env.WORKBRIDGE_DESKTOP_PARENT_PIPE === '1') {
   process.stdin.resume();
-  process.stdin.once('end', () => lifecycle.abort());
-  process.stdin.once('error', () => lifecycle.abort());
+  process.stdin.once('end', requestShutdown);
+  process.stdin.once('error', requestShutdown);
 }
 
 const emit = data => process.stdout.write(JSON.stringify(data) + '\n');

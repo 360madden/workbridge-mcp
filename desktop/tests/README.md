@@ -42,6 +42,16 @@ dotnet run --project .\\desktop\\tests\\BoundedLineReaderTests.csproj -c Release
 
 The unit harness tests the incremental 64,000-character line limit, CRLF, EOF, cancellation and oversized messages. The integration fixture creates a new disposable folder under the repository's `temp` directory, copies the already-built GUI there, configures that copy to use its own fake monitor, and verifies oversized output -> offline -> recovery -> offline. It refuses to run when the dashboard already exists, cleans up only its own fixture/process, and **does not stop the live MCP server**. `Run-StalledMonitorFixture.ps1` creates a separate fixture whose monitor emits one healthy status and then hangs without exiting. The GUI must mark that stale connection offline after the 25-second heartbeat limit, terminate its own child and reconnect after a fixture flag is set. Only the temporary process/fixture is cleaned up; the real Workbridge service is not stopped. `Run-TunnelHealthFixture.ps1` independently confirms the dashboard displays healthy, reachable-but-degraded, and recovered tunnel states without falsely claiming full connectivity or disturbing the real Workbridge service. `Run-JobSelectionFixture.ps1` tests two synthetic command jobs: loaded details remain visible across a refresh when the same job is selected, clear immediately when another job is selected, and then show the second job's details on demand. The fixture also delays a request and cycles A -> B -> A to ensure a response from before the selection changes is rejected even when the job ID matches again. `Run-AssignmentDisconnectFixture.ps1` uses a delayed fake assignment response and offline status messages to prove that old coordination assignments cannot overwrite the unavailable state, and that a new post-reconnect query works. It also checks that changing the repository input clears prior results immediately and invalidates delayed A -> B -> A lookup results even when the final name matches. Test success is not independent code-review sign-off.
 
+## Monitor owner-loss lifecycle regression
+
+From `C:\work\workbridge-mcp`:
+
+```powershell
+node .\desktop\tests\desktop-monitor-parent-eof.test.mjs
+```
+
+This test copies the real monitor source into a fresh disposable fixture, replaces MCP imports with inert stubs and simulates an unresponsive diagnostics call. Closing its own monitor child's stdin must cause clean termination within the 2-second shutdown watchdog, even while the stub intentionally holds an active event-loop handle. The harness never contacts the actual Workbridge service, does not touch other Node processes and deletes its own fixture. The forced exit applies only after a parent/signal shutdown request, not during ordinary monitoring.
+
 ## Synthetic tray callback regression
 
 From `C:\work\workbridge-mcp` in Windows PowerShell, after building the desktop application:
