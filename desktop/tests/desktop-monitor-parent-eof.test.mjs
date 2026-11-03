@@ -19,6 +19,8 @@ try {
   assert.ok(adapted.includes("from './fake-service.mjs'"));
   await Promise.all([
     writeFile(path.join(fixture, 'monitor.mjs'), adapted),
+    writeFile(path.join(fixture, 'desktop-monitor-format.mjs'),
+      await readFile(path.join(repo, 'scripts', 'desktop-monitor-format.mjs'), 'utf8')),
     writeFile(path.join(fixture, 'fake-service.mjs'),
       "export async function connectService(){ return {endpoint:{version:'FIXTURE'},transport:{}}; }\n"),
     writeFile(path.join(fixture, 'fake-client.mjs'), [

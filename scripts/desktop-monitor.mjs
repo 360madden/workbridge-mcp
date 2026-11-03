@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { Client } from '@modelcontextprotocol/client';
 import { connectService } from '../dist/local-service.js';
+import { formatStatus, serializeStatus } from './desktop-monitor-format.mjs';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
 const state = path.join(repo, '.local');
@@ -36,31 +37,7 @@ if (process.env.WORKBRIDGE_DESKTOP_PARENT_PIPE === '1') {
   process.stdin.once('error', requestShutdown);
 }
 
-const emit = data => process.stdout.write(JSON.stringify(data) + '\n');
-
-function formatStatus(result, endpoint) {
-  const capacity = result.jobs?.capacity ?? {};
-  const jobs = Array.isArray(capacity.jobs) ? capacity.jobs : [];
-  return {
-    ok: true,
-    version: result.version ?? endpoint.version,
-    tunnelReady: result.tunnel?.ready === true,
-    controlPlane: result.tunnel?.controlPlane ?? 'unknown',
-    capacity: {
-      limit: capacity.limit ?? null,
-      occupied: capacity.occupied ?? null,
-      available: capacity.available ?? null,
-      retainedResults: capacity.retainedResults ?? null
-    },
-    runningJobs: result.jobs?.runningJobs ?? null,
-    inventoryComplete: result.jobs?.inventory?.complete === true,
-    jobs: jobs.slice(0, 36).map(job => ({
-      id: job.jobId, project: job.project, status: job.status,
-      kind: job.kind, nextAction: job.nextAction
-    })),
-    sampledUtc: new Date().toISOString()
-  };
-}
+const emit = data => process.stdout.write(serializeStatus(data));
 
 async function closeClient() {
   const current = client;

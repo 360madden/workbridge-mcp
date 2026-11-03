@@ -94,6 +94,11 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - Real read-only client `wbdesktop-eof-live-status-20261102` passed with v0.16.4-dev, healthy tunnel and 36-slot capacity. WPF `-warnaserror` build, 15 reader assertions, tray callback regression and full GUI smoke all passed (`wbdesktop-eof-build-20261102`, `wbdesktop-eof-reader-unit-20261102`, `wbdesktop-eof-tray-smoke-20261102`, `wbdesktop-eof-fullsmoke-20261102`). Live owner/VM and startup task unchanged.
 - Independent reviewer sign-off and actual Explorer notification-icon click remain open.
 
+## Bounded monitor transport checkpoint (2026-11-02)
+- Found that Node serialized diagnostic job metadata without enforcing WPF's 64,000-character input limit, so sufficiently large or escape-heavy metadata could repeatedly force a healthy GUI offline. Added `scripts/desktop-monitor-format.mjs`, capped serialized samples at 60,000 characters, bounded individual text fields and at most 36 jobs, and marks shortened/dropped inventories partial while preserving capacity counters.
+- `desktop/tests/desktop-monitor-format.test.mjs` passed 23 assertions (`wbdesktop-format-boundary-tests-20261102`) including oversized/escaped metadata and bounded fallback. Node syntax tests, `wbdesktop-format-parent-eof-20261102`, reader unit tests (15/15), `wbdesktop-format-wpf-build-20261102` (0 warnings/errors), `wbdesktop-format-full-gui-20261102` and `wbdesktop-format-tray-gui-20261102` all passed exit 0. Existing parent-EOF harness was updated to copy the new pure formatter into its disposable fixture.
+- User explicitly requested **no Ollama** for this workflow. Cancelled the CPU-only local reviewer job (`wbdesktop-local-deepseek-review-20261102-v2`) and its temporary localhost Ollama server (`wbdesktop-ollama-review-temp-server-20261102`); neither yielded review findings or sign-off. Continue using ChatGPT Chat mode and Workbridge only.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.

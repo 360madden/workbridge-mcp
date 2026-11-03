@@ -13,6 +13,7 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 - `desktop/Workbridge.ControlCenter/Workbridge.ControlCenter.csproj`
 - `desktop/Workbridge.ControlCenter/workbridge-control-center.json`
 - `scripts/desktop-monitor.mjs`
+- `scripts/desktop-monitor-format.mjs`
 - `scripts/desktop-status.mjs`
 - `scripts/desktop-job-detail.mjs`
 - `scripts/desktop-assignments.mjs`
@@ -27,13 +28,14 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 - `desktop/tests/Run-PhysicalTrayAcceptance.ps1`
 - `desktop/tests/Run-AssignmentDisconnectFixture.ps1`
 - `desktop/tests/desktop-monitor-parent-eof.test.mjs`
+- `desktop/tests/desktop-monitor-format.test.mjs`
 
 ## Required review questions
 
 1. **Single-instance correctness:** Inspect mutex and restore-event initialization, concurrent startup, dispatcher shutdown, and the 15-attempt retry boundary. Check for potential lost activations or exceptions.
 2. **Tray lifecycle:** Examine hide-on-X, icon creation/disposal, double-click restore, ContextMenuStrip Exit, and new dispatcher-shutdown guard. A PID-targeted synthetic WinForms notification-callback test now exercises both DoubleClick and the actual Exit menu item; physical Explorer notification-area clicks remain unverified.
 3. **Background monitoring:** Check monitor lifecycle, unexpected GUI death, stalled MCP connection and orphan risk. WPF applies a per-line 25-second heartbeat timeout. Node now requests abort on parent EOF/signal and arms an unref'd 2-second forced exit only during shutdown. Review whether that deadline could drop useful cleanup, parent/child race behavior, and unexpected cleanup blockers. The synthetic hanging-MCP/EOF fixture passed but is not independent sign-off.
-4. **Streaming bounds:** Review `BoundedLineReader.cs` and deterministic tests. Confirm the 64,000-character ceiling is enforced **while reading**, including CRLF, EOF, buffered subsequent lines, cancellation and exceptional output. Verify the on-demand probes accept at most one 64K line and terminate the owned child for oversized or malformed output. Check for any remaining unbounded streams, malformed JSON handling, stdout backpressure, and child cleanup.
+4. **Streaming bounds:** Review the pure `desktop-monitor-format.mjs` serialization limit (60,000 characters), explicit inventory partial flag when jobs are trimmed, and `BoundedLineReader.cs` 64,000-character receive limit. Confirm escape-heavy metadata, EOF, subsequent-line preservation, cancellation, on-demand probes, malformed JSON handling, stdout backpressure and child cleanup. The formatter's 23 assertions and GUI integration passed; do not treat coordinator tests as independent reviewer approval.
 5. **UI correctness:** Review healthy/reachable-but-degraded/offline state classification, inventory-completeness label, and detail selection. Job details now clear on selecting a different job but persist through five-second list reconstruction with the same job selected. Verify refresh guards, selection-revision protection against delayed A -> B -> A responses and disconnect/reconnect, disappearance of selected jobs, and on-demand per-repository coordination assignments, especially `_statusRevision` rejecting replies from before offline/reconnect and `_assignmentInputRevision` rejecting delayed repository A -> B -> A input changes. Ensure assignment state counts are never described as independently reasoning AI agents.
 6. **Local authorization:** The service endpoint requires an authenticated DPAPI-protected descriptor. Confirm the GUI uses the existing `connectService` path and never logs or exposes its credential.
 7. **Safety of displayed output:** Job logs can contain secrets. Confirm that sensitive output remains local and bounded; suggest appropriate operator-facing behavior without silently sending it elsewhere.
