@@ -19,12 +19,19 @@ To additionally verify the details button for a known *currently running* Workbr
 .\desktop\tests\Run-DesktopSmoke.ps1 -ExpectedJobId '<actual-running-job-ID>'
 ```
 
-When invoked through Workbridge's `terminal_run`, its own running job ID can be passed as `-ExpectedJobId`.
+To also test the on-demand coordination assignments view for the default `workbridge-mcp` repository, run:
+
+```powershell
+.\desktop\tests\Run-DesktopSmoke.ps1 -CheckAssignments
+```
+
+You can combine `-CheckAssignments` with `-ExpectedJobId`. When invoked through Workbridge's `terminal_run`, its own running job ID can be passed as `-ExpectedJobId`.
 
 ## Acceptance checks
 
 - Displays a live authenticated version/status.
 - Selects a real job and invokes the details button when a matching job ID is supplied.
+- Optionally invokes the **Load assignments** button and verifies that it displays coordination records separately from genuine AI sessions.
 - Sends `WM_CLOSE` to the exact window handle of the test process. Verifies the window hides but the process survives.
 - Starts a second instance. Verifies it exits and restores exactly one original instance.
 - Stops only the process created by the test, including on failure.

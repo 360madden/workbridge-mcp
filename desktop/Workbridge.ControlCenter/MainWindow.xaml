@@ -36,6 +36,17 @@
                  HorizontalScrollBarVisibility="Auto"/>
         <TextBlock Text="Job output can include secrets from local commands; it is displayed only in this window."
                    Margin="0,10,0,0" Foreground="Gray" TextWrapping="Wrap"/>
+        <TextBlock Text="Coordinated assignments (not AI agents)" FontWeight="Bold"
+                   Margin="0,18,0,8"/>
+        <StackPanel Orientation="Horizontal">
+          <TextBox x:Name="AssignmentsProjectText" Text="workbridge-mcp"
+                   Width="260" MaxLength="512"/>
+          <Button x:Name="AssignmentsButton" Content="Load assignments" Width="145"
+                  Margin="10,0,0,0" Click="AssignmentsButton_Click"/>
+        </StackPanel>
+        <TextBlock x:Name="AssignmentsSummary" Text="Enter a repository path and load its recorded assignments."
+                   Margin="0,8,0,0" Foreground="Gray" TextWrapping="Wrap"/>
+        <ListBox x:Name="AssignmentsList" Height="130" Margin="0,8,0,0"/>
         <TextBlock Text="Closing this window hides it to the system tray. Workbridge runs independently."
                    Margin="0,16,0,0" TextWrapping="Wrap"/>
       </StackPanel>

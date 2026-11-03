@@ -14,6 +14,7 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 - `scripts/desktop-monitor.mjs`
 - `scripts/desktop-status.mjs`
 - `scripts/desktop-job-detail.mjs`
+- `scripts/desktop-assignments.mjs`
 - `desktop/tests/Run-DesktopSmoke.ps1`
 
 ## Required review questions
@@ -22,7 +23,7 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 2. **Tray lifecycle:** Examine hide-on-X, notification icon creation/disposal, restore on double-click, and explicit Exit GUI. The actual notification-area click/menu path is *not yet runtime-verified*.
 3. **Background monitoring:** Check whether the long-lived Node.js monitor can survive unexpected GUI death, hang on a stalled MCP connection, leak processes, or retry too aggressively.
 4. **Streaming bounds:** Review line length and buffering **before** parsing; a post-read 64K check is not a hard memory bound. Assess whether malformed/oversized output can affect the UI. Evaluate stdout backpressure.
-5. **UI correctness:** Review live/offline state, inventory-completeness label, selection restoration during five-second refreshes, and stale job-detail response rejection.
+5. **UI correctness:** Review live/offline state, inventory-completeness label, selection restoration during five-second refreshes, stale job-detail response rejection, and on-demand per-repository coordination assignments. Ensure assignment state counts are never described as independently reasoning AI agents.
 6. **Local authorization:** The service endpoint requires an authenticated DPAPI-protected descriptor. Confirm the GUI uses the existing `connectService` path and never logs or exposes its credential.
 7. **Safety of displayed output:** Job logs can contain secrets. Confirm that sensitive output remains local and bounded; suggest appropriate operator-facing behavior without silently sending it elsewhere.
 8. **Root/package behavior:** Review `workbridge-control-center.json` absolute root resolution when installed outside the repository, including malformed paths and fallback behavior.
@@ -36,7 +37,8 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 - With `-ExpectedJobId wbdesktop-repeatable-smoke-run-20261102-v1`, the smoke test passed live status, selected-job detail, close-to-tray, second-launch restoration, and cleanup.
 - Negative safety case: a pre-existing Control Center caused the script to refuse to run (exit 1), leaving its owner alive until deliberately stopped.
 - Isolated offline/online/offline fixture tests passed without stopping the real server.
-- Earlier Shell_TrayWnd UI Automation read found no exact Workbridge notification icon; **do not infer actual icon/menu usability from that check**.
+- Read-only Shell_TrayWnd UI Automation found 'Show Hidden Icons' but not the Workbridge icon while the overflow window was closed; **do not infer actual icon/menu usability from that check**.
+- On-demand assignment lookup and WPF interaction passed in `wbdesktop-assignments-ui-smoke-20261102-v1`. A lookup outside configured roots (`C:\Windows`) was refused.
 
 ## Output contract for independent review
 

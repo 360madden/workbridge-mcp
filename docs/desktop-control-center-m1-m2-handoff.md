@@ -32,6 +32,8 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - Negative safety job `wbdesktop-smoke-guard-refusal-20261102-v1` exited 1 because a pre-existing test dashboard was running. That owner remained alive and was then explicitly cancelled (`wbdesktop-smoke-guard-owner-20261102-v1`).
 - The standard no-job-ID run `wbdesktop-repeatable-smoke-nojob-20261102-v1` also passed exit 0 after `wbdesktop-smoke-suite-build-20261102-v1` passed with zero warnings/errors. The test runs independently of any one-off inline test command.
 - Added `docs/desktop-control-center-review-brief.md` for a genuinely independent Extra High reviewer when such a worker is available. This brief is not a completed review.
+- Added a bounded read-only per-repository coordination assignments view, never AI agent spawning. `scripts/desktop-assignments.mjs` uses authenticated `agent_list`; WPF provides Load assignments. Valid repository and invalid out-of-root tests passed; `wbdesktop-assignments-ui-smoke-20261102-v1` passed all regression checks including `-CheckAssignments`. Follow-up error-state cleanup was implemented and verified with a fresh zero-warning build (`wbdesktop-assignments-finalbuild-20261102-v1`) and a repeated comprehensive smoke test (`wbdesktop-assignments-finalsmoke-20261102-v1`, exit 0).
+- A read-only notification-area inspection found 'Show Hidden Icons' in the shell but no Workbridge icon while overflow was closed; no shared desktop input was injected.
 - This is deterministic regression evidence for M1/M2; actual taskbar notification icon clicks and genuinely independent Extra High code review remain unverified.
 
 ## Remaining acceptance gates

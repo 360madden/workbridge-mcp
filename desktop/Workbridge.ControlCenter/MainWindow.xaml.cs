@@ -62,7 +62,7 @@ public partial class MainWindow : Window
         throw new FileNotFoundException("Workbridge probe scripts were not found in an ancestor directory.");
     }
 
-    private static async Task<JsonDocument> RunProbeAsync(string scriptName, string? jobId,
+    private static async Task<JsonDocument> RunProbeAsync(string scriptName, string? argument,
         CancellationToken cancellationToken)
     {
         var root = RepoRoot();
@@ -81,7 +81,7 @@ public partial class MainWindow : Window
             }
         };
         process.StartInfo.ArgumentList.Add(script);
-        if (jobId is not null) process.StartInfo.ArgumentList.Add(jobId);
+        if (argument is not null) process.StartInfo.ArgumentList.Add(argument);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(15));
         process.Start();
@@ -214,6 +214,8 @@ public partial class MainWindow : Window
         InventoryText.Text = "Inventory: unavailable";
         JobList.Items.Clear();
         DetailsText.Text = "Workbridge disconnected; previously retrieved job details cleared.";
+        AssignmentsSummary.Text = "Assignments unavailable while Workbridge is offline.";
+        AssignmentsList.Items.Clear();
     }
 
     private async void DetailsButton_Click(object sender, RoutedEventArgs e)
@@ -253,6 +255,62 @@ public partial class MainWindow : Window
         finally
         {
             if (!_exiting && !_stop.IsCancellationRequested) DetailsButton.IsEnabled = true;
+        }
+    }
+
+    private async void AssignmentsButton_Click(object sender, RoutedEventArgs e)
+    {
+        var project = AssignmentsProjectText.Text.Trim();
+        if (string.IsNullOrWhiteSpace(project))
+        {
+            AssignmentsSummary.Text = "Enter a repository path under an authorized Workbridge root.";
+            return;
+        }
+        AssignmentsButton.IsEnabled = false;
+        AssignmentsSummary.Text = "Loading recorded assignments...";
+        AssignmentsList.Items.Clear();
+        try
+        {
+            using var json = await RunProbeAsync("desktop-assignments.mjs", project, _stop.Token);
+            if (_exiting || _stop.IsCancellationRequested) return;
+            if (!string.Equals(AssignmentsProjectText.Text.Trim(), project, StringComparison.Ordinal))
+            {
+                AssignmentsSummary.Text = "Repository selection changed. Load assignments again.";
+                return;
+            }
+            var data = json.RootElement;
+            var capacity = data.GetProperty("maxWorkers");
+            var running = data.GetProperty("running");
+            var recorded = data.GetProperty("recorded").GetInt32();
+            var capacityLabel = capacity.ValueKind == JsonValueKind.Number ? capacity.GetInt32().ToString() : "?";
+            var runningLabel = running.ValueKind == JsonValueKind.Number ? running.GetInt32().ToString() : "?";
+            AssignmentsSummary.Text = $"Project: {project} | Recorded: {recorded} | Running assignment states: {runningLabel} | Capacity: {capacityLabel}. These are coordination records, not AI sessions.";
+            foreach (var task in data.GetProperty("assignments").EnumerateArray())
+            {
+                var taskId = task.GetProperty("taskId").GetString();
+                var worker = task.GetProperty("workerId").GetString();
+                var state = task.GetProperty("state").GetString();
+                var jobId = task.GetProperty("jobId");
+                var jobLabel = jobId.ValueKind == JsonValueKind.Null ? "no job" : jobId.GetString();
+                AssignmentsList.Items.Add($"{state} | {worker} | {taskId} | {jobLabel}");
+            }
+            if (AssignmentsList.Items.Count == 0)
+                AssignmentsList.Items.Add("No coordination assignments recorded for this repository.");
+            if (data.GetProperty("truncated").GetBoolean())
+                AssignmentsSummary.Text += " Display limited to 36 records.";
+        }
+        catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
+        catch (Exception)
+        {
+            if (!_exiting && !_stop.IsCancellationRequested)
+            {
+                AssignmentsList.Items.Clear();
+                AssignmentsSummary.Text = "Assignment lookup unavailable. Verify the repository path and Workbridge connection.";
+            }
+        }
+        finally
+        {
+            if (!_exiting && !_stop.IsCancellationRequested) AssignmentsButton.IsEnabled = true;
         }
     }
 

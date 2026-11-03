@@ -1,7 +1,7 @@
 # Repeatable, isolated smoke test for the Workbridge WPF desktop shell.
 # Does not alter Workbridge, its scheduled task, or unrelated windows.
 [CmdletBinding()]
-param([string]$ExpectedJobId = '', [int]$TimeoutSeconds = 30)
+param([string]$ExpectedJobId = '', [switch]$CheckAssignments, [int]$TimeoutSeconds = 30)
 $ErrorActionPreference = 'Stop'
 if ($TimeoutSeconds -lt 5 -or $TimeoutSeconds -gt 90) {
     throw 'TimeoutSeconds must be between 5 and 90.'
@@ -42,6 +42,7 @@ $receipt = [ordered]@{
     closeToTray = $false
     singleInstanceRestore = $false
     selectedJobDetails = 'not_requested'
+    coordinationAssignments = 'not_requested'
     cleanedUp = $false
 }
 try {
@@ -114,6 +115,33 @@ try {
         }
     }
 
+    if ($CheckAssignments) {
+        $receipt.coordinationAssignments = 'waiting'
+        $assignmentsButton = Get-UIElement $hwnd 'AssignmentsButton'
+        if ($null -eq $assignmentsButton) { throw 'Assignments button was missing.' }
+        $scrollObject = $null
+        if ($assignmentsButton.TryGetCurrentPattern(
+            [System.Windows.Automation.ScrollItemPattern]::Pattern, [ref]$scrollObject)) {
+            ([System.Windows.Automation.ScrollItemPattern]$scrollObject).ScrollIntoView()
+        }
+        $assignmentsInvoke = [System.Windows.Automation.InvokePattern]$assignmentsButton.GetCurrentPattern(
+            [System.Windows.Automation.InvokePattern]::Pattern)
+        $assignmentsInvoke.Invoke()
+        while ([DateTime]::UtcNow -lt $deadline) {
+            $summary = Get-UIElement $hwnd 'AssignmentsSummary'
+            if ($null -ne $summary -and
+                $summary.Current.Name.StartsWith('Project: workbridge-mcp') -and
+                $summary.Current.Name.Contains('not AI sessions')) {
+                $receipt.coordinationAssignments = 'passed'
+                break
+            }
+            Start-Sleep -Milliseconds 200
+        }
+        if ($receipt.coordinationAssignments -ne 'passed') {
+            throw 'Coordination assignments did not load as a distinct read-only view.'
+        }
+    }
+
     $sent = [IntPtr]::Zero
     $ok = [WorkbridgeDesktopSmokeWin32]::SendMessageTimeout(
         $hwnd, 0x10, [IntPtr]::Zero, [IntPtr]::Zero, 2, 2000, [ref]$sent)
@@ -148,6 +176,7 @@ finally {
 }
 if (-not ($receipt.liveStatus -and $receipt.closeToTray -and
     $receipt.singleInstanceRestore -and $receipt.cleanedUp -and
-    $receipt.selectedJobDetails -notin @('waiting'))) {
+    $receipt.selectedJobDetails -notin @('waiting') -and
+    $receipt.coordinationAssignments -notin @('waiting'))) {
     exit 2
 }
