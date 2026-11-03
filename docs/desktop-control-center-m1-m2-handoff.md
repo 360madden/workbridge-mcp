@@ -57,6 +57,11 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - `wbdesktop-heartbeat-build-20261102` passed with zero warnings/errors, `wbdesktop-heartbeat-reader-unit-20261102` passed 15/15 assertions, and both `wbdesktop-heartbeat-tray-regression-20261102` and `wbdesktop-heartbeat-full-smoke-20261102` passed (exit 0).
 - Independent reviewer sign-off and physical Windows taskbar click remain unverified.
 
+## Physical Explorer tray acceptance harness checkpoint (2026-11-02)
+- Added `desktop/tests/Run-PhysicalTrayAcceptance.ps1` with two modes: `-ValidateOnly` checks the Windows Shell icon registration and process cleanup automatically; full mode waits for an actual user double-click and context-menu Exit, while merely observing the owned GUI and PID.
+- `wbdesktop-physical-tray-validator-20261102-v1` exited 0 (`iconRegistered=true`, `cleanedUp=true`, uID=1, `validateOnly=true`). `wbdesktop-physical-tray-preexist-guard-20261102` intentionally failed with exit 1 because the test GUI was already running; that owner remained alive and was explicitly cancelled.
+- Actual physical input has **not** occurred. Do not mark the M1 physical-click gate passed until the non-validation mode returns an observed pass.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.

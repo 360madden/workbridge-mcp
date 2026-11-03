@@ -51,6 +51,24 @@ This test refuses to run over an existing Control Center instance. It starts an 
 
 **Scope limitation:** This proves the application's notification callbacks and actual WinForms context-menu item work. It does **not** prove that clicking the icon through Windows Explorer's taskbar or overflow UI works. That remains a separate M1 acceptance gate.
 
+## Actual Explorer notification-icon acceptance (requires physical user input)
+
+After closing any existing Workbridge Control Center instance, in Windows PowerShell from `C:\work\workbridge-mcp`:
+
+```powershell
+.\desktop\tests\Run-PhysicalTrayAcceptance.ps1
+```
+
+This harness starts a disposable `--tray` Control Center, confirms its icon registration through a read-only Shell API, and **waits for actual user actions**: first double-click the Workbridge icon in Windows notification area (or Show hidden icons) to restore the dashboard; then right-click that same icon and choose **Exit Control Center**. The script observes the resulting window/process state without sending global mouse or keyboard input. It reports JSON pass/fail and cleans up only the process it owns. No live Workbridge service changes.
+
+To validate only the harness and icon registration without performing physical clicks:
+
+```powershell
+.\desktop\tests\Run-PhysicalTrayAcceptance.ps1 -ValidateOnly
+```
+
+`-ValidateOnly` is **not** physical-click acceptance. The acceptance gate stays open until the full mode passes. The harness refuses to run if another Control Center instance is already running; do not bypass that check.
+
 ## Acceptance checks
 
 - Displays a live authenticated version/status.
