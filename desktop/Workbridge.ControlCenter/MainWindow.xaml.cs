@@ -215,9 +215,13 @@ public partial class MainWindow : Window
     private void ApplyStatus(JsonElement data)
     {
         var capacity = data.GetProperty("capacity");
-        ConnectionText.Text = "Connected · Tunnel ready: " + data.GetProperty("tunnelReady").GetBoolean();
+        var tunnelReady = data.GetProperty("tunnelReady").GetBoolean();
+        var controlPlane = data.GetProperty("controlPlane").GetString() ?? "unknown";
+        ConnectionText.Text = tunnelReady && string.Equals(controlPlane, "ok", StringComparison.OrdinalIgnoreCase)
+            ? "Connected · Tunnel ready: True"
+            : "Engine reachable · Tunnel/control plane degraded";
         VersionText.Text = "Version: " + data.GetProperty("version").GetString();
-        ControlPlaneText.Text = "Control plane: " + data.GetProperty("controlPlane").GetString();
+        ControlPlaneText.Text = "Control plane: " + controlPlane;
         CapacityText.Text = $"Slots: {capacity.GetProperty("occupied").GetInt32()} / {capacity.GetProperty("limit").GetInt32()} occupied";
         JobsText.Text = "Running jobs: " + data.GetProperty("runningJobs").GetInt32();
         var retained = capacity.GetProperty("retainedResults");

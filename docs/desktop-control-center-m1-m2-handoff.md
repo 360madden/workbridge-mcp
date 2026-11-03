@@ -62,6 +62,11 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - `wbdesktop-physical-tray-validator-20261102-v1` exited 0 (`iconRegistered=true`, `cleanedUp=true`, uID=1, `validateOnly=true`). `wbdesktop-physical-tray-preexist-guard-20261102` intentionally failed with exit 1 because the test GUI was already running; that owner remained alive and was explicitly cancelled.
 - Actual physical input has **not** occurred. Do not mark the M1 physical-click gate passed until the non-validation mode returns an observed pass.
 
+## Connection-state accuracy checkpoint (2026-11-02)
+- The GUI previously printed `Connected · Tunnel ready: False` when the MCP service was reachable but its tunnel or control plane was degraded. It now distinguishes **engine reachable with degraded tunnel/control plane** from a fully connected system and a disconnected service.
+- `desktop/tests/Run-TunnelHealthFixture.ps1` passed isolated healthy -> degraded -> recovered UI-state observation (`wbdesktop-tunnel-health-fixture-20261102`, exit 0). Build job `wbdesktop-tunnel-health-build-20261102` passed zero warnings/errors, unit tests passed 15/15, tray and oversized-monitor regressions passed, and full GUI smoke job `wbdesktop-tunnel-health-full-smoke-20261102` passed.
+- No live Workbridge engine changes; physical tray click and independent code review remain pending.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.
