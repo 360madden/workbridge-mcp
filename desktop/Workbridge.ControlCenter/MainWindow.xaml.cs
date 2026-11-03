@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private bool _exiting;
     private bool _refreshingJobs;
     private long _selectionRevision;
+    private long _statusRevision;
     private string? _detailsForJobId;
 
     public MainWindow()
@@ -272,6 +273,7 @@ public partial class MainWindow : Window
 
     private void ShowOffline()
     {
+        _statusRevision++; // Invalidate lookups started before a disconnect.
         ConnectionText.Text = "Disconnected / status unavailable";
         VersionText.Text = "Version: —";
         ControlPlaneText.Text = "Control plane: —";
@@ -340,13 +342,14 @@ public partial class MainWindow : Window
             AssignmentsSummary.Text = "Enter a repository path under an authorized Workbridge root.";
             return;
         }
+        var statusRevision = _statusRevision;
         AssignmentsButton.IsEnabled = false;
         AssignmentsSummary.Text = "Loading recorded assignments...";
         AssignmentsList.Items.Clear();
         try
         {
             using var json = await RunProbeAsync("desktop-assignments.mjs", project, _stop.Token);
-            if (_exiting || _stop.IsCancellationRequested) return;
+            if (_exiting || _stop.IsCancellationRequested || _statusRevision != statusRevision) return;
             if (!string.Equals(AssignmentsProjectText.Text.Trim(), project, StringComparison.Ordinal))
             {
                 AssignmentsSummary.Text = "Repository selection changed. Load assignments again.";
@@ -376,7 +379,7 @@ public partial class MainWindow : Window
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
         catch (Exception)
         {
-            if (!_exiting && !_stop.IsCancellationRequested)
+            if (!_exiting && !_stop.IsCancellationRequested && _statusRevision == statusRevision)
             {
                 AssignmentsList.Items.Clear();
                 AssignmentsSummary.Text = "Assignment lookup unavailable. Verify the repository path and Workbridge connection.";

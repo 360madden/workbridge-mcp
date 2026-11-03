@@ -78,6 +78,11 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - The expanded `desktop/tests/Run-JobSelectionFixture.ps1` now delays A's result and asserts that an A -> B -> A sequence cannot display that stale output. Job `wbdesktop-aba-selection-fixture-20261102` passed (`staleAbaResponseRejected=true`, exit 0). Previous selection tests also passed.
 - Build `wbdesktop-aba-build-20261102` passed 0 errors/warnings; `wbdesktop-aba-tray-regression-20261102` and `wbdesktop-aba-full-smoke-20261102` passed. The live service and other Windows workflows remained unchanged.
 
+## Stale assignments after disconnect checkpoint (2026-11-02)
+- Fixed an M2 race: a pending coordination-assignment request could complete after the monitor went offline and replace `Assignments unavailable while Workbridge is offline` with obsolete data. The GUI now increments `_statusRevision` on disconnect and accepts a lookup result only from its original status generation.
+- Isolated `desktop/tests/Run-AssignmentDisconnectFixture.ps1` job `wbdesktop-assignment-disconnect-fixture-20261102` passed all five checks (exit 0): healthy status, offline during delayed assignment query, rejection of old reply, new post-reconnect query works, and fixture/owned-process cleanup.
+- Build `wbdesktop-assignment-disconnect-build-20261102` (0 warnings/errors), reader tests `wbdesktop-assignment-disconnect-units-20261102` (15/15), tray `wbdesktop-assignment-disconnect-tray-20261102` (exit 0), full GUI `wbdesktop-assignment-disconnect-fullsmoke-20261102` (exit 0), and test script syntax all passed. No MCP server/VM changes.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.
