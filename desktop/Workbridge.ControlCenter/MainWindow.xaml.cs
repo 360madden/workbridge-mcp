@@ -217,6 +217,15 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string NonnegativeIntOrUnavailable(JsonElement obj, string name)
+    {
+        return obj.TryGetProperty(name, out var value) &&
+            value.ValueKind == JsonValueKind.Number &&
+            value.TryGetInt32(out var count) && count >= 0
+            ? count.ToString()
+            : "unavailable";
+    }
+
     private void ApplyStatus(JsonElement data)
     {
         var capacity = data.GetProperty("capacity");
@@ -227,8 +236,12 @@ public partial class MainWindow : Window
             : "Engine reachable · Tunnel/control plane degraded";
         VersionText.Text = "Version: " + data.GetProperty("version").GetString();
         ControlPlaneText.Text = "Control plane: " + controlPlane;
-        CapacityText.Text = $"Slots: {capacity.GetProperty("occupied").GetInt32()} / {capacity.GetProperty("limit").GetInt32()} occupied";
-        JobsText.Text = "Running jobs: " + data.GetProperty("runningJobs").GetInt32();
+        var occupied = NonnegativeIntOrUnavailable(capacity, "occupied");
+        var limit = NonnegativeIntOrUnavailable(capacity, "limit");
+        CapacityText.Text = occupied == "unavailable" || limit == "unavailable"
+            ? "Slots: unavailable"
+            : $"Slots: {occupied} / {limit} occupied";
+        JobsText.Text = "Running jobs: " + NonnegativeIntOrUnavailable(data, "runningJobs");
         var retained = capacity.GetProperty("retainedResults");
         RetainedText.Text = "Retained results: " + (retained.ValueKind == JsonValueKind.Number ? retained.GetInt32().ToString() : "unavailable");
         SampleText.Text = "Last sample: " + data.GetProperty("sampledUtc").GetString();

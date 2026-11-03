@@ -18,6 +18,8 @@ $result = [ordered]@{
     initiallyHealthy = $false
     degradedReported = $false
     recovered = $false
+    unknownCountersHandled = $false
+    recoveredFromUnknownCounters = $false
     cleanedUp = $false
 }
 $p = $null
@@ -40,13 +42,16 @@ import fs from 'node:fs';
 process.stdin.resume();
 process.stdin.once('end', () => process.exit(0));
 const degraded = new URL('../degraded.flag', import.meta.url);
+const missing = new URL('../unknown-counters.flag', import.meta.url);
 const emit = () => {
     const down = fs.existsSync(degraded);
+    const unknown = fs.existsSync(missing);
     process.stdout.write(JSON.stringify({
         ok: true, version: 'FIXTURE', tunnelReady: !down,
         controlPlane: down ? 'unavailable' : 'ok',
-        capacity: { limit: 36, occupied: 0, available: 36, retainedResults: 0 },
-        runningJobs: 0, inventoryComplete: true, jobs: [],
+        capacity: { limit: unknown ? null : 36, occupied: unknown ? null : 0,
+                    available: unknown ? null : 36, retainedResults: 0 },
+        runningJobs: unknown ? null : 0, inventoryComplete: !unknown, jobs: [],
         sampledUtc: new Date().toISOString()
     }) + '\n');
 };
@@ -92,6 +97,31 @@ setInterval(emit, 350);
         }
     }
     if (-not $result.recovered) { throw 'Healthy status did not recover.' }
+    # The real monitor intentionally reports null when counters are missing.
+    # Unknown counters must not turn a reachable healthy service into offline.
+    New-Item -ItemType File -Path (Join-Path $fixture 'unknown-counters.flag') | Out-Null
+    while ([DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 150
+        if ((Read-UI $hwnd 'ConnectionText') -like 'Connected*' -and
+            (Read-UI $hwnd 'CapacityText') -eq 'Slots: unavailable' -and
+            (Read-UI $hwnd 'JobsText') -eq 'Running jobs: unavailable' -and
+            (Read-UI $hwnd 'InventoryText') -like 'Inventory: partial*') {
+            $result.unknownCountersHandled = $true; break
+        }
+    }
+    if (-not $result.unknownCountersHandled) {
+        throw 'Null counters incorrectly disconnected the GUI or displayed fabricated values.'
+    }
+    Remove-Item -LiteralPath (Join-Path $fixture 'unknown-counters.flag') -Force
+    while ([DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 150
+        if ((Read-UI $hwnd 'ConnectionText') -like 'Connected*' -and
+            (Read-UI $hwnd 'CapacityText') -eq 'Slots: 0 / 36 occupied' -and
+            (Read-UI $hwnd 'JobsText') -eq 'Running jobs: 0') {
+            $result.recoveredFromUnknownCounters = $true; break
+        }
+    }
+    if (-not $result.recoveredFromUnknownCounters) { throw 'Dashboard did not recover numeric counters.' }
 }
 finally {
     if ($null -ne $p) { Stop-Process -Id $p.Id -ErrorAction SilentlyContinue }
@@ -102,4 +132,5 @@ finally {
         @(Get-Process -Name Workbridge.ControlCenter -ErrorAction SilentlyContinue).Count -eq 0)
     $result | ConvertTo-Json -Compress
 }
-if (-not ($result.initiallyHealthy -and $result.degradedReported -and $result.recovered -and $result.cleanedUp)) { exit 2 }
+if (-not ($result.initiallyHealthy -and $result.degradedReported -and $result.recovered -and
+    $result.unknownCountersHandled -and $result.recoveredFromUnknownCounters -and $result.cleanedUp)) { exit 2 }

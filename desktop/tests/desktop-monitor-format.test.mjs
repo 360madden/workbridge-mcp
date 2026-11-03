@@ -32,6 +32,18 @@ check(normal.ok === true && normal.inventoryComplete === true, 'normal healthy c
 check(normal.jobs.length === 2 && normal.capacity.limit === 36, 'normal job identifiers/counters preserved');
 check(normal.version === '0.16.4-dev' && normal.tunnelReady, 'normal version and tunnel state preserved');
 
+const partialCounters = structuredClone(basic);
+partialCounters.jobs.capacity.limit = null;
+partialCounters.jobs.capacity.occupied = null;
+partialCounters.jobs.capacity.available = null;
+partialCounters.jobs.runningJobs = null;
+partialCounters.jobs.inventory.complete = false;
+const unknownCounts = parse(serializeStatus(formatStatus(partialCounters, {})));
+check(unknownCounts.ok && unknownCounts.tunnelReady, 'unknown counts do not mean disconnected');
+check(unknownCounts.capacity.limit === null && unknownCounts.capacity.occupied === null &&
+      unknownCounts.runningJobs === null, 'unknown counts preserved as null');
+check(unknownCounts.inventoryComplete === false, 'partial inventory remains labeled partial');
+
 const hugeJob = { jobId: 'J'.repeat(2000), project: '\u0000'.repeat(100_000),
   status: 'running', kind: 'in_progress', nextAction: 'command_status' };
 const all = structuredClone(basic);
