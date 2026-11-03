@@ -17,6 +17,8 @@ public partial class MainWindow : Window
     private readonly Forms.NotifyIcon _trayIcon;
     private readonly CancellationTokenSource _stop = new();
     private bool _exiting;
+    private bool _refreshingJobs;
+    private string? _detailsForJobId;
 
     public MainWindow()
     {
@@ -230,20 +232,39 @@ public partial class MainWindow : Window
         InventoryText.Text = data.GetProperty("inventoryComplete").GetBoolean()
             ? "Inventory: complete" : "Inventory: partial — results may be missing";
         var selectedId = (JobList.SelectedItem as ListBoxItem)?.Tag as string;
-        JobList.Items.Clear();
-        ListBoxItem? selection = null;
-        foreach (var job in data.GetProperty("jobs").EnumerateArray())
+        _refreshingJobs = true;
+        try
         {
-            var id = job.GetProperty("id").GetString() ?? "";
-            var project = job.GetProperty("project").GetString() ?? "";
-            var state = job.GetProperty("status").GetString() ?? "";
-            var kind = job.GetProperty("kind").GetString() ?? "";
-            var item = new ListBoxItem { Content = $"{state} | {kind} | {project} | {id}", Tag = id };
-            JobList.Items.Add(item);
-            if (id == selectedId) selection = item;
+            JobList.Items.Clear();
+            ListBoxItem? selection = null;
+            foreach (var job in data.GetProperty("jobs").EnumerateArray())
+            {
+                var id = job.GetProperty("id").GetString() ?? "";
+                var project = job.GetProperty("project").GetString() ?? "";
+                var state = job.GetProperty("status").GetString() ?? "";
+                var kind = job.GetProperty("kind").GetString() ?? "";
+                var item = new ListBoxItem { Content = $"{state} | {kind} | {project} | {id}", Tag = id };
+                JobList.Items.Add(item);
+                if (id == selectedId) selection = item;
+            }
+            JobList.SelectedItem = selection;
+            if (JobList.Items.Count == 0) JobList.Items.Add("No active or retained command jobs");
         }
-        JobList.SelectedItem = selection;
-        if (JobList.Items.Count == 0) JobList.Items.Add("No active or retained command jobs");
+        finally { _refreshingJobs = false; }
+        ClearDetailsIfSelectionChanged();
+    }
+
+    private void ClearDetailsIfSelectionChanged()
+    {
+        var selected = (JobList.SelectedItem as ListBoxItem)?.Tag as string;
+        if (_detailsForJobId is null || string.Equals(selected, _detailsForJobId, StringComparison.Ordinal)) return;
+        _detailsForJobId = null;
+        DetailsText.Text = "Selection changed; choose View selected job details again.";
+    }
+
+    private void JobList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_refreshingJobs) ClearDetailsIfSelectionChanged();
     }
 
     private void ShowOffline()
@@ -256,6 +277,7 @@ public partial class MainWindow : Window
         RetainedText.Text = "Retained results: —";
         SampleText.Text = "Last sample: unavailable";
         InventoryText.Text = "Inventory: unavailable";
+        _detailsForJobId = null;
         JobList.Items.Clear();
         DetailsText.Text = "Workbridge disconnected; previously retrieved job details cleared.";
         AssignmentsSummary.Text = "Assignments unavailable while Workbridge is offline.";
@@ -270,6 +292,7 @@ public partial class MainWindow : Window
             DetailsText.Text = "Select an actual job record first.";
             return;
         }
+        _detailsForJobId = jobId;
         DetailsButton.IsEnabled = false;
         DetailsText.Text = "Loading job details...";
         try

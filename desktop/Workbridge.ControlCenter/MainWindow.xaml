@@ -25,7 +25,7 @@
         </Border>
         <TextBlock Text="Active and retained command jobs" FontWeight="Bold" Margin="0,20,0,8"/>
         <TextBlock x:Name="InventoryText" Text="Inventory: —" Foreground="Gray"/>
-        <ListBox x:Name="JobList" Height="160" Margin="0,8,0,0"/>
+        <ListBox x:Name="JobList" Height="160" Margin="0,8,0,0" SelectionChanged="JobList_SelectionChanged"/>
         <Button x:Name="DetailsButton" Content="View selected job details" Width="200"
                 HorizontalAlignment="Left" Margin="0,10,0,0" Click="DetailsButton_Click"/>
         <TextBlock Text="Selected job details · Output is limited to the latest 4,000 characters"

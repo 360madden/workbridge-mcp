@@ -23,6 +23,7 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 - `desktop/tests/Run-OversizeMonitorFixture.ps1`
 - `desktop/tests/Run-StalledMonitorFixture.ps1`
 - `desktop/tests/Run-TunnelHealthFixture.ps1`
+- `desktop/tests/Run-JobSelectionFixture.ps1`
 - `desktop/tests/Run-PhysicalTrayAcceptance.ps1`
 
 ## Required review questions
@@ -31,7 +32,7 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 2. **Tray lifecycle:** Examine hide-on-X, icon creation/disposal, double-click restore, ContextMenuStrip Exit, and new dispatcher-shutdown guard. A PID-targeted synthetic WinForms notification-callback test now exercises both DoubleClick and the actual Exit menu item; physical Explorer notification-area clicks remain unverified.
 3. **Background monitoring:** Check monitor lifecycle, unexpected GUI death, stalled MCP connection and orphan risk. WPF now applies a per-line 25-second heartbeat timeout, marks the state offline, kills only its own stalled child, and restarts with a bounded delay. Review that cancellation and shutdown cannot race a recovery into recreating an unwanted process; assess the timeout under delayed host conditions.
 4. **Streaming bounds:** Review `BoundedLineReader.cs` and deterministic tests. Confirm the 64,000-character ceiling is enforced **while reading**, including CRLF, EOF, buffered subsequent lines, cancellation and exceptional output. Verify the on-demand probes accept at most one 64K line and terminate the owned child for oversized or malformed output. Check for any remaining unbounded streams, malformed JSON handling, stdout backpressure, and child cleanup.
-5. **UI correctness:** Review healthy/reachable-but-degraded/offline state classification, inventory-completeness label, selection restoration during five-second refreshes, stale job-detail response rejection, and on-demand per-repository coordination assignments. Ensure assignment state counts are never described as independently reasoning AI agents.
+5. **UI correctness:** Review healthy/reachable-but-degraded/offline state classification, inventory-completeness label, and detail selection. Job details now clear on selecting a different job but persist through five-second list reconstruction with the same job selected. Verify the refresh guard, stale async response rejection, disappearance of selected jobs, and on-demand per-repository coordination assignments. Ensure assignment state counts are never described as independently reasoning AI agents.
 6. **Local authorization:** The service endpoint requires an authenticated DPAPI-protected descriptor. Confirm the GUI uses the existing `connectService` path and never logs or exposes its credential.
 7. **Safety of displayed output:** Job logs can contain secrets. Confirm that sensitive output remains local and bounded; suggest appropriate operator-facing behavior without silently sending it elsewhere.
 8. **Root/package behavior:** Review `workbridge-control-center.json` absolute root resolution when installed outside the repository, including malformed paths and fallback behavior.

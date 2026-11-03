@@ -67,6 +67,12 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - `desktop/tests/Run-TunnelHealthFixture.ps1` passed isolated healthy -> degraded -> recovered UI-state observation (`wbdesktop-tunnel-health-fixture-20261102`, exit 0). Build job `wbdesktop-tunnel-health-build-20261102` passed zero warnings/errors, unit tests passed 15/15, tray and oversized-monitor regressions passed, and full GUI smoke job `wbdesktop-tunnel-health-full-smoke-20261102` passed.
 - No live Workbridge engine changes; physical tray click and independent code review remain pending.
 
+## Job detail selection consistency checkpoint (2026-11-02)
+- Identified a local UI correctness issue: after viewing one command job's log, selecting another job could leave the first job's output visible. `MainWindow.xaml.cs` now clears stale output on actual selection changes but suppresses clearing during the five-second list reconstruction when the same job remains selected.
+- `desktop/tests/Run-JobSelectionFixture.ps1` passed (`wbdesktop-job-selection-fixture-run-20261102`, exit 0): job A details displayed and retained across refresh, cleared immediately on selecting job B, and job B output displayed on demand. Fixture/process cleanup passed.
+- WPF build `wbdesktop-job-selection-build-20261102` passed without errors/warnings, unit tests `wbdesktop-selection-regress-unit-20261102` passed 15 assertions, tray test `wbdesktop-selection-regress-tray-20261102` passed, full live GUI test `wbdesktop-selection-full-smoke-20261102` passed. No Workbridge service or startup changes.
+- Independent reviewer sign-off and physical taskbar acceptance remain open.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.
