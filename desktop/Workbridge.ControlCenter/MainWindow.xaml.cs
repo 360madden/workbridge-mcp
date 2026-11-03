@@ -85,14 +85,22 @@ public partial class MainWindow : Window
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(15));
         process.Start();
-        string output;
+        string? output;
         try
         {
-            output = await process.StandardOutput.ReadToEndAsync(timeout.Token);
+            // A probe must return exactly one bounded JSON message. Neither a
+            // malformed script nor a broken MCP response may grow GUI memory.
+            var reader = new BoundedLineReader(process.StandardOutput, 64_000);
+            output = await reader.ReadLineAsync(timeout.Token);
+            if (output is null) throw new InvalidDataException("Workbridge probe returned no message.");
+            if (await reader.ReadLineAsync(timeout.Token) is not null)
+                throw new InvalidDataException("Workbridge probe returned multiple messages.");
             await process.WaitForExitAsync(timeout.Token);
         }
-        catch (OperationCanceledException)
+        catch
         {
+            // Kill on any failure, not only timeout: over-limit and invalid
+            // output must not strand an on-demand Node process.
             try
             {
                 if (!process.HasExited) process.Kill(entireProcessTree: true);

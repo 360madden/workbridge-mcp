@@ -64,6 +64,7 @@ Gate: WPF detail view built successfully (wbdesktop-detail-build-20261102-v1; ze
 - [x] `wbdesktop-bounded-reader-unit-20261102` passed 15 assertions: CRLF, EOF, cancellation, exact boundary, over-limit, preserved following line, and synthetic two-million-character stream terminated close to limit.
 - [x] `wbdesktop-bounded-reader-wpf-build-20261102` passed zero errors/warnings; `wbdesktop-bounded-wpf-smoke-20261102` passed full live GUI smoke suite with job details and assignment view (exit 0).
 - [x] `wbdesktop-oversize-fixture-run-20261102` passed isolated oversized-output -> offline -> recovered -> offline acceptance, with fixture and owned process cleanup. The real Workbridge MCP server was untouched.
+- [x] Extended `BoundedLineReader` to on-demand job/assignment probes: accept exactly one bounded JSON line (64,000 characters), reject extras, and kill only the owned child on all read/parse-limit failures. `wbdesktop-ondemand-build-20261102` (0 errors/warnings), `wbdesktop-ondemand-unit-20261102` (15/15), and `wbdesktop-ondemand-smoke-20261102` (full GUI smoke, exit 0) passed.
 - [ ] Genuinely independent Extra High code review and direct notification-area icon/menu acceptance remain open; do not mark M2 fully accepted.
 
 ### M3 — Job controls

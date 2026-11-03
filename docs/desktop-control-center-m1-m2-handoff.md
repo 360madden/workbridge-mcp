@@ -41,6 +41,7 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - Unit harness `desktop/tests/BoundedLineReaderTests.csproj`: `wbdesktop-bounded-reader-unit-20261102` passed all 15 assertions. WPF `-warnaserror` build job `wbdesktop-bounded-reader-wpf-build-20261102` passed.
 - `wbdesktop-bounded-wpf-smoke-20261102` passed complete real GUI smoke test, including selected job/assignments and cleanup.
 - Isolated oversized output fixture `desktop/tests/Run-OversizeMonitorFixture.ps1`: `wbdesktop-oversize-fixture-run-20261102` exited 0, verifying oversize rejected, offline status, recovery, subsequent offline, and cleanup. The live Workbridge service was not stopped.
+- Follow-up: on-demand job and assignment probes now consume at most one 64,000-character JSON line using the same bounded reader and terminate their child process on all read/limit errors. `wbdesktop-ondemand-build-20261102` (0 warnings/errors), `wbdesktop-ondemand-unit-20261102` (15 assertions), and `wbdesktop-ondemand-smoke-20261102` (full GUI acceptance, exit 0) passed.
 - Test scripts/documentation are committed with the source change; independent code review and actual tray icon/menu interactions remain pending.
 
 ## Remaining acceptance gates
