@@ -27,6 +27,12 @@ public static class WbTrayCallbackTest {
     [DllImport("user32.dll", SetLastError=true)]
     public static extern IntPtr SendMessageTimeout(IntPtr hwnd, uint message, IntPtr wparam,
         IntPtr lparam, uint flags, uint timeoutMs, out IntPtr result);
+    [DllImport("shell32.dll")]
+    public static extern int Shell_NotifyIconGetRect(ref Identifier identifier, out Rectangle rect);
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Identifier { public uint cbSize; public IntPtr hWnd; public uint uID; public Guid guidItem; }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rectangle { public int Left, Top, Right, Bottom; }
     public static IntPtr[] Enumerate(uint threadId) {
         var windows = new List<IntPtr>();
         EnumThreadWindows(threadId, (hwnd, _) => { windows.Add(hwnd); return true; }, IntPtr.Zero);
@@ -56,6 +62,7 @@ $receipt = [ordered]@{
     syntheticEvent = $true
     targetRestrictedToOwnPid = $true
     initiallyHidden = $false
+    shellIconRegistered = $false
     doubleClickRestored = $false
     closeToTrayWorked = $false
     menuExitFound = $false
@@ -82,6 +89,27 @@ try {
         if ($notify -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 150 }
     }
     if ($notify -eq [IntPtr]::Zero) { throw 'Owned WinForms notification window unavailable.' }
+
+    # Read-only Shell API verifies that Explorer registered the icon (including
+    # an icon in the overflow area). No taskbar clicks or preference changes.
+    for ($retry = 0; $retry -lt 12 -and -not $receipt.shellIconRegistered; $retry++) {
+        for ($iconId = 0; $iconId -le 8; $iconId++) {
+            $identifier = New-Object WbTrayCallbackTest+Identifier
+            $identifier.cbSize = [uint32][Runtime.InteropServices.Marshal]::SizeOf(
+                [type]'WbTrayCallbackTest+Identifier')
+            $identifier.hWnd = $notify
+            $identifier.uID = [uint32]$iconId
+            $identifier.guidItem = [Guid]::Empty
+            $rect = New-Object WbTrayCallbackTest+Rectangle
+            if ([WbTrayCallbackTest]::Shell_NotifyIconGetRect([ref]$identifier, [ref]$rect) -eq 0) {
+                $receipt.shellIconRegistered = $true
+                $receipt.shellIconId = $iconId
+                break
+            }
+        }
+        if (-not $receipt.shellIconRegistered) { Start-Sleep -Milliseconds 150 }
+    }
+    if (-not $receipt.shellIconRegistered) { throw 'Explorer did not report the owned notification icon.' }
 
     # WinForms notification callback: WM_USER + 1024, WM_LBUTTONDBLCLK.
     if (![WbTrayCallbackTest]::PostMessage($notify, 0x800, [IntPtr]1, [IntPtr]0x203)) {
@@ -158,7 +186,7 @@ finally {
         @(Get-Process -Name 'Workbridge.ControlCenter' -ErrorAction SilentlyContinue).Count -eq 0
     $receipt | ConvertTo-Json -Compress
 }
-if ($receipt.initiallyHidden -and $receipt.doubleClickRestored -and
+if ($receipt.initiallyHidden -and $receipt.shellIconRegistered -and $receipt.doubleClickRestored -and
     $receipt.closeToTrayWorked -and $receipt.menuExitFound -and
     $receipt.menuExitInvoked -and $receipt.guiExitedViaMenu -and $receipt.cleanedUp) {
     exit 0

@@ -46,7 +46,7 @@ From `C:\work\workbridge-mcp` in Windows PowerShell, after building the desktop 
 .\desktop\tests\Run-TrayCallbackSmoke.ps1
 ```
 
-This test refuses to run over an existing Control Center instance. It starts an isolated `--tray` process, enumerates **only windows owned by that process**, sends simulated WinForms notification callback messages to its hidden notification window, verifies double-click restoration and close-to-tray behavior, then opens its context menu and invokes **Exit Control Center** through UI Automation. It verifies shutdown and removes only the owned process. No global mouse/keyboard input is sent.
+This test refuses to run over an existing Control Center instance. It starts an isolated `--tray` process, enumerates **only windows owned by that process**, sends simulated WinForms notification callback messages to its hidden notification window, verifies double-click restoration and close-to-tray behavior, then opens its context menu and invokes **Exit Control Center** through UI Automation. It also calls the read-only Windows `Shell_NotifyIconGetRect` API using only its own notification HWND and identifier to confirm Explorer registered the icon, even when hidden in overflow. It verifies shutdown and removes only the owned process. No global mouse/keyboard input is sent.
 
 **Scope limitation:** This proves the application's notification callbacks and actual WinForms context-menu item work. It does **not** prove that clicking the icon through Windows Explorer's taskbar or overflow UI works. That remains a separate M1 acceptance gate.
 
