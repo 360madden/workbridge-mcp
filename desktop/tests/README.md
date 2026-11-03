@@ -27,6 +27,17 @@ To also test the on-demand coordination assignments view for the default `workbr
 
 You can combine `-CheckAssignments` with `-ExpectedJobId`. When invoked through Workbridge's `terminal_run`, its own running job ID can be passed as `-ExpectedJobId`.
 
+## Bounded monitor regression tests
+
+Run from `C:\\work\\workbridge-mcp` in Windows PowerShell:
+
+```powershell
+dotnet run --project .\\desktop\\tests\\BoundedLineReaderTests.csproj -c Release --nologo
+.\\desktop\\tests\\Run-OversizeMonitorFixture.ps1
+```
+
+The unit harness tests the incremental 64,000-character line limit, CRLF, EOF, cancellation and oversized messages. The integration fixture creates a new disposable folder under the repository's `temp` directory, copies the already-built GUI there, configures that copy to use its own fake monitor, and verifies oversized output -> offline -> recovery -> offline. It refuses to run when the dashboard already exists, cleans up only its own fixture/process, and **does not stop the live MCP server**. Test success is not independent code-review sign-off.
+
 ## Acceptance checks
 
 - Displays a live authenticated version/status.

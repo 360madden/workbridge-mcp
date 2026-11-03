@@ -6,6 +6,7 @@
 
 Review only the Workbridge desktop Control Center and its integration scripts, not the running MCP owner or unrelated RIFT projects.
 
+- `desktop/Workbridge.ControlCenter/BoundedLineReader.cs`
 - `desktop/Workbridge.ControlCenter/App.xaml.cs`
 - `desktop/Workbridge.ControlCenter/MainWindow.xaml.cs`
 - `desktop/Workbridge.ControlCenter/MainWindow.xaml`
@@ -16,13 +17,16 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 - `scripts/desktop-job-detail.mjs`
 - `scripts/desktop-assignments.mjs`
 - `desktop/tests/Run-DesktopSmoke.ps1`
+- `desktop/tests/BoundedLineReaderTests.cs`
+- `desktop/tests/BoundedLineReaderTests.csproj`
+- `desktop/tests/Run-OversizeMonitorFixture.ps1`
 
 ## Required review questions
 
 1. **Single-instance correctness:** Inspect mutex and restore-event initialization, concurrent startup, dispatcher shutdown, and the 15-attempt retry boundary. Check for potential lost activations or exceptions.
 2. **Tray lifecycle:** Examine hide-on-X, notification icon creation/disposal, restore on double-click, and explicit Exit GUI. The actual notification-area click/menu path is *not yet runtime-verified*.
 3. **Background monitoring:** Check whether the long-lived Node.js monitor can survive unexpected GUI death, hang on a stalled MCP connection, leak processes, or retry too aggressively.
-4. **Streaming bounds:** Review line length and buffering **before** parsing; a post-read 64K check is not a hard memory bound. Assess whether malformed/oversized output can affect the UI. Evaluate stdout backpressure.
+4. **Streaming bounds:** Review `BoundedLineReader.cs` and deterministic tests. Confirm the 64,000-character ceiling is enforced **while reading**, including CRLF, EOF, buffered subsequent lines, cancellation and exceptional output. Check for remaining unbounded streams (including on-demand probes), malformed JSON handling, stdout backpressure, and child cleanup.
 5. **UI correctness:** Review live/offline state, inventory-completeness label, selection restoration during five-second refreshes, stale job-detail response rejection, and on-demand per-repository coordination assignments. Ensure assignment state counts are never described as independently reasoning AI agents.
 6. **Local authorization:** The service endpoint requires an authenticated DPAPI-protected descriptor. Confirm the GUI uses the existing `connectService` path and never logs or exposes its credential.
 7. **Safety of displayed output:** Job logs can contain secrets. Confirm that sensitive output remains local and bounded; suggest appropriate operator-facing behavior without silently sending it elsewhere.
@@ -39,6 +43,7 @@ Review only the Workbridge desktop Control Center and its integration scripts, n
 - Isolated offline/online/offline fixture tests passed without stopping the real server.
 - Read-only Shell_TrayWnd UI Automation found 'Show Hidden Icons' but not the Workbridge icon while the overflow window was closed; **do not infer actual icon/menu usability from that check**.
 - On-demand assignment lookup and WPF interaction passed in `wbdesktop-assignments-ui-smoke-20261102-v1`. A lookup outside configured roots (`C:\Windows`) was refused.
+- Bounded streaming checkpoint: `wbdesktop-bounded-reader-unit-20261102` passed 15 assertions, `wbdesktop-bounded-reader-wpf-build-20261102` passed 0 warnings/errors, `wbdesktop-bounded-wpf-smoke-20261102` passed full GUI smoke, and `wbdesktop-oversize-fixture-run-20261102` passed oversize/offline/recovered/offline fixture with cleanup. These are developer-run tests, not independent reviewer sign-off.
 
 ## Output contract for independent review
 

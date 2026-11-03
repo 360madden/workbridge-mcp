@@ -136,11 +136,13 @@ public partial class MainWindow : Window
                 monitor.StartInfo.Environment["WORKBRIDGE_DESKTOP_PARENT_PIPE"] = "1";
                 monitor.StartInfo.ArgumentList.Add(script);
                 monitor.Start();
+                // Enforce the message limit while reading rather than after a
+                // possibly unbounded ReadLineAsync allocation.
+                var boundedOutput = new BoundedLineReader(monitor.StandardOutput, 64_000);
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var line = await monitor.StandardOutput.ReadLineAsync(cancellationToken);
+                    var line = await boundedOutput.ReadLineAsync(cancellationToken);
                     if (line is null) throw new IOException("Monitor exited.");
-                    if (line.Length > 64_000) throw new InvalidDataException("Monitor output too long.");
                     using var json = JsonDocument.Parse(line);
                     if (_exiting || cancellationToken.IsCancellationRequested) break;
                     if (json.RootElement.TryGetProperty("ok", out var ok) && ok.GetBoolean())

@@ -36,6 +36,13 @@ Build a personal Windows 11 WPF/.NET 10 dashboard with system-tray lifecycle and
 - A read-only notification-area inspection found 'Show Hidden Icons' in the shell but no Workbridge icon while overflow was closed; no shared desktop input was injected.
 - This is deterministic regression evidence for M1/M2; actual taskbar notification icon clicks and genuinely independent Extra High code review remain unverified.
 
+## Bounded-stream reliability checkpoint (2026-11-02)
+- Fixed a concrete reliability risk: previously the GUI checked line length **after** `StreamReader.ReadLineAsync`, so an enormous line could be buffered before rejection. `BoundedLineReader.cs` enforces a 64,000-character limit while incrementally reading with a 4,096-character reusable buffer.
+- Unit harness `desktop/tests/BoundedLineReaderTests.csproj`: `wbdesktop-bounded-reader-unit-20261102` passed all 15 assertions. WPF `-warnaserror` build job `wbdesktop-bounded-reader-wpf-build-20261102` passed.
+- `wbdesktop-bounded-wpf-smoke-20261102` passed complete real GUI smoke test, including selected job/assignments and cleanup.
+- Isolated oversized output fixture `desktop/tests/Run-OversizeMonitorFixture.ps1`: `wbdesktop-oversize-fixture-run-20261102` exited 0, verifying oversize rejected, offline status, recovery, subsequent offline, and cleanup. The live Workbridge service was not stopped.
+- Test scripts/documentation are committed with the source change; independent code review and actual tray icon/menu interactions remain pending.
+
 ## Remaining acceptance gates
 1. Test actual Windows notification-area icon double-click and context menu Exit. Shell_TrayWnd UIA name lookup did not expose icon; do not claim pass.
 2. Obtain genuinely independent code review, ideally Extra High reasoning, through an environment that actually exposes native AI subagents. Workbridge agent assignments are metadata, not spawned reasoning agents.
