@@ -1,6 +1,6 @@
 # Candidate research findings — 2026-11-04
 
-Research began source-only. Since then, Workbridge read-only WinApp measurements, guest status probes and a synthetic process-lifetime test have been performed, and an isolated candidate source checkout has been verified. **No production runtime replacement or GUI actions**. Evidence: `reports/2026-11-04-investigation-sitrep-01.md`.
+Research began source-only. Since then, Workbridge read-only WinApp measurements, guest status probes and a synthetic process-lifetime test have been performed, and an isolated candidate source checkout has been verified. **No production runtime replacement or GUI actions**. Evidence: `reports/2026-11-04-investigation-sitrep-01.md` and `reports/2026-11-04-investigation-sitrep-02.md`.
 
 | Candidate | Role | Primary repository |
 | --- | --- | --- |
@@ -35,3 +35,10 @@ Open questions: actual comparative speed/reliability on Joey's host, multi-agent
 - Existing Workbridge `Desktop-JobLifetime.cs` synthetic smoke passed 1/1; this proves process-tree cleanup for the fixture, not cancellation of real COM UIA calls.
 - Fresh Lab1 queue blocked with missing cleanup receipt and disconnected guest, whereas Lab2 queue clean and guest connected. RR2's RIFT-only cleanup watchdog cannot safely attest an independent UIA writer; design a separate integrated lease before guest input.
 - UIA is not universal: Windows Graphics Capture cannot capture minimized windows; secure desktop requires user handoff; custom-rendered controls may need Win32/WGC plus image/OCR observation.
+
+## Protocol-only and safety gates — 2026-11-04
+- Sbroenne direct MCP stdio server self-contained publish on SDK 10.0.302 passed; verified EXE `c74dfc9e...e47f0f9` and managed DLL `99d3a37d...b6a9900`, full hashes in `benchmarks/sbroenne-stdio-server-build-2026-11-04.md`.
+- One bounded direct MCP stdio protocol job `wda_sbroenne_stdio_protocol_20261104_001` **passed**: 1.107 s outer, exactly `ui_snapshot` registered, **zero actual tools/call** or GUI operation, direct child close observed. Windows Job descendant settlement remains not-proven; do not interpret as UIA reliability.
+- Prefer direct stdio over `wincli` hidden daemon for the first isolated comparison; avoid the daemon auto-start/stop caller-ownership race. `ui_read` can OCR overlapping pixels, so initial future UIA permitlist is **only** `ui_snapshot`, with explicit HWND and private output projection.
+- Sbroenne window enumeration filters taskbar and untitled windows. A fair full-cycle comparison needs the same titled disposable DesktopProbe target. Its 120s UI-thread timer is **not a hard watchdog**, and launching it may take game focus; ask Joey and establish independent cleanup first.
+- WinApp `--interactive` is an inspect output filter, not a persistent CLI session. Caller-side known-identity direct `desktop_inspect` is the immediate low-risk performance improvement to measure.

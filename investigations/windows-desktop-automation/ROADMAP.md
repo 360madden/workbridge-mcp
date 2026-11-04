@@ -13,7 +13,7 @@
 
 ## M2 — Evaluate sbroenne/mcp-windows as the leading replacement candidate
 - [x] Pin a release/source revision and review license, build provenance, packaging and compatibility with .NET 10 (v1.3.28, SHA 655b9fc; CLI built on SDK 10.0.302).
-- [ ] Evaluate its MCP surface against `wincli` persistent daemon and map candidate functions that could replace existing Workbridge tool implementations.
+- [x] Source/static-catalog evaluation of `wincli` vs direct MCP stdio and map candidate functions (18-tool inventory; protocol-only `tools/list` passed). Performance replacement comparison is separate below.
 - [ ] Verify immutable observed element IDs, process-instance identity, target/foreground checks and concurrent input behavior.
 - [ ] Run identical synthetic app observations and failure cases; no live RIFT or guest input.
 - [ ] Compare results with M1 using the same test cases and independent state evidence.
@@ -51,3 +51,12 @@ Never label the trial `PASS` simply because a tool says `success`.
 - [x] Exact sbroenne v1.3.28 source revision verified and isolated `wincli` self-contained publish passed on SDK 10.0.302; no GUI tool invoked.
 - [x] Guest Lab-1 blocked queue surfaced without mutation; protect quarantine pending separate diagnosis.
 - [ ] Controlled synthetic action proof and vendor comparison; no production changes.
+
+## Second-wave checkpoint (2026-11-04)
+- [x] Sbroenne MCP stdio server published under ignored investigation temp with exact EXE/DLL/runtimeconfig hash pins.
+- [x] Direct MCP protocol-only smoke job `wda_sbroenne_stdio_protocol_20261104_001`: `protocol_passed`, exactly one `ui_snapshot` tool, 0 tool calls, direct child exited; **Job descendant settlement not proven**.
+- [x] Hardened synthetic effect-then-hang test with Job members=2, child alive before kill and independent durable journal; 1/1 passed.
+- [x] Source audits of legacy/OCR/Win32 candidates, provisional function-provider matrix and guest UIA/OneDrive/latency designs documented.
+- [ ] Prove hard process-lifetime watchdog and user-approved focus window for visible `DesktopProbe` before a fair read-only provider comparison.
+- [ ] Independently verify actual UIA effects/latency in a disposable fixture; no live RIFT or guest input until separate safety gate.
+- [ ] No production provider replacement; WB-001 remains separate.
