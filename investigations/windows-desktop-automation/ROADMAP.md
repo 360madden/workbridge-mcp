@@ -12,7 +12,7 @@
 - [ ] Measure cold/warm latency, median/p95, nonempty evidence, timeouts and context/output size.
 
 ## M2 — Evaluate sbroenne/mcp-windows as the leading replacement candidate
-- [ ] Pin a release/source revision and review license, build provenance, packaging and compatibility with .NET 10.
+- [x] Pin a release/source revision and review license, build provenance, packaging and compatibility with .NET 10 (v1.3.28, SHA 655b9fc; CLI built on SDK 10.0.302).
 - [ ] Evaluate its MCP surface against `wincli` persistent daemon and map candidate functions that could replace existing Workbridge tool implementations.
 - [ ] Verify immutable observed element IDs, process-instance identity, target/foreground checks and concurrent input behavior.
 - [ ] Run identical synthetic app observations and failure cases; no live RIFT or guest input.
@@ -48,6 +48,6 @@ Never label the trial `PASS` simply because a tool says `success`.
 ## First-wave checkpoints (2026-11-04)
 - [x] Microsoft WinApp 10-cycle taskbar discovery+inspect baseline (read-only) and 15-call startup decomposition.
 - [x] Existing Job Object synthetic descendant containment smoke: 1/1 passed (not actual hung COM proof).
-- [x] Exact sbroenne v1.3.28 source revision verified; private build remains experimental.
+- [x] Exact sbroenne v1.3.28 source revision verified and isolated `wincli` self-contained publish passed on SDK 10.0.302; no GUI tool invoked.
 - [x] Guest Lab-1 blocked queue surfaced without mutation; protect quarantine pending separate diagnosis.
 - [ ] Controlled synthetic action proof and vendor comparison; no production changes.

@@ -31,7 +31,7 @@ Open questions: actual comparative speed/reliability on Joey's host, multi-agent
 ## Verified first-wave updates
 - Workbridge WinApp full discovery+inspect median **3677 ms** and approximate P95 **5672 ms** over 10 read-only taskbar cycles; 0 errors, low N.
 - Independent 15-call CLI startup timings found two avoidable `--version` calls in each full cycle; direct `desktop_inspect` with known PID/HWND still revalidates identity. Optimization not yet deployed.
-- Only host .NET SDK **10.0.302** is installed; sbroenne v1.3.28 source pinned to commit `655b9fc92d03ad52a270067c6844ea1231c90559`, global.json pins SDK 10.0.401. Isolated publish compatibility unresolved as of initial checkpoint.
+- Only host .NET SDK **10.0.302** is installed; sbroenne v1.3.28 source pinned to commit `655b9fc92d03ad52a270067c6844ea1231c90559`, global.json pins SDK 10.0.401. Isolated v1.3.28 self-contained `wincli.exe` publish **PASSED** on SDK 10.0.302 (16 s); exact binary SHA `ecd1ad47a4e9d5e6bb4d55d53ed0119b42a3c1afd2e3a3e11f19afc4dbe46438`, under ignored investigation `temp/`; no daemon or GUI call. Release tag unsigned; SHA match is not signature attestation.
 - Existing Workbridge `Desktop-JobLifetime.cs` synthetic smoke passed 1/1; this proves process-tree cleanup for the fixture, not cancellation of real COM UIA calls.
 - Fresh Lab1 queue blocked with missing cleanup receipt and disconnected guest, whereas Lab2 queue clean and guest connected. RR2's RIFT-only cleanup watchdog cannot safely attest an independent UIA writer; design a separate integrated lease before guest input.
 - UIA is not universal: Windows Graphics Capture cannot capture minimized windows; secure desktop requires user handoff; custom-rendered controls may need Win32/WGC plus image/OCR observation.
