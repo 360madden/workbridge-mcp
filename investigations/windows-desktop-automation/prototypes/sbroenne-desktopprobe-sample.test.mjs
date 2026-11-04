@@ -17,7 +17,7 @@ function manifest() {
     pid: 12468, startedAtUtcTicks: utcTicks(),
     sessionId: 2, hwnd: '778899', className: 'WindowsForms10.Window.8.app.0.abc',
     title: 'Workbridge GUI-004 Native Input Probe',
-    exePath: path.join(repo, '.tools', 'desktop-probe-bin', 'DesktopProbe.exe'),
+    exePath: path.join(root, 'desktopprobe-' + runId, 'publish', 'DesktopProbe.exe'),
     exeSha256: 'e'.repeat(64), foregroundHwnd: '778899', evidenceDir,
     observedAtUtc: new Date().toISOString(), watchdogPid: 12470,
     watchdogStartedAtUtcTicks: '639000000000000001',
@@ -51,6 +51,8 @@ test('reject non-DesktopProbe, stale, invalid foreground, foreign lock, and bad 
     { startedAtUtcTicks: (BigInt(utcTicks()) - 660000000n).toString() },
     { observedAtUtc: new Date(Date.now() - 300000).toISOString() },
     { className: 'Chrome_WidgetWin_1' },
+    { jobActiveAfterSpawn: 3 },
+    { exePath: path.join(root, 'desktopprobe-' + runId, 'other', 'DesktopProbe.exe') },
     { evidenceDir: path.join(repo, '.tools', 'desktop-evidence') }
   ]) assert.throws(() => validateManifest({ ...m, ...altered }, m.requestId, manifestPath),
       (err) => err instanceof PilotError);

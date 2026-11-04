@@ -19,7 +19,7 @@ internal static class SbroenneProviderHost
     private const string NodeSha = "119d6fa70e6ae1b15b90688ab6bcc8e3a2819acea021af196895cab1843645af";
     private const string ProtoDir = @"C:\work\workbridge-mcp\investigations\windows-desktop-automation\prototypes";
     private const string SyntheticSha = "5ba53304594b2159252145f45139b21d8eb96ce45fa72a3a771bf9760280ae02";
-    private const string SnapshotSha = "c30a69346057214d4b75f35016620e671785292b442507c0e3fdbfb52572b27a";
+    private const string SnapshotSha = "b49a70771b45f7504c8df06e627af3cf661d35712c011f39cdcccb2f7b1c6fd4";
     private static readonly Stopwatch Clock = Stopwatch.StartNew();
 
     private static string Q(string s)

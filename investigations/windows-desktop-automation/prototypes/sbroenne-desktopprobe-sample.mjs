@@ -65,7 +65,7 @@ export function validateManifest(m, requestId, manifestPath) {
       !requestIdValid(requestId) || m.requestId !== requestId ||
       !requestIdValid(m.runId) || !requestIdValid(m.leaseId) ||
       !safeInt(m.pid) || !safeInt(m.sessionId) ||
-      !safeInt(m.watchdogPid) || !safeInt(m.jobActiveAfterSpawn, 64) ||
+      !safeInt(m.watchdogPid) || m.jobActiveAfterSpawn !== 2 ||
       !boundedDecimal(m.hwnd) || !boundedDecimal(m.foregroundHwnd) ||
       !boundedDecimal(m.startedAtUtcTicks) || !boundedDecimal(m.watchdogStartedAtUtcTicks) ||
       !/^S-[0-9]+-[0-9]+(-[0-9]+)+$/.test(m.ownerSid ?? '') ||
@@ -85,7 +85,9 @@ export function validateManifest(m, requestId, manifestPath) {
   if (path.resolve(m.evidenceDir).toLowerCase() !== expectedEvidence.toLowerCase() ||
       path.resolve(manifestPath).toLowerCase() !== path.join(expectedEvidence, 'target-manifest.json').toLowerCase())
     fail('MANIFEST_PATH_MISMATCH');
-  if (!isChild(path.resolve(m.exePath), repo)) fail('PROBE_EXE_OUTSIDE_REPO');
+  const expectedProbe = path.join(privateRoot, 'desktopprobe-' + m.runId, 'publish', 'DesktopProbe.exe');
+  if (path.resolve(m.exePath).toLowerCase() !== expectedProbe.toLowerCase())
+    fail('PROBE_EXE_NOT_WATCHDOG_PUBLISH');
   return Object.freeze({ ...m, exeSha256: m.exeSha256.toLowerCase() });
 }
 
