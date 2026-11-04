@@ -3,7 +3,7 @@
 ## M0 — Establish the isolated investigation
 - [x] Define a separate Workbridge-owned research directory, with reports/candidates/benchmark/prototype areas.
 - [x] Record Joey's permission to replace specific existing desktop functions when an external replacement is better than writing an adapter.
-- [ ] Commit the documentation-only baseline and confirm the live Workbridge owner remains unchanged.
+- [x] Commit the documentation-only baseline and confirm the live Workbridge owner remains unchanged (commit 8fc6c78; owner 0.16.4-dev PID 43508 verified).
 
 ## M1 — Baseline the installed Microsoft WinApp CLI
 - [ ] Inventory actual local 0.7.1 verbs, response schema and supported UIA selectors.
