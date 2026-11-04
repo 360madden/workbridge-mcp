@@ -1,0 +1,104 @@
+# DesktopProbe host comparison: exact launch and teardown runbook
+
+**Prepared:** 2026-11-04  
+**Status:** 🟡 **NO-RUN / NOT AUTHORIZATION TO EXECUTE**. Source was inspected read-only. No build, task registration, process launch, UI focus, WinApp/wincli query, screenshot or teardown operation was run. This document is an isolated host-Windows test procedure for a later separately approved WinApp CLI 0.7.1 vs sbroenne wincli v1.3.28 evaluation; it does **not** operate VMware guests or RIFT.
+
+## 1. Audit and the critical two-minute caveat
+
+| Verified source (2026-11-04) | Current behavior | Implication |
+| --- | --- | --- |
+| scripts/helpers/DesktopProbe/Program.cs, SHA256 509662a61284ce50a0c056d5fb78fc35ad0d71173e95c9972f49a17c777db6d6 | .NET 10 WinForms, exactly one absolute **local** output-directory argument; shows a 700×410 centered taskbar window titled **Workbridge GUI-004 Native Input Probe**; names IncrementButton, ResetButton and CounterDisplay; native JSONL stages starting/shown/incremented/reset/closed/error. | This is the existing disposable benchmark oracle; not an arbitrary desktop-action provider. It may surface on top of the physical game or change keyboard focus simply by opening. |
+| DesktopProbe.csproj, SHA256 a1e8669d3bf6652e3fc9f180bf4be06325404815a3c2c0d5c2fc4f7370840a77 | Target net10.0-windows, Windows Forms, WinExe; warnings are errors. | Build with the installed .NET 10 SDK and retain source/build/exe exact hashes; do not assume .NET 10 runtime presence merely from SDK. |
+| Program.cs timer at lines 142–150 | A **System.Windows.Forms.Timer** of 120,000 ms starts on **Shown** and calls Close on Tick; FormClosed stops timer. | **Not a hard ≤120-second lifetime guarantee**: UI-thread message-loop starvation/hang or a window never Shown can delay/skip Tick; the timeout starts after Shown, not process launch. |
+| scripts/Manage-HelperTask.ps1, SHA256 d9bbf232e440e0c591cd3715630babec1e238dfadec3f901b72babb26504afd7 | Actions Register/Start/Status/Stop/Remove; task name **Workbridge Helper <HelperId>**; current user's SID, **Interactive**, **Limited**, no trigger unless explicit AtLogon; MultipleInstances IgnoreNew; zero restarts. Task state stored at .local/helpers/<id>/registration.json, owner checks and SHA-bound registration description. | Correct interactive-user task pattern, but an ephemeral test still writes **a narrowly owned registration under Workbridge's existing .local root**. No AtLogon. Verify collisions and identities before registration. |
+| Manage-HelperTask.ps1 Settings at lines 60–70 and 110–115 | **ExecutionTimeLimit=PT0S** (unlimited); Assert-OwnedHelperTask requires exactly that. Stop polls task state up to 15 sec, but doesn't independently prove descendants closed. Remove retains registration receipt. | The existing task manager **does not independently enforce** the promised 120-second close. **Hard stop gate:** design and verify a separate bounded, owned watchdog/Job launcher, or extend the *isolated* helper path to enforce a verified deadline, before ever claiming guaranteed ≤120s. |
+| scripts/Desktop-JobLifetime.cs | Kill-on-job-close private Job Object helper attaches **its current process**; checks handle not inherited and active process count. | Useful design/reference for a new owner watchdog. It is **not automatically attached** to a DesktopProbe started independently by Scheduled Task. Do not claim it already contains scheduled-task descendants. |
+| scripts/desktop-probe-act.mjs, SHA256 8c5c63a280cbb30652ef64b37bc914dff9215e1d9f7a23bda809efb2cf3f5c83 | Pin exact DesktopProbe PID/HWND/title, validate UIA tree and IncrementButton, journal durable intent, take exclusive desktop-input-turn.lock, compare independent native-probe-<pid>.jsonl counter n→n+1, refuse uncertain replay; child HWND ancestry check for keyboard path. | Strong action oracle. For **initial** head-to-head use read-only window/UIA inspect only; any invoke/click/focus needs distinct approval and quiet desktop. |
+| docs/interactive-desktop-vm-roadmap.md GUI-003/004 | Historical source publish, on-demand helper via task manager without AtLogon, stale-HWND/minimized checks, native journal proof. A WinApp click once claimed success at offscreen (-31877,-31771) yet native counter didn't increment. | Keep geometry/PID-HWND/child-owner checks and independent postcondition. Historical PID/HWND values must never be reused. |
+
+**Action blocker to solve before a guaranteed-bounded pilot:** The combination of a 120-second UI message timer and unlimited Scheduled Task execution is **best-effort, not a strict wall-clock cap**. The minimal correct hardening is a **separately owned, interactive-session launcher/watchdog** that starts the probe as its own child inside a private kill-on-close Windows Job Object, records PID/start, applies an independent monotonic deadline **≤115 seconds from process launch**, and verifies child exit and job-settlement by 120 seconds. Reuse the tested Desktop-JobLifetime.cs concept, but it must actually own the child; a normal task-launched process is not covered by merely attaching the unrelated Workbridge host to a Job. If ownership, timeout enforcement or task exit verification cannot be proven in an isolated synthetic test, mark **NO-GO** and do not launch the comparison. OS scheduling/hardware failure means no user-mode mechanism is literally an absolute real-time guarantee; report this operationally as a verified bounded-stop contract, not magical certainty.
+
+The later watchdog is a small separate implementation/verification gate, not something to slip into the currently running Workbridge service. This no-run document creates **no** code.
+
+## 2. Private paths, naming, source hashes
+
+- **Working root:** the currently verified Workbridge repository root (historically C:\work\workbridge-mcp). Re-resolve through current Workbridge workspace_info, not an assumed C: path if the installation moved.
+- **Private ignored run directory:** <repo>\investigations\windows-desktop-automation\temp\desktopprobe-<runId>\ with publish\, artifacts\, evidence\, logs\, and summary\. The repository .gitignore explicitly ignores directories named **temp/**. All output/artifacts go there, never into a user document, RIFT addon directory or VMware guest.
+- **Unique HelperId:** dpcompare-<date>-<6hex>, lower-case letters, digits and hyphens only, <=48 characters. The task name is exactly **Workbridge Helper dpcompare-...**. No generic helper ID and no existing task override.
+- **Source pin:** prior Program.cs SHA and DesktopProbe.csproj SHA above; rerun hashes before a later build, record the **actual** Git commit/source hashes used and the produced DesktopProbe.exe SHA. Fail closed on mismatch instead of treating any executable with the same basename as safe.
+- **Task registration side effect:** .local/helpers/<HelperId>/registration.json even when published exe and output live in ignored temp. Verify this exact new subdirectory is absent and leave other .local helper receipts untouched. If the coordinator requires absolutely zero .local writes, use a separately approved private interactive launcher/task wrapper; the current manager cannot satisfy that criterion unchanged.
+- **Other backend pin:** Microsoft WinApp CLI version 0.7.1 remains read-only. sbroenne/mcp-windows pinned source tag v1.3.28/commit 655b9fc92d03ad52a270067c6844ea1231c90559 and local isolated build from benchmarks/sbroenne-build-2026-11-04.md. Candidate normal ui/window commands may autostart its hidden daemon via EnsureRunningAsync, so its private owned daemon/IPC/Job lifecycle has a separate **must-pass** gate; informational --help/--version do not prove that gate.
+
+## 3. Preflight — read-only, no desktop effect
+
+These are **future steps only**; the actual values must be observed anew.
+
+1. **Explicit gate:** Coordinator obtains Joey's agreement to show a small centered WinForms test window **on the host desktop** in a quiet interval. Warn that starting it may momentarily change foreground/focus, overlay a game or interrupt typing. **Do not proceed if Joey is playing physical RIFT, using desktop dialogs, or expecting a VM window to keep focus**. A ChatGPT "Allow ChatGPT to use Workbridge?" prompt may appear at later Workbridge terminal calls; require normal UI approval and do not auto-approve or bypass.
+2. **Owner/runtime:** Record production Workbridge 0.16.4-dev (or then-current) owner PID/start/health without restart; inspect other Workbridge helpers/tasks and the exact desktop-input-turn.lock. No competing helper or uncertain/quarantined input lock.
+3. **User/session:** Determine intended current logged-on interactive host SID, session ID, WindowStation/desktop and explorer.exe PID/start; confirm Workbridge or the task launcher can legitimately start under that **same SID and interactive session**. A scheduled-task **Interactive** principal doesn't alone establish that a window actually appeared in the desired session. Do not use Session 0 or an unidentified elevated token.
+4. **Target isolation:** Confirm no existing DesktopProbe exe window/PID, helper ID, task name, target journal file, candidate daemon or unknown IPC singleton for the selected run. Keep VMX/RIFT processes untouched. Do not silently reuse old generated artifacts.
+5. **Files:** Confirm Program.cs/csproj/manager and proposed watchdog hashes; confirm new run directory, publish path, evidence path and helper registration path absent. Never delete a folder to make a name available; choose a fresh runId. Ensure the Windows user has rights to that bounded path. Avoid OneDrive-backed folders entirely.
+6. **Window/screen:** Record display geometry/DPI, active foreground PID/HWND and user's input state. The probe centers on whichever screen Windows chooses; multi-monitor DPI/context must be part of timing metadata. If it might open over the active game, STOP.
+7. **Lifetime:** **Must prove** the independent owned watchdog/Job process containment and <=120s termination, plus owned-IPC cleanup for candidate daemon, in a separate synthetic test before GUI launch. If only the current WinForms timer is available, treat the launch as potentially unbounded and do not run under a strict timeout requirement.
+
+## 4. Later publish/register/start procedure (examples, not executed)
+
+**PowerShell location:** When authorized, run commands from a normal PowerShell/Workbridge developer terminal in **C:\work\workbridge-mcp** (if that is still the verified repo root). The following templates deliberately retain placeholders. Never copy-paste until live identifiers and owner approval have been verified. No shell command is being run here.
+
+1. **Compile with .NET 10 into the new ignored run directory**, adapting the documented GUI-004 publish; output and intermediate artifacts must both stay in private temp, and hashes/SDK version must be recorded:
+
+       dotnet publish scripts/helpers/DesktopProbe/DesktopProbe.csproj --configuration Release --output investigations/windows-desktop-automation/temp/desktopprobe-<runId>/publish --artifacts-path investigations/windows-desktop-automation/temp/desktopprobe-<runId>/artifacts --nologo
+
+   Verify the specific DesktopProbe.exe exists, target framework/runtime and output SHA, and that no generated changes appeared outside the owned temp and established tool caches. **No implicit installation or global PATH change.** If publishing would restore packages or touch user/global state unexpectedly, review that separately.
+2. **Register only a new, exact, no-trigger task** after the watchdog gate. Conceptual use of current task manager:
+
+       powershell.exe -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File scripts/Manage-HelperTask.ps1 -Action Register -HelperId <HelperId> -Executable "<absolute approved owner watchdog.exe>" -Argument "<absolute private publish\DesktopProbe.exe>","<absolute private evidence>" -WorkingDirectory "<absolute private publish>"
+
+   This is deliberately **not a runnable final command**: the proposed watchdog launcher and its exact allowlisted argument schema **do not yet exist**, and the runner has to be implemented/tested first. If instead registering DesktopProbe.exe directly with the current manager, the 120-second bound is **not guaranteed** and that configuration fails this runbook's hard gate. Never supply -AtLogon. The manager itself validates SID/limited run level/one exact task action/no triggers and rejects collisions; independently verify the final task and registration SHA.
+3. **Status without launch:** Use exact -Action Status for this HelperId. Confirm its task action/path, no auto trigger, logon type Interactive, run level Limited, MultipleInstances IgnoreNew, no restart and exact principal SID/args. The manager's Status is task state only, not proof a visible window will belong to the intended desktop.
+4. **Start once (later and separately authorized):** In the quiet maintenance window, use -Action Start with exact HelperId; the task starts the owned watchdog which launches the hash-pinned DesktopProbe child. No AtLogon or boot startup. The watchdog must log process birth time and ownership and self-settle by its monotonic deadline.
+5. **Confirm new target identity before any UIA call:** From independent Win32/process read-only observer, record process PID, **process creation UTC ticks** (native probe log alone omits this), executable full path+SHA, process owner SID, session ID, top-level HWND/class/title/owner hierarchy, 700×410 expected client geometry (actual frame differs), monitor/DPI/foreground/minimized state. Cross-check the native JSONL **starting → shown**, same PID and SessionId, fresh HWND and counter 0; no previous user's filename or raw UIA text saved. If two windows match, the instance is stale/hidden, wrong session, or foreground becomes contested, STOP and terminate only after owned-lifetime proof.
+6. **Read-only provider comparison first:** Use exact PID/HWND with WinApp CLI 0.7.1 and pinned candidate wincli only after daemon isolation gate; count stable UIA root and button structure, not arbitrary text. A provider observation may cause a daemon startup; include that in cold measurements and teardown. Compare same target, same depth/projection, nonempty semantic output and independent unchanged native counter; never trust an API "success" alone.
+7. **Later, distinct synthetic input approval:** Only if explicitly granted, run one IncrementButton invoke with exact expectedCount 0 under exclusive desktop-input-turn.lock, durable requestId and preintent, fresh PID/HWND, geometry and independent JSONL counter **0→1**; restore/teardown on the owned path. Do not automate ResetButton, target OneDrive, or use any RIFT/VM UI. Repeated action IDs must replay receipts **without a new click**.
+
+## 5. Native proof, journal and latency fields
+
+Program.cs writes **native-probe-<PID>.jsonl** with stages starting, shown, incremented, reset, closed, error, each storing utc, pid, sessionId, hwnd, counter, title and error type. Use a bounded read-only reader to verify only this file under the new private evidence folder. Required addition by independent host observer: PID **creation time UTC**, actual executable SHA/path, owner SID, target class/root HWND, display/DPI/foreground and tool timings. Neither a Scheduled Task "Running" state nor a WinApp Invoke reply proves an increment.
+
+For each provider read-only observation capture: exact provider revision/binary SHA, process/daemon cold vs warm, request ID, app target identity, start/end host monotonic times, startup cost, UIA lookup cost, parse/result bytes, independent unchanged-after counter, focus/foreground changes, timeout and cleanup. For later mutating probe: native journal before/after, input method, event ID, counter expected/result, postcondition timestamp, intent and receipt hashes, lock outcome, stale-handle/child-owner check. Ignore historical PID/HWND from docs; identify live values anew.
+
+**Known regression to retain:** A minimized WinForms window was reported as UIA isOffscreen=false with geometry around -32000. A mouse click returned success, but counter did not increment. Reject tiny/minimized/off-window geometry and verify native n→n+1; do not call this a successful operation.
+
+## 6. Teardown and rollback — exact task and process only
+
+1. **Prefer the probe closing itself**, but the new out-of-process watchdog must enforce the independent 115-second deadline and settle by 120 seconds from verified launch, even if WinForms UI message pump hangs. Record native **closed** when it appears; absence of closed after forced termination is expected and must be explicitly classified, not fabricated.
+2. **Independently verify process exit:** Confirm exact child PID+creation time has exited, Job Object reports no child processes, owned watchdog exited, Scheduled Task state Ready/terminated, no owned daemon/IPC remains, no unexpected helper/RIFT/VM foreground changes. If any of these checks fail, classify **cleanup_uncertain** and quarantine the run; don't falsely report success because Task Scheduler says Ready.
+3. **Use exact task management, never wildcard:** If still Running and the owner/registration is valid, future -Action Stop for the exact HelperId invokes Stop-ScheduledTask and bounded status polling; this alone is not proof of process-tree cleanup, so recheck PID/start and watchdog Job. **Never Stop-Process by image name**, disable Workbridge services, kill explorer, restart desktop, power a VM, or remove a foreign task.
+4. **Only after settled ownership**, use -Action Remove for the exact HelperId; it unregisters the task but **intentionally retains .local/helpers/<id>/registration.json and helper artifacts**. This preservation is a feature, not a cleanup bug. Do not recursively delete broad .local or temp paths. The coordinator can later approve disposal of only the validated run-owned ignored temp directory after relevant redacted summary is committed; if uncertain, preserve it.
+5. **Rollback is narrow:** A failed candidate trial does not mutate the deployed Workbridge server, WinApp installation, VMware sessions or RIFT. Stop only the verified private provider daemon/IPC and probe process tree, unregister only the owned ephemeral task after proof, retain intent/unknown records and reuse existing Workbridge provider. If a candidate daemon escaped its Job, leave it untouched unless exact ownership can be independently established and coordinator approves recovery. Review user-visible focus/foreground after session end without forcing it back if Joey interacted meanwhile.
+6. **Evidence privacy:** Raw probe journal and UIA/screen data stay in ignored private temp. Commit only bounded redacted timing/identity category summary and exact source hashes. The persistent task registration receipt is ignored under .local. Keep all unrelated dirty files unmodified.
+
+## 7. No-go / completion checklist
+
+| Gate | Required condition |
+| --- | --- |
+| 🟢 Files | Source/project SHA verified; build and outputs isolated to one new ignored temp run; binary SHA pinned |
+| 🟢 User/session | Current owner SID and actual interactive session confirmed; Joey agrees to centered window/focus risk; no physical RIFT input collision |
+| 🟢 Task | Unique HelperId, no existing task collision, Interactive Limited, **no AtLogon**, one exact binary/action; no production task replaced |
+| 🔴 Lifetime | **Current code alone fails hard two-minute guarantee.** Must first prove independent watchdog, child Job ownership and ≤120s settle; otherwise **NO LAUNCH** |
+| 🟡 Candidate | wincli daemon/IPC ownership and teardown independently proved; no foreign daemon takeover |
+| 🟢 Target | Fresh PID+creation time, session, owner HWND, valid UIA structure and native JSONL shown/counter 0; no minimized/stale geometry |
+| 🟢 Proof | For read-only, unchanged before/after; for later approved invoke, native 0→1, intent/receipt verified, no uncertain duplicate action |
+| 🔵 Teardown | Exact probe child/watchdog/daemon closed, task removed only when settled, no RIFT/VM/OneDrive change, production Workbridge healthy |
+
+**Current milestone status:** Design and source audit only. The first true next task is the owned watchdog proof/hardening gate, not clicking Start. Coordinator owns any future source change, approved launch, guarded status commands, and commit.
+
+## References within Workbridge
+
+- scripts/helpers/DesktopProbe/Program.cs and DesktopProbe.csproj
+- scripts/Manage-HelperTask.ps1
+- scripts/Desktop-JobLifetime.cs
+- scripts/desktop-probe-act.mjs and scripts/Check-DesktopWindowHandle.ps1
+- docs/interactive-desktop-vm-roadmap.md GUI-003 and GUI-004a/b
+- benchmarks/winapp-vs-wincli-comparison-plan.md and benchmarks/README.md
+- AGENTS.md and docs/autonomous-investigation-policy.md
