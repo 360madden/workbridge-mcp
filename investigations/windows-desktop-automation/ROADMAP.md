@@ -57,6 +57,21 @@ Never label the trial `PASS` simply because a tool says `success`.
 - [x] Direct MCP protocol-only smoke job `wda_sbroenne_stdio_protocol_20261104_001`: `protocol_passed`, exactly one `ui_snapshot` tool, 0 tool calls, direct child exited; **Job descendant settlement not proven**.
 - [x] Hardened synthetic effect-then-hang test with Job members=2, child alive before kill and independent durable journal; 1/1 passed.
 - [x] Source audits of legacy/OCR/Win32 candidates, provisional function-provider matrix and guest UIA/OneDrive/latency designs documented.
-- [ ] Prove hard process-lifetime watchdog and user-approved focus window for visible `DesktopProbe` before a fair read-only provider comparison.
+- [x] Prove independent hard process-lifetime watchdog in **synthetic-only** tests: `prototypes/desktopprobe-watchdog/`, 110-second deadline, exact GUI-turn lease, Job membership 1→2→1. Independent source review passed. Live interactive Task Scheduler helper remains unproven.
 - [ ] Independently verify actual UIA effects/latency in a disposable fixture; no live RIFT or guest input until separate safety gate.
 - [ ] No production provider replacement; WB-001 remains separate.
+
+## Third-wave checkpoint (2026-11-04)
+
+- [x] WinApp fixture structural read-only sampler with deadline parity; 7/7 offline tests.
+- [x] Shared WinApp/Sbroenne exact target/lease/deadline/typed-control contract; 4/4 offline tests.
+- [x] Direct Sbroenne MCP snapshot sampler, pinned binaries and 5/5 offline tests; **no MCP UI tool called**.
+- [x] Sbroenne native Job forensic: host + two Node + two conhost members; fixed three-member assumption rejected, and Workbridge terminal exit0 alone is not semantic success.
+- [x] Protect November 2 RIFT GUI lock/quarantine. Read-only classifier 10/10 synthetic; current `conhost.exe` lineage likely diagnostic sidecars, not proof of Nov2 completion.
+- [x] Source-only future archival design: retain `unknown_outcome`, enforce cross-producer desktop admission freeze, archive exact sidecar first and lock last; **no release executed**.
+- [x] Preferred future host path: one on-demand no-AtLogon Limited/Interactive scheduled watchdog; WinApp first, Sbroenne only after native containment green.
+- [ ] Reconcile old quarantine under separately approved and technically proven release gates; no age-based auto release/replay.
+- [ ] Verify real interactive watchdog/fixture launch and teardown, then one read-only WinApp sample.
+- [ ] Finish and independently review synthetic Sbroenne native Job supervisor v2; only then consider one read-only MCP fixture sample.
+
+Evidence: `reports/2026-11-04-investigation-sitrep-03.md`. Production deployment remains a separate M6 decision.
