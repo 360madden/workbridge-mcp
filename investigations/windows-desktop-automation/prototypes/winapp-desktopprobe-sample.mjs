@@ -70,6 +70,12 @@ export function validateManifest(v) {
   const startMs = Number((BigInt(v.startedAtUtcTicks) - EPOCH_TICKS) / 10000n);
   const ageMs = Date.now() - startMs;
   if (ageMs < -1000 || ageMs > MAX_PROBE_AGE_MS) deny('PROBE_OUTSIDE_WATCHDOG_BUDGET');
+  const observedMs = Date.parse(v.observedAtUtc);
+  const deadlineMs = Date.parse(v.deadlineUtc);
+  if (!Number.isFinite(observedMs) || !Number.isFinite(deadlineMs) ||
+      observedMs > Date.now() + 1000 ||
+      Date.now() - observedMs > MAX_PROBE_AGE_MS ||
+      deadlineMs - Date.now() < 30_000) deny('WATCHDOG_DEADLINE_NEAR');
   return v;
 }
 
@@ -247,6 +253,10 @@ export async function sample(target, sampleId, deps = {}) {
         : args[0] === 'ui' && args[1] === 'list-windows' ? 'discover'
         : args[0] === 'ui' && args[1] === 'inspect' ? 'inspect' : null;
       if (!phase) deny('UNEXPECTED_WINAPP_COMMAND');
+      // Watchdog owns the private Job; avoid UIA near its hard teardown.
+      if (phase === 'inspect' && Date.parse(target.deadlineUtc) - Date.now() < 15_000) {
+        deny('WATCHDOG_DEADLINE_NEAR');
+      }
       const t0 = performance.now();
       // Explicit literal command disables WORKBRIDGE_WINAPP_EXE ambient executable overrides.
       const raw = await command(args, { timeoutMs: 7000, executable: 'winapp.exe' });

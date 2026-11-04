@@ -25,6 +25,8 @@ function target() {
     exePath: join(temp, 'desktopprobe-' + runId, 'publish', 'DesktopProbe.exe'),
     exeSha256: 'a'.repeat(64),
     evidenceDir: join(temp, 'desktopprobe-' + runId, 'evidence'),
+    observedAtUtc: new Date().toISOString(),
+    deadlineUtc: new Date(Date.now() + 80_000).toISOString(),
   };
 }
 function lease(t) {
@@ -78,6 +80,8 @@ test('arguments and manifest reject ambiguous or stale target', () => {
   assert.throws(() => validateManifest(wrongDir), /WRONG_EVIDENCE_DIRECTORY/);
   const stale = target(); stale.startedAtUtcTicks = '630000000000000000';
   assert.throws(() => validateManifest(stale), /PROBE_OUTSIDE_WATCHDOG_BUDGET/);
+  const shortBudget = target(); shortBudget.deadlineUtc = new Date(Date.now() + 5_000).toISOString();
+  assert.throws(() => validateManifest(shortBudget), /WATCHDOG_DEADLINE_NEAR/);
 });
 
 test('exact private watchdog lease only', () => {
@@ -152,4 +156,24 @@ test('a changed after-state fails closed even when provider reported success', a
   });
   assert.equal(got.result, 'unknown_outcome');
   assert.equal(got.reasonCode, 'OBSERVED_STATE_CHANGED');
+});
+
+test('watchdog deadline is rechecked just before WinApp UIA dispatch', async () => {
+  const t = target();
+  const commands = [];
+  const fake = fakeWinapp(t, commands);
+  const got = await sample(t, 'sample-003', {
+    confirmLease: async () => {},
+    observe: async () => observer(t),
+    runWinapp: async (args) => {
+      const output = await fake(args);
+      if (args[1] === 'list-windows') {
+        t.deadlineUtc = new Date(Date.now() + 1_000).toISOString();
+      }
+      return output;
+    },
+  });
+  assert.equal(got.result, 'blocked');
+  assert.equal(got.reasonCode, 'WATCHDOG_DEADLINE_NEAR');
+  assert.equal(commands.filter((line) => line.includes('inspect')).length, 0);
 });
