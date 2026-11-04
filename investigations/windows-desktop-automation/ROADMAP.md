@@ -6,8 +6,8 @@
 - [x] Commit the documentation-only baseline and confirm the live Workbridge owner remains unchanged (commit 8fc6c78; owner 0.16.4-dev PID 43508 verified).
 
 ## M1 — Baseline the installed Microsoft WinApp CLI
-- [ ] Inventory actual local 0.7.1 verbs, response schema and supported UIA selectors.
-- [ ] Record current Workbridge desktop tools, locks and request journaling without changing them.
+- [x] Inventory actual local 0.7.1 verbs, response schema and supported UIA selectors (read-only; SITREP 01).
+- [x] Record current Workbridge desktop tools, locks and request journaling without changing them (SITREP 01).
 - [ ] Test repeated read-only observations, exact PID/HWND/process identity, dialogs, minimized windows and multi-DPI behavior on disposable targets.
 - [ ] Measure cold/warm latency, median/p95, nonempty evidence, timeouts and context/output size.
 
@@ -24,7 +24,7 @@
 - [ ] Benchmark selected operations where WinApp/sbroenne falls short; do not port mechanisms by assumption.
 
 ## M4 — Guest/VM and desktop reliability
-- [ ] Separate host Windows, VMware Workstation chrome, guest Windows session, RIFT renderer and guest receiver paths.
+- [x] Separate host Windows, VMware Workstation chrome, guest Windows session, RIFT renderer and guest receiver paths (read-only RR2 evidence in SITREP 01).
 - [ ] Test dialog handling, uncertain outcomes, hung UIA provider, window disappearance, foreground theft, two concurrent callers and manual-user takeover.
 - [ ] Validate guest-side observation and controlled input only with independently identified guest receiver/session; keep both live RIFT instances undisturbed.
 - [ ] Where a non-UIA backend is superior, include it in the comparison rather than forcing FlaUI/WinApp.
@@ -44,3 +44,10 @@
 For every trial record: date, repo commit/release, host/guest/desktop identity, target PID/start/HWND, request ID, starting state, exact operation, duration, returned status, independently observed final state, failure category and cleanup.
 
 Never label the trial `PASS` simply because a tool says `success`.
+
+## First-wave checkpoints (2026-11-04)
+- [x] Microsoft WinApp 10-cycle taskbar discovery+inspect baseline (read-only) and 15-call startup decomposition.
+- [x] Existing Job Object synthetic descendant containment smoke: 1/1 passed (not actual hung COM proof).
+- [x] Exact sbroenne v1.3.28 source revision verified; private build remains experimental.
+- [x] Guest Lab-1 blocked queue surfaced without mutation; protect quarantine pending separate diagnosis.
+- [ ] Controlled synthetic action proof and vendor comparison; no production changes.

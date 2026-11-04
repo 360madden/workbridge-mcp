@@ -33,4 +33,4 @@ Make Workbridge reliable at controlling Windows desktop applications, native/thi
 ## Initial baseline
 Workbridge workspace_info on 2026-11-04 reported live version 0.16.4-dev, 36 command/worker slots and a local owner. Microsoft WinApp CLI 0.7.1 has already been installed and partially validated in the older GUI roadmap. These facts do **not** prove all proposed new features are ready.
 
-Status: investigation organization in progress; no new backend installed, production code or service modified.
+Status as of November 4: **M0 complete; M1 read-only WinApp timings measured; M2 pinned sbroenne isolated source clone/build evaluation underway; M3 source audits complete; M4 guest-control boundaries checked read-only**. First evidence checkpoint: `reports/2026-11-04-investigation-sitrep-01.md` (commit `05dad3d`). No production code/service changed.
