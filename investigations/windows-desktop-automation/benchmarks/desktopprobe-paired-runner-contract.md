@@ -47,6 +47,31 @@ Observer projects boolean ownerSidVerified=true, not raw SID. Public benchmark r
 
 The providers do **not** use identical UIA implementations. Report full cycle vs provider-only durations separately; a cached/persistent server time is not comparable to WinApp fresh-process total. Sbroenne's snapshot maxDepth may limit returned nodes without limiting internal traversal; record this as a limitation.
 
+## Shared A/B fairness gate (source-reviewed Nov. 4)
+
+1. Use one exact watchdog-owned target manifest and unchanged GUI-turn lease for each A/B block. Run IDs used for paired samples must fit both validators (8–51 alphanumeric/hyphen characters; begin lowercase alphanumeric), with immutable watchdog requestId=runId. A has its own --sample-id; B has its own separate sampleId for one create-new audit filename per trial. Never reuse a per-trial receipt name.
+2. Both providers admit only native-proven fresh DesktopProbe PID/start-tick **strings**, HWND, session/owner SID, titled WindowsForms class and run-owned evidence. Foreground HWND must be nonzero and **unchanged**, but need not equal target HWND. Neither sampler may bring the fixture to foreground or take input.
+3. Common time budget at admission: fixture process age <=65s, native manifest observed age <=65s, watchdog deadline remaining >=30s. Repeat deadline >=15s immediately before provider UIA dispatch. Stop scheduling a fixture on the first near-deadline/uncertain result; watchdog owns teardown. WinApp implemented this in 8db1a8d; Sbroenne implementation is independently source/test checked.
+4. For a successful semantic tree, each provider must prove exactly one IncrementButton and ResetButton of Button type and one CounterDisplay of Text type. Compare control presence, nodes and depths only when the UIA depth semantics match; do **not** compare provider-specific structural SHA256 values as though the algorithms were identical.
+
+### Timing and outcome normalization
+
+| Stage | WinApp A | Sbroenne B | Fair interpretation |
+| --- | --- | --- | --- |
+| Native checks | 2 separate PowerShell observers, before and after | 3 observers: before, immediately pre-snapshot, after | B has an extra strict safety check: report its preDispatch latency separately, not a hidden provider penalty |
+| Startup | Version CLI and discovery CLI, plus inspect CLI process launches | Pin hashes; MCP connect and strict one-tool catalog; native-host/private Job handshake | Report cold startup separately; no persistent/warm claim from one-shot B |
+| Provider read | inspect | discoverOrSnapshot | Compare latency of the read-only UIA operation, with different tree traversal semantics disclosed |
+| Full invocation | total inside Node A, external Workbridge child settlement status | total inside Node B; native host Duration and strict Job settlement separately | Report deployed-policy end-to-end, **not** as identical-work microbenchmark |
+| Result status | success / blocked / unknown_outcome | success / blocked / unknown | Normalize the two unknown labels; exclude failed preflight from provider latency distribution and report its own rejection rate |
+
+Provider B's direct stdio receipt is persisted as a hash-addressed file in the private evidence directory and becomes publishable only after the native host proves its Job's descendants settled. A's Node receipt does not itself prove Job teardown (processTreeSettlement=not-proven); this difference must appear in safety comparison. Never use only best-case times or count preflight rejection as a UIA backend failure.
+
+### Staged comparison scheduling
+
+Perform 1 paired pilot first, then 10 alternating provider samples (5 each), then up to 30 A/B/B/A blocks across multiple freshly approved watchdog lifetimes. **One fixture is capped at 110 seconds total** and admission stops at 65s; do not cram the full 30 into one run. Alternate block starting provider where possible to reduce ordering bias; label missing pairs as censored. After first identity drift, changed native journal, host cleanup uncertainty, lock drift, focus change or hard deadline, stop and preserve receipts. Output a small table for min, median, p95, max, error and timeout rates by phase, noting that small-N p95 is unstable.
+
+Offline cross-provider source test: prototypes/desktopprobe-paired-contract.test.mjs (job wb_desktopprobe_paired_contract_test_20261104_a01, exit 0, 4/4). No GUI trial has yet been authorized or run by this benchmark lane.
+
 ## Opt-in one-sample template — HOLD
 
 Only after watchdog Job/lease, quiet desktop approval and native target manifest are verified, coordinator may submit one bounded Workbridge terminal_run:
