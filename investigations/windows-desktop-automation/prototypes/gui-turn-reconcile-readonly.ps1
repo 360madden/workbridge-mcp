@@ -68,6 +68,7 @@ function Snapshot {
     if (($end - $start).TotalSeconds -gt 15 -or $observed.Count -lt 1) { Fail 'INVENTORY_SLOW_OR_EMPTY' }
     $rows = @(
         foreach ($process in $observed) {
+            if ([int]$process.ProcessId -eq 0) { continue } # Windows System Idle sentinel, not a live child.
             if ($null -eq $process.CreationDate) { Fail 'INVENTORY_CREATION_MISSING' }
             @{
                 pid = [int]$process.ProcessId
@@ -148,7 +149,8 @@ try {
         if ($null -eq $item) { Fail 'INVENTORY_NULL_ENTRY' }
         $id = Number $item.pid
         $parent = Number $item.parentPid
-        if ($id -le 0 -or $byId.ContainsKey($id)) { Fail 'INVENTORY_DUPLICATE_PID' }
+        if ($id -eq 0) { continue } # Also tolerate explicit PID-0 synthetic rows.
+        if ($byId.ContainsKey($id)) { Fail 'INVENTORY_DUPLICATE_PID' }
         $started = Utc $item.startUtc
         if ($started -gt $captured.AddSeconds(5)) { Fail 'INVENTORY_FUTURE_PROCESS' }
         $byId[$id] = @{

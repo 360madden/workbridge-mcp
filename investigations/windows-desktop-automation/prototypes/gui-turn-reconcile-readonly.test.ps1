@@ -76,6 +76,10 @@ $cases = @()
 try {
     [IO.Directory]::CreateDirectory($testRoot) | Out-Null
     $cases += Execute 'clean_no_postlease' 'quarantined_no_present_descendant' { param($c) }
+    $cases += Execute 'system_idle_pid_zero' 'quarantined_no_present_descendant' {
+        param($c)
+        $c.snapshot.processes += [ordered]@{ pid = 0; parentPid = 0; startUtc = $null; sessionId = 0 }
+    }
     $cases += Execute 'candidate_descendant' 'quarantined_candidate_descendant_present' {
         param($c)
         $c.snapshot.processes += [ordered]@{ pid = 3000; parentPid = 1000
