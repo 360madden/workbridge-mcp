@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CS8625;CS8600;CS8618</NoWarn>
+    <AssemblyName>DesktopProbeWatchdog</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../../scripts/Desktop-JobLifetime.cs" Link="Desktop-JobLifetime.cs" />
+  </ItemGroup>
+</Project>
