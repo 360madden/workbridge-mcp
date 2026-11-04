@@ -72,6 +72,6 @@ Never label the trial `PASS` simply because a tool says `success`.
 - [x] Preferred future host path: one on-demand no-AtLogon Limited/Interactive scheduled watchdog; WinApp first, Sbroenne only after native containment green.
 - [ ] Reconcile old quarantine under separately approved and technically proven release gates; no age-based auto release/replay.
 - [ ] Verify real interactive watchdog/fixture launch and teardown, then one read-only WinApp sample.
-- [ ] Finish and independently review synthetic Sbroenne native Job supervisor v2; only then consider one read-only MCP fixture sample.
+- [x] Finish and independently review **synthetic** Sbroenne native Job supervisor v2; clean OS exit0 and forced-negative OS exit3 both prove Job empty. Evidence `benchmarks/sbroenne-private-job-v2-synthetic-2026-11-04.md`, commit `fb479175`. Real MCP/UIA fixture sample remains gated.
 
 Evidence: `reports/2026-11-04-investigation-sitrep-03.md`. Production deployment remains a separate M6 decision.
