@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   link,
   lstat,
@@ -188,6 +188,105 @@ test('real staged capture keeps default evidence under the fixture repository ro
   );
 });
 
+test('staged direct capture CLI refuses missing or foreign November 2 guards without WinApp', async (t) => {
+  const root = await fixture(t, true);
+  await stageDesktopRuntime({ repoRoot: root });
+  const script = path.join(root, 'dist', 'desktop-capture.mjs');
+  const args = [
+    script,
+    '--pid',
+    '100',
+    '--hwnd',
+    '200',
+    '--process',
+    'fixture',
+    '--request-id',
+    'staged_unowned_001',
+  ];
+  const run = () =>
+    spawnSync(process.execPath, args, {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 10_000,
+    });
+  const first = run();
+  assert.equal(first.status, 1);
+  assert.equal(JSON.parse(first.stdout).error.code, 'UI_TURN_RECOVERY_REQUIRED');
+  assert.equal(first.stderr, '');
+  const evidenceRoot = path.join(root, '.tools', 'desktop-evidence');
+  await mkdir(evidenceRoot, { recursive: true });
+  const original = 'November 2 unresolved desktop-input-turn lock';
+  await writeFile(path.join(evidenceRoot, 'desktop-input-turn.lock'), original, { flag: 'wx' });
+  const second = run();
+  assert.equal(second.status, 1);
+  assert.equal(JSON.parse(second.stdout).error.code, 'UI_TURN_RECOVERY_REQUIRED');
+  assert.equal(await readFile(path.join(evidenceRoot, 'desktop-input-turn.lock'), 'utf8'), original);
+  assert.equal(
+    (await readdir(evidenceRoot)).some((name) => name.startsWith('capture-')),
+    false,
+  );
+});
+
+test('staged child accepts exact parent-owned locks before invoking only its injected fake backend', async (t) => {
+  const root = await fixture(t, true);
+  await stageDesktopRuntime({ repoRoot: root });
+  const script = path.join(root, 'dist', 'desktop-capture.mjs');
+  const evidenceRoot = path.join(root, '.tools', 'desktop-evidence');
+  await mkdir(evidenceRoot, { recursive: true });
+  const requestId = 'staged_owned_001';
+  const admission = {
+    schemaVersion: 1,
+    kind: 'workbridge.gui-admission',
+    admissionId: randomUUID(),
+    mode: 'producer',
+    producer: 'desktop-capture-window',
+    requestId,
+    owner: { pid: process.pid },
+    acquiredUtc: new Date().toISOString(),
+  };
+  const turn = {
+    schemaVersion: 1,
+    kind: 'workbridge.gui-turn',
+    leaseId: randomUUID(),
+    producer: 'desktop-capture-window',
+    requestId,
+    owner: { pid: process.pid },
+    target: { kind: 'window', pid: 100, hwnd: 200, process: 'fixture' },
+    acquiredUtc: new Date().toISOString(),
+  };
+  const admissionBytes = JSON.stringify(admission) + '\n';
+  const turnBytes = JSON.stringify(turn) + '\n';
+  await writeFile(path.join(evidenceRoot, 'desktop-turn-admission.lock'), admissionBytes, { flag: 'wx' });
+  await writeFile(path.join(evidenceRoot, 'desktop-input-turn.lock'), turnBytes, { flag: 'wx' });
+  // A real child process (process.ppid === this test process.pid) imports the
+  // staged module; only a fake runner is passed, so no Windows GUI can be touched.
+  const program = [
+    'const mod = await import(' + JSON.stringify(pathToFileURL(script).href) + ');',
+    'const req = mod.parseCaptureRequest(' +
+      JSON.stringify(['--pid', '100', '--hwnd', '200', '--process', 'fixture', '--request-id', requestId]) +
+      ');',
+    'let calls = 0;',
+    "try { await mod.captureWindowUnderParentTurn(req, {runner: async () => {calls++; throw new Error('SYNTHETIC_BACKEND_REACHED');}}); } catch {}",
+    'process.stdout.write(JSON.stringify({calls}));',
+    'process.exitCode = calls === 1 ? 0 : 1;',
+  ].join('\n');
+  const child = spawnSync(process.execPath, ['--input-type=module', '--eval', program], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 10_000,
+  });
+  assert.equal(child.status, 0, child.stderr);
+  assert.deepEqual(JSON.parse(child.stdout), { calls: 1 });
+  assert.equal(
+    await readFile(path.join(evidenceRoot, 'desktop-turn-admission.lock'), 'utf8'),
+    admissionBytes,
+  );
+  assert.equal(await readFile(path.join(evidenceRoot, 'desktop-input-turn.lock'), 'utf8'), turnBytes);
+  assert.equal(
+    (await readdir(evidenceRoot)).some((name) => name.startsWith('capture-')),
+    false,
+  );
+});
 test('missing or oversized inputs and non-file destinations fail before publication', async (t) => {
   for (const invalid of ['missing', 'oversized', 'directory']) {
     const root = await fixture(t);

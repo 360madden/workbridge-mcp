@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import {
   parseCaptureRequest,
   assertVisibleTarget,
   captureWindow,
+  captureWindowUnderParentTurn,
   verifyPng,
 } from '../scripts/desktop-capture.mjs';
+import {
+  acquireDesktopMaintenanceAdmission,
+  releaseDesktopAdmission,
+} from '../scripts/desktop-turn-admission.mjs';
 
 const samplePng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/bH8AAAAASUVORK5CYII=',
@@ -226,4 +232,119 @@ test('GUI-003 fails closed on offscreen target without writing image', async () 
   } finally {
     await rm(evidenceRoot, { recursive: true, force: true });
   }
+});
+
+async function seedParentLease(evidenceRoot, request, parentPid = process.pid) {
+  const admission = {
+    schemaVersion: 1,
+    kind: 'workbridge.gui-admission',
+    admissionId: randomUUID(),
+    mode: 'producer',
+    producer: 'desktop-capture-window',
+    requestId: request.requestId,
+    owner: { pid: parentPid },
+    acquiredUtc: new Date().toISOString(),
+  };
+  const turn = {
+    schemaVersion: 1,
+    kind: 'workbridge.gui-turn',
+    leaseId: randomUUID(),
+    producer: 'desktop-capture-window',
+    requestId: request.requestId,
+    owner: { pid: parentPid, processStartUtc: null, sessionId: null },
+    target: {
+      kind: 'window',
+      pid: request.target.pid,
+      hwnd: request.target.hwnd,
+      process: request.target.process,
+    },
+    acquiredUtc: new Date().toISOString(),
+  };
+  const admissionBytes = JSON.stringify(admission) + '\n';
+  const turnBytes = JSON.stringify(turn) + '\n';
+  await writeFile(path.join(evidenceRoot, 'desktop-turn-admission.lock'), admissionBytes, { flag: 'wx' });
+  await writeFile(path.join(evidenceRoot, 'desktop-input-turn.lock'), turnBytes, { flag: 'wx' });
+  return { admissionBytes, turnBytes };
+}
+
+test('GUI-003 CLI refuses direct/legacy-quarantined calls without parent admission before WinApp', async (t) => {
+  const evidenceRoot = await mkdtemp(path.join(os.tmpdir(), 'wb-gui003-legacy-turn-'));
+  t.after(() => rm(evidenceRoot, { recursive: true, force: true }));
+  const { calls, runner } = fakeBackend();
+  const legacy = path.join(evidenceRoot, 'desktop-input-turn.lock');
+  await writeFile(legacy, 'November 2 foreign owner retained');
+  await assert.rejects(
+    captureWindowUnderParentTurn(parse('gui003_legacy_001'), {
+      runner,
+      evidenceRoot,
+      parentPid: process.pid,
+    }),
+    { code: 'UI_TURN_RECOVERY_REQUIRED' },
+  );
+  assert.deepEqual(calls, []);
+  assert.equal(await readFile(legacy, 'utf8'), 'November 2 foreign owner retained');
+});
+
+test('GUI-003 CLI refuses maintenance admission and orphan quarantine without invoking WinApp', async (t) => {
+  const evidenceRoot = await mkdtemp(path.join(os.tmpdir(), 'wb-gui003-maintenance-'));
+  t.after(() => rm(evidenceRoot, { recursive: true, force: true }));
+  const { calls, runner } = fakeBackend();
+  const request = parse('gui003_maint_001');
+  const maintenance = await acquireDesktopMaintenanceAdmission(
+    path.join(evidenceRoot, 'desktop-input-turn.lock'),
+    'gui003_maintenance_001',
+  );
+  await assert.rejects(
+    captureWindowUnderParentTurn(request, { runner, evidenceRoot, parentPid: process.pid }),
+    { code: 'UI_TURN_RECOVERY_REQUIRED' },
+  );
+  await releaseDesktopAdmission(maintenance);
+  await seedParentLease(evidenceRoot, request);
+  const sidecar = path.join(evidenceRoot, 'desktop-turn-quarantine-legacy.json');
+  await writeFile(sidecar, 'orphan sidecar veto');
+  await assert.rejects(
+    captureWindowUnderParentTurn(request, { runner, evidenceRoot, parentPid: process.pid }),
+    { code: 'UI_TURN_RECOVERY_REQUIRED' },
+  );
+  assert.deepEqual(calls, []);
+  assert.equal(await readFile(sidecar, 'utf8'), 'orphan sidecar veto');
+});
+
+test('GUI-003 CLI accepts only exact current parent-owned turn, preserving both stamps', async (t) => {
+  const evidenceRoot = await mkdtemp(path.join(os.tmpdir(), 'wb-gui003-parent-turn-'));
+  t.after(() => rm(evidenceRoot, { recursive: true, force: true }));
+  const request = parse('gui003_parent_001');
+  const stamps = await seedParentLease(evidenceRoot, request);
+  const { calls, runner } = fakeBackend();
+  await assert.rejects(
+    captureWindowUnderParentTurn(request, { runner, evidenceRoot, parentPid: process.pid + 1 }),
+    { code: 'UI_TURN_RECOVERY_REQUIRED' },
+  );
+  await assert.rejects(
+    captureWindowUnderParentTurn(
+      { ...request, target: { ...request.target, hwnd: request.target.hwnd + 1 } },
+      {
+        runner,
+        evidenceRoot,
+        parentPid: process.pid,
+      },
+    ),
+    { code: 'UI_TURN_RECOVERY_REQUIRED' },
+  );
+  assert.deepEqual(calls, []);
+  const first = await captureWindowUnderParentTurn(request, { runner, evidenceRoot, parentPid: process.pid });
+  assert.equal(first.ok, true);
+  assert.equal(first.replayed, false);
+  const replay = await captureWindowUnderParentTurn(request, {
+    runner,
+    evidenceRoot,
+    parentPid: process.pid,
+  });
+  assert.equal(replay.replayed, true);
+  assert.equal(calls.filter((x) => x[1] === 'screenshot').length, 1);
+  assert.equal(
+    await readFile(path.join(evidenceRoot, 'desktop-turn-admission.lock'), 'utf8'),
+    stamps.admissionBytes,
+  );
+  assert.equal(await readFile(path.join(evidenceRoot, 'desktop-input-turn.lock'), 'utf8'), stamps.turnBytes);
 });

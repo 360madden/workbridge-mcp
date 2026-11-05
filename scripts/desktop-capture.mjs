@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Bounded, targeted WinApp screenshot capture. Never sends keyboard or mouse input.
 import { createHash } from 'node:crypto';
-import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { DesktopUiError, executeReadOnly, parseRequest, runWinapp } from './desktop-ui.mjs';
+import { desktopAdmissionPath } from './desktop-turn-admission.mjs';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
 const DEFAULT_EVIDENCE_ROOT = path.join(repo, '.tools', 'desktop-evidence');
@@ -238,10 +239,106 @@ export async function captureWindow(
   return { ok: true, replayed: false, ...receipt };
 }
 
+// The CLI is child-owned by the MCP capture turn; it never acquires a second
+// admission (which would deadlock). Standalone shell invocations fail closed.
+// VMware imports captureWindow() only while its own guarded turn is active.
+async function readParentStamp(filename) {
+  let before;
+  let after;
+  let bytes;
+  try {
+    before = await lstat(filename);
+    if (
+      !before.isFile() ||
+      before.isSymbolicLink() ||
+      before.nlink !== 1 ||
+      before.size < 2 ||
+      before.size > 4096
+    ) {
+      fail('UI_TURN_RECOVERY_REQUIRED', 'Desktop parent turn has invalid file identity');
+    }
+    bytes = await readFile(filename);
+    after = await lstat(filename);
+  } catch {
+    fail('UI_TURN_RECOVERY_REQUIRED', 'Desktop parent turn is missing or unreadable');
+  }
+  if (
+    bytes.length !== before.size ||
+    before.dev !== after.dev ||
+    before.ino !== after.ino ||
+    before.mtimeMs !== after.mtimeMs ||
+    before.ctimeMs !== after.ctimeMs ||
+    before.size !== after.size
+  ) {
+    fail('UI_TURN_RECOVERY_REQUIRED', 'Desktop parent turn changed during inspection');
+  }
+  try {
+    const stamp = JSON.parse(bytes.toString('utf8'));
+    if (!stamp || typeof stamp !== 'object' || Array.isArray(stamp)) throw new Error('stamp');
+    return stamp;
+  } catch {
+    fail('UI_TURN_RECOVERY_REQUIRED', 'Desktop parent turn stamp is malformed');
+  }
+}
+
+export async function captureWindowUnderParentTurn(
+  request,
+  { runner = runWinapp, evidenceRoot = DEFAULT_EVIDENCE_ROOT, parentPid = process.ppid } = {},
+) {
+  if (
+    !Number.isSafeInteger(parentPid) ||
+    parentPid < 1 ||
+    !request?.target ||
+    !/^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/.test(request.requestId ?? '')
+  ) {
+    fail('UI_TURN_RECOVERY_REQUIRED', 'Desktop capture has no valid parent identity');
+  }
+  const lockPath = path.join(evidenceRoot, 'desktop-input-turn.lock');
+  // Admission and GUI turn are separately authenticated. A lock merely existing
+  // (especially November 2's quarantined lock) is never permission to act.
+  const admission = await readParentStamp(desktopAdmissionPath(lockPath));
+  const guiTurn = await readParentStamp(lockPath);
+  const uuid = (value) =>
+    typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value);
+  if (
+    admission.schemaVersion !== 1 ||
+    admission.kind !== 'workbridge.gui-admission' ||
+    !uuid(admission.admissionId) ||
+    admission.mode !== 'producer' ||
+    admission.producer !== 'desktop-capture-window' ||
+    admission.requestId !== request.requestId ||
+    admission.owner?.pid !== parentPid ||
+    guiTurn.schemaVersion !== 1 ||
+    guiTurn.kind !== 'workbridge.gui-turn' ||
+    !uuid(guiTurn.leaseId) ||
+    guiTurn.producer !== 'desktop-capture-window' ||
+    guiTurn.requestId !== request.requestId ||
+    guiTurn.owner?.pid !== parentPid ||
+    guiTurn.target?.kind !== 'window' ||
+    guiTurn.target.pid !== request.target.pid ||
+    guiTurn.target.hwnd !== request.target.hwnd ||
+    guiTurn.target.process !== request.target.process
+  ) {
+    fail('UI_TURN_RECOVERY_REQUIRED', 'Desktop capture has no matching live parent-owned turn');
+  }
+  let entries;
+  try {
+    entries = await readdir(evidenceRoot);
+  } catch {
+    fail('UI_TURN_RECOVERY_REQUIRED', 'Desktop quarantine directory cannot be inspected');
+  }
+  if (entries.some((name) => name.startsWith('desktop-turn-quarantine-') && name.endsWith('.json'))) {
+    fail('UI_TURN_RECOVERY_REQUIRED', 'Desktop quarantine vetoes the parent-owned capture turn');
+  }
+  // Parent retains both locks until this child settles and its own process tree
+  // is confirmed stopped; a forced/uncertain exit quarantines the parent's turn.
+  return captureWindow(request, { runner, evidenceRoot });
+}
+
 async function main() {
   try {
     const request = parseCaptureRequest(process.argv.slice(2));
-    process.stdout.write(JSON.stringify(await captureWindow(request)) + '\n');
+    process.stdout.write(JSON.stringify(await captureWindowUnderParentTurn(request)) + '\n');
   } catch (error) {
     process.stdout.write(
       JSON.stringify({
