@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import { captureWindow, verifyPng } from './desktop-capture.mjs';
 import { DesktopUiError, executeReadOnly, parseRequest, runWinapp } from './desktop-ui.mjs';
+import { DesktopAdmissionError, withDesktopAdmission } from './desktop-turn-admission.mjs';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
 const DEFAULT_ROOT = path.join(repo, '.tools', 'desktop-evidence');
@@ -296,6 +297,27 @@ async function verifyExistingCaptureEvidence(previous, request, evidenceRoot) {
 }
 
 export async function captureVmwareHostOnce(
+  request,
+  {
+    runner = runWinapp,
+    evidenceRoot = DEFAULT_ROOT,
+    vmLister = readRunningVmList,
+    capture = captureWindow,
+  } = {},
+) {
+  try {
+    return await withDesktopAdmission(
+      path.join(evidenceRoot, 'desktop-input-turn.lock'),
+      { producer: 'vmware-host-capture', requestId: request.requestId },
+      () => captureVmwareHostOnceOwned(request, { runner, evidenceRoot, vmLister, capture }),
+    );
+  } catch (error) {
+    if (error instanceof DesktopAdmissionError) fail(error.code, error.message);
+    throw error;
+  }
+}
+
+async function captureVmwareHostOnceOwned(
   request,
   {
     runner = runWinapp,

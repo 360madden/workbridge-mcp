@@ -38,6 +38,34 @@ export async function withDesktopCaptureTurn<T>(
   lockPath: string = desktopTurnPath,
   owner?: DesktopCaptureTurnOwner,
 ): Promise<T> {
+  // Deployed dist shares the project-root scripts directory; isolated builds stage the helper.
+  const helperUrl: string = new URL('../scripts/desktop-turn-admission.mjs', import.meta.url).href;
+  const { withDesktopAdmission } = (await import(helperUrl)) as {
+    withDesktopAdmission: (
+      guiLockPath: string,
+      owner: { producer: string; requestId: string | null },
+      action: () => Promise<T>,
+    ) => Promise<T>;
+  };
+  try {
+    return await withDesktopAdmission(
+      lockPath,
+      { producer: 'desktop-capture-window', requestId: owner?.requestId ?? null },
+      () => withDesktopCaptureTurnOwned(action, lockPath, owner),
+    );
+  } catch (error) {
+    if ((error as { name?: unknown })?.name === 'DesktopAdmissionError') {
+      throw new BridgeError((error as { code: string }).code, (error as Error).message);
+    }
+    throw error;
+  }
+}
+
+async function withDesktopCaptureTurnOwned<T>(
+  action: () => Promise<T>,
+  lockPath: string = desktopTurnPath,
+  owner?: DesktopCaptureTurnOwner,
+): Promise<T> {
   await mkdir(path.dirname(lockPath), { recursive: true });
   let handle;
   try {

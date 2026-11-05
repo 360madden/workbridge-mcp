@@ -9,6 +9,7 @@ import { execFile } from 'node:child_process';
 import { parseArgs, promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { DesktopUiError, executeReadOnly, parseRequest, runWinapp } from './desktop-ui.mjs';
+import { DesktopAdmissionError, withDesktopAdmission } from './desktop-turn-admission.mjs';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
 const DEFAULT_ROOT = path.join(repo, '.tools', 'desktop-evidence');
@@ -237,6 +238,22 @@ export async function inspectChildHandle({ parentHwnd, reportedHwnd, expectedPid
 }
 
 export async function invokeProbeOnce(
+  request,
+  { runner = runWinapp, root = DEFAULT_ROOT, handleInspector = inspectChildHandle } = {},
+) {
+  try {
+    return await withDesktopAdmission(
+      path.join(root, 'desktop-input-turn.lock'),
+      { producer: 'desktop-probe-action', requestId: request.requestId },
+      () => invokeProbeOnceOwned(request, { runner, root, handleInspector }),
+    );
+  } catch (error) {
+    if (error instanceof DesktopAdmissionError) fail(error.code, error.message);
+    throw error;
+  }
+}
+
+async function invokeProbeOnceOwned(
   request,
   { runner = runWinapp, root = DEFAULT_ROOT, handleInspector = inspectChildHandle } = {},
 ) {
