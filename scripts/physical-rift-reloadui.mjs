@@ -354,6 +354,92 @@ export async function executePhysicalReloadOnce(request, {
     });
 }
 
+/**
+ * Staged keyboard delivery for a single already-admitted physical-RIFT reload.
+ * This factory is NOT wired to the CLI. An independently captured and visually
+ * checked preflight screenshot must attest chat CLOSED and EMPTY before the GUI
+ * lease is acquired. We only verify that immutable evidence is still fresh
+ * during input; we never start an acquiring screenshot adapter while holding
+ * the desktop admission/turn locks.
+ *
+ * After Enter opens chat, the initial screenshot cannot prove the new state.
+ * Target/process/session/foreground are instead rechecked immediately before
+ * every phase, with uncertain outcomes sealed for manual reconciliation.
+ *
+ * WinApp's HWND-bound send-input route is intentionally used without --target:
+ * RIFT's custom chat field is absent from its UI Automation tree.
+ */
+export function createGuardedWinappSender({
+  runner = runWinapp,
+  getProcess = getWindowsProcessIdentity,
+  chatClosedEvidence,
+} = {}) {
+  if (!chatClosedEvidence || typeof chatClosedEvidence !== 'object') {
+    refuse('CHAT_STATE_GATE_REQUIRED', 'Fresh pre-lock chat-closed evidence is required');
+  }
+  const evidence = Object.freeze({
+    confirmed: chatClosedEvidence.confirmed,
+    state: chatClosedEvidence.state,
+    pid: chatClosedEvidence.pid,
+    hwnd: chatClosedEvidence.hwnd,
+    startedUtc: chatClosedEvidence.startedUtc,
+    sessionId: chatClosedEvidence.sessionId,
+    capturedUtc: chatClosedEvidence.capturedUtc,
+    imageSha256: chatClosedEvidence.imageSha256,
+  });
+  return async function sendOneReload(input) {
+    if (!input || !Array.isArray(input.sequence) ||
+        input.sequence.length !== ACTION.length ||
+        input.sequence.some((key, index) => key !== ACTION[index])) {
+      refuse('INVALID_ACTION_SEQUENCE', 'Only one literal Enter /reloadui Enter sequence is permitted');
+    }
+    const target = { pid: input.pid, hwnd: input.hwnd, startedUtc: input.startedUtc };
+    let sessionId = null;
+    for (let phase = 0; phase < ACTION.length; phase++) {
+      const current = await inspectPhysicalRift(target, { runner, getProcess });
+      if (current.sessionId !== input.sessionId ||
+          (sessionId !== null && current.sessionId !== sessionId)) {
+        refuse('SESSION_MISMATCH', 'Physical game or input session changed before a key phase');
+      }
+      sessionId = current.sessionId;
+      // The same pre-lock screenshot only proves chat was initially closed/empty.
+      // No nested capture/control call or invented per-phase chat-state assertion.
+      const age = Date.now() - Date.parse(evidence.capturedUtc ?? '');
+      if (evidence.confirmed !== true || evidence.state !== 'chat-closed-empty' ||
+          evidence.pid !== input.pid || evidence.hwnd !== input.hwnd ||
+          evidence.startedUtc !== input.startedUtc || evidence.sessionId !== input.sessionId ||
+          !Number.isFinite(age) || age < -1000 || age > 15000 ||
+          !/^[a-f0-9]{64}$/i.test(evidence.imageSha256 ?? '')) {
+        refuse('CHAT_STATE_UNVERIFIED', 'Initial chat-closed screenshot proof is missing/stale');
+      }
+      // Check foreground again immediately before sending this individual phase.
+      const beforeKey = await inspectPhysicalRift(target, { runner, getProcess });
+      if (beforeKey.sessionId !== sessionId || beforeKey.foreground !== true) {
+        refuse('TARGET_CHANGED_BEFORE_KEY', 'Physical game foreground/session changed');
+      }
+      const literal = phase === 1;
+      const keys = literal ? ACTION[phase] : 'enter';
+      const args = ['ui', 'send-keys', keys, '-w', String(input.hwnd),
+        '--via', 'send-input'];
+      if (literal) args.push('--verbatim');
+      args.push('--json');
+      const reply = parseJson(await runner(args), 'WinApp send-input response');
+      if (reply?.via !== 'send-input' || reply?.keys !== keys ||
+          Number(reply?.hwnd) !== input.hwnd ||
+          !Number.isInteger(reply?.actionCount) ||
+          reply.actionCount < 1 || reply.actionCount > 32 ||
+          !Array.isArray(reply?.warnings) || reply.warnings.length !== 0 ||
+          (reply.target !== undefined && reply.target !== null &&
+            reply.target !== '' && reply.target !== 'RIFT')) {
+        refuse('ACTION_RECOVERY_REQUIRED', 'Native keyboard delivery was not independently attributable');
+      }
+    }
+    return { submitted: true, sequenceCount: ACTION.length,
+      targetPid: input.pid, targetHwnd: input.hwnd, senderSessionId: sessionId,
+    };
+  };
+}
+
 async function main() {
   try {
     const request = parseReloadRequest(process.argv.slice(2));

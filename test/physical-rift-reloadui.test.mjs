@@ -4,7 +4,7 @@ import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import {
-  parseReloadRequest, inspectPhysicalRift, executePhysicalReloadOnce,
+  parseReloadRequest, inspectPhysicalRift, executePhysicalReloadOnce, createGuardedWinappSender,
 } from '../scripts/physical-rift-reloadui.mjs';
 
 const BASE = ['--pid','32156','--hwnd','462734','--started-utc','2026-11-05T19:01:10.123Z',
@@ -113,6 +113,105 @@ test('uncertain native action retains intent and GUI turn lock; later attempt do
   assert(!names.includes('desktop-turn-admission.lock'));
   await assert.rejects(executePhysicalReloadOnce(target,{...fakes(),sender,root}),{code:'UI_TURN_RECOVERY_REQUIRED'});
   assert.equal(sent,1);
+});
+
+
+test('staged WinApp sender sends immutable three phases with fresh visual and foreground checks',async()=>{
+  const base=fakes();
+  const keyCalls=[];
+  const runner=async(args)=>{
+    if(args[1]==='send-keys'){
+      keyCalls.push(args);
+      return JSON.stringify({keys:args[2],via:'send-input',actionCount:1,
+        target:null,hwnd:target.hwnd,warnings:[]});
+    }
+    return await base.runner(args);
+  };
+  const sender=createGuardedWinappSender({runner,getProcess:base.getProcess,
+    chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',pid:target.pid,hwnd:target.hwnd,
+    startedUtc:target.startedUtc,sessionId:2,capturedUtc:new Date().toISOString(),
+    imageSha256:'a'.repeat(64)}});
+  const result=await sender({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']});
+  assert.equal(result.submitted,true);
+  assert.equal(result.sequenceCount,3);
+  assert.equal(result.senderSessionId,2);
+  assert.deepEqual(keyCalls,[
+    ['ui','send-keys','enter','-w','462734','--via','send-input','--json'],
+    ['ui','send-keys','/reloadui','-w','462734','--via','send-input','--verbatim','--json'],
+    ['ui','send-keys','enter','-w','462734','--via','send-input','--json'],
+  ]);
+  assert(base.calls.filter(c=>c[1]==='list-windows').length>=6,
+    'window must be reidentified both before and after each gate');
+});
+
+test('staged sender refuses missing chat proof, wrong target, and uncertain native input',async()=>{
+  assert.throws(()=>createGuardedWinappSender(),{code:'CHAT_STATE_GATE_REQUIRED'});
+  const base=fakes();
+  const sender=createGuardedWinappSender({runner:base.runner,getProcess:base.getProcess,
+    chatClosedEvidence:{...{confirmed:true,state:'chat-closed-empty',pid:target.pid,hwnd:target.hwnd,
+    startedUtc:target.startedUtc,sessionId:2,capturedUtc:new Date().toISOString(),
+    imageSha256:'b'.repeat(64)},confirmed:false}});
+  await assert.rejects(sender({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']}),
+    {code:'CHAT_STATE_UNVERIFIED'});
+  await assert.rejects(sender({...target,sessionId:2,sequence:['Enter','/quit','Enter']}),
+    {code:'INVALID_ACTION_SEQUENCE'});
+  const bad=fakes({isForeground:false});
+  const forbidden=createGuardedWinappSender({runner:bad.runner,getProcess:bad.getProcess,
+    chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',pid:target.pid,hwnd:target.hwnd,
+    startedUtc:target.startedUtc,sessionId:2,capturedUtc:new Date().toISOString(),
+    imageSha256:'c'.repeat(64)}});
+  await assert.rejects(forbidden({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']}),
+    {code:'NOT_FOREGROUND'});
+  const uncertain=createGuardedWinappSender({
+    getProcess:base.getProcess,
+    runner:async(args)=>args[1]==='send-keys'
+      ? JSON.stringify({keys:'wrong',via:'send-input',actionCount:1,hwnd:target.hwnd,warnings:[]})
+      : base.runner(args),
+    chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',pid:target.pid,hwnd:target.hwnd,
+    startedUtc:target.startedUtc,sessionId:2,capturedUtc:new Date().toISOString(),
+    imageSha256:'d'.repeat(64)}});
+  await assert.rejects(uncertain({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']}),
+    {code:'ACTION_RECOVERY_REQUIRED'});
+});
+
+
+test('staged sender aborts after first key when RIFT loses foreground, never sends text or final Enter',async()=>{
+  const base=fakes();
+  let sent=0;
+  const runner=async(args)=>{
+    if(args[1]==='send-keys'){
+      sent++;
+      return JSON.stringify({keys:args[2],via:'send-input',actionCount:1,
+        target:null,hwnd:target.hwnd,warnings:[]});
+    }
+    if(args[1]==='list-windows' && sent>=1)
+      return JSON.stringify([{...windowRecord,isForeground:false}]);
+    return await base.runner(args);
+  };
+  const sender=createGuardedWinappSender({runner,getProcess:base.getProcess,
+    chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',pid:target.pid,hwnd:target.hwnd,
+    startedUtc:target.startedUtc,sessionId:2,capturedUtc:new Date().toISOString(),
+    imageSha256:'e'.repeat(64)}});
+  await assert.rejects(sender({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']}),
+    {code:'NOT_FOREGROUND'});
+  assert.equal(sent,1,'must never type /reloadui into a different foreground target');
+});
+
+
+test('staged sender refuses stale chat screenshot and never injects first key',async()=>{
+  const base=fakes();
+  let sent=0;
+  const runner=async(args)=>{
+    if(args[1]==='send-keys') { sent++; throw new Error('Unexpected input'); }
+    return base.runner(args);
+  };
+  const sender=createGuardedWinappSender({runner,getProcess:base.getProcess,
+    chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',
+      pid:target.pid,hwnd:target.hwnd,startedUtc:target.startedUtc,sessionId:2,
+      capturedUtc:new Date(Date.now()-25000).toISOString(),imageSha256:'f'.repeat(64)}});
+  await assert.rejects(sender({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']}),
+    {code:'CHAT_STATE_UNVERIFIED'});
+  assert.equal(sent,0);
 });
 
 test('no default sender means zero game input and no durable intent',async()=>{
