@@ -59,3 +59,15 @@ See `C:\work\rre\docs\RRE-WORKBRIDGE-QUARANTINE-CLEARANCE-HANDOFF-2026-11-05.md`
 
 **Deployment remains separately gated:** The currently running older Workbridge owner does *not* honor the new updater admission lock. Therefore no Apply is permitted without Joey's explicit approval for a coordinated Workbridge-only maintenance window that suspends new jobs from other chats/automations. The standalone C# watchdog is not part of WB-001 payload and must be independently checked before any quarantine archival or GUI input pilot. Keep prep02 and prep03 sealed, and preserve original Nov2 evidence.
 
+## Authorized deployment and hosted verification (2026-11-05)
+
+**Status: PASS — WB-001 deployed; desktop-input quarantine remains ACTIVE.** Joey explicitly approved a coordinated Workbridge-only maintenance window. The hourly RRE automation `6ae97e1f47848191a839458995713b1b` was disabled after its previous iteration completed, then re-enabled after hosted verification. No game/Windows reload or restart occurred.
+
+- Operation ID: `wb001_gui_prep03_apply_20261105a`. Dispatcher completed successfully, and the independent scheduled controller task finished in `Ready` state.
+- Controller journal: `phase=completed`, `error=null`, `recoveryError=null`, at **2026-11-05T20:17:50.5294819Z**. Ordered events `preparing → prepared → stopping → installing → starting → verifying → completed`; recoverable backup/checksum and prior release identity retained under `C:\work\workbridge-mcp\.local\update-operations\wb001_gui_prep03_apply_20261105a`.
+- Installed release digest: `01D7C888B9297708B15D2133484C202019E138206D30C20FE295DA6B91225519`; version remains `0.16.4-dev`, previous release digest `F04B372A9F47466997456105D6027FBF67B07FEE8B5C083B181380552E4E38FB`.
+- Hosted Workbridge `workspace_info` and `diagnostics` PASS: new PID **58580**, new instance `be5f373a-8c98-4877-b5dd-dbea9e5728d5`, listener/tunnel ready, command capacity **36**, occupied **0**. Post-install hash comparison passed for all six installed `dist` desktop files and their runtime manifest (**7/7 byte-exact** against sealed payload).
+- Nov2 `desktop-input-turn.lock` and its quarantine sidecar remained SHA-identical to their pinned hashes. Separate `DesktopProbeWatchdog` processes: **0**, and it was not included in WB-001 payload. No synthetic desktop pilot, physical RIFT keyboard input, or `/reloadui` was attempted.
+- The runtime `diagnostics.jobs.inventory` remains bounded at 20,000 and reports incomplete for the >21,000 historical files; this is **expected**. The deployed updater's separate full-census fallback handles the specific limit-only preflight safely. The journal's `hostedVerified=false` remains its local-only field; actual hosted verification is documented above.
+
+**Remaining independent gates:** Verify the standalone watchdog and all desktop producer admissions in read-only/synthetic conditions; then request separate approval to archive the two original quarantine artifacts and run one explicitly authorized live game-input pilot. Do not delete/quarantine-bypass existing evidence automatically.
