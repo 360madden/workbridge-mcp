@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Reuses Joey's local FlaUI implementation; no copied/invented SendInput code. -->
+    <ProjectReference Include="..\..\..\..\..\FlaUI\src\FlaUI.Core\FlaUI.Core.csproj"
+                      SetTargetFramework="TargetFramework=net10.0-windows"
+                      AdditionalProperties="GeneratePackageOnBuild=false" />
+  </ItemGroup>
+</Project>
