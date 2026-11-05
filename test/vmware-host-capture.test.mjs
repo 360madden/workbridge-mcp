@@ -116,6 +116,21 @@ async function withEvidence(t) {
   return evidenceRoot;
 }
 
+test('orphan desktop quarantine vetoes VMware capture without invoking any UI runner', async (t) => {
+  const evidenceRoot = await withEvidence(t);
+  const sidecar = path.join(evidenceRoot, 'desktop-turn-quarantine-orphan.json');
+  await writeFile(sidecar, 'unparseable sidecar still vetoes capture');
+  const h = makeHarness();
+  await assert.rejects(captureVmwareHostOnce(request, { ...h, evidenceRoot }), {
+    code: 'UI_TURN_RECOVERY_REQUIRED',
+  });
+  assert.deepEqual(h.calls, []);
+  assert.equal(h.counters.capture, 0);
+  assert.equal(h.counters.list, 0);
+  await assert.rejects(readFile(path.join(evidenceRoot, 'desktop-input-turn.lock')), { code: 'ENOENT' });
+  assert.equal(await readFile(sidecar, 'utf8'), 'unparseable sidecar still vetoes capture');
+});
+
 test('parser only accepts pinned PID/HWND arguments and durable capture ID', () => {
   assert.equal(request.target.pid, PID);
   assert.equal(request.target.hwnd, HWND);

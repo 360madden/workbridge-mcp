@@ -2,7 +2,7 @@
 // Replay-safe UIA / window-targeted keyboard / pointer trials on disposable DesktopProbe only.
 // No arbitrary app or VMware guest inputs.
 import { createHash, randomUUID } from 'node:crypto';
-import { open, mkdir, lstat, readFile, writeFile, unlink } from 'node:fs/promises';
+import { open, mkdir, lstat, readFile, readdir, writeFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
@@ -291,6 +291,11 @@ export async function invokeProbeOnce(
     await lock.writeFile(stampBytes);
     await lock.sync();
     stampReady = true;
+    // A surviving quarantine sidecar vetoes new input even without its original lock.
+    const entries = await readdir(root);
+    if (entries.some((name) => name.startsWith('desktop-turn-quarantine-') && name.endsWith('.json'))) {
+      fail('UI_TURN_RECOVERY_REQUIRED', 'Desktop quarantine sidecar requires manual reconciliation');
+    }
     if ((await readReceipt(receiptPath)) || (await readReceipt(intentPath))) {
       fail('ACTION_RECOVERY_REQUIRED', 'Previous action has a receipt or an unfinished intent');
     }

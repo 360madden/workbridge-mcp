@@ -99,6 +99,24 @@ test('GUI-006 emits image content only after a separate verified read and omits 
   assert.equal(JSON.stringify(result.structuredContent).includes(data), false);
 });
 
+test('GUI-006 orphan quarantine sidecar blocks a new turn even when the lock is absent', async (t) => {
+  const base = await mkdtemp(path.join(os.tmpdir(), 'wb-gui006-orphan-'));
+  t.after(async () => rm(base, { recursive: true, force: true }));
+  const lock = path.join(base, 'desktop-input-turn.lock');
+  const sidecar = path.join(base, 'desktop-turn-quarantine-orphan.json');
+  await writeFile(sidecar, 'unparseable sidecar still vetoes input');
+  let invoked = 0;
+  await assert.rejects(
+    withDesktopCaptureTurn(async () => {
+      invoked++;
+    }, lock),
+    { code: 'UI_TURN_RECOVERY_REQUIRED' },
+  );
+  assert.equal(invoked, 0, 'no capture callback may run');
+  await assert.rejects(stat(lock), { code: 'ENOENT' }, 'the new owned lock is released');
+  assert.equal(await readFile(sidecar, 'utf8'), 'unparseable sidecar still vetoes input');
+});
+
 test('GUI-006 shared capture turn serializes callers and preserves a foreign lock', async (t) => {
   const base = await mkdtemp(path.join(os.tmpdir(), 'wb-gui006-turn-'));
   t.after(async () => rm(base, { recursive: true, force: true }));

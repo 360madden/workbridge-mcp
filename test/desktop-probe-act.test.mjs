@@ -131,6 +131,25 @@ const fakeHandleInspector = async ({ parentHwnd, reportedHwnd, expectedPid }) =>
   belongsToTarget: true,
 });
 
+test('GUI-004 orphan quarantine sidecar vetoes probe input before any UI runner call', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'wb-gui004-orphan-'));
+  t.after(async () => rm(root, { recursive: true, force: true }));
+  const sidecar = path.join(root, 'desktop-turn-quarantine-orphan.json');
+  await writeFile(sidecar, 'unparseable sidecar still vetoes input');
+  const h = fakeUi(root);
+  await assert.rejects(
+    invokeProbeOnce(request('gui004_orphan_001'), {
+      root,
+      runner: h.runner,
+      handleInspector: fakeHandleInspector,
+    }),
+    { code: 'UI_TURN_RECOVERY_REQUIRED' },
+  );
+  assert.deepEqual(h.calls, [], 'no WinApp command may run');
+  await assert.rejects(readFile(path.join(root, 'desktop-input-turn.lock')), { code: 'ENOENT' });
+  assert.equal(await readFile(sidecar, 'utf8'), 'unparseable sidecar still vetoes input');
+});
+
 test('GUI-004 accepts only a numbered probe action, no arbitrary target or verb', () => {
   assert.equal(request().target.process, 'DesktopProbe');
   assert.equal(request().target.title, win.title);

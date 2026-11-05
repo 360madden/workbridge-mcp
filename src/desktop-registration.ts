@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, open, lstat, readFile, unlink } from 'node:fs/promises';
+import { mkdir, open, lstat, readFile, readdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { errorDetails, BridgeError } from './workspace.js';
@@ -78,6 +78,15 @@ export async function withDesktopCaptureTurn<T>(
     await handle.writeFile(stampBytes);
     await handle.sync();
     stampWritten = true;
+    // A quarantine sidecar is an independent veto, even if its original lock is missing.
+    // Only the already-owned turn is released; the sidecar needs manual reconciliation.
+    const entries = await readdir(path.dirname(lockPath));
+    if (entries.some((name) => name.startsWith('desktop-turn-quarantine-') && name.endsWith('.json'))) {
+      throw new BridgeError(
+        'UI_TURN_RECOVERY_REQUIRED',
+        'Desktop quarantine sidecar requires manual reconciliation.',
+      );
+    }
     const result = await action();
     treeUnsettled = false;
     return result;

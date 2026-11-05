@@ -3,7 +3,7 @@
 // VM is never powered, configured or given guest keyboard/mouse input.
 import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, readFile, unlink, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
@@ -366,6 +366,11 @@ export async function captureVmwareHostOnce(
     await lease.sync();
     stampWritten = true;
     quarantineLease = false;
+    // Existing quarantine remains authoritative if an earlier lock was lost or archived.
+    const entries = await readdir(evidenceRoot);
+    if (entries.some((name) => name.startsWith('desktop-turn-quarantine-') && name.endsWith('.json'))) {
+      fail('UI_TURN_RECOVERY_REQUIRED', 'Desktop quarantine sidecar requires manual reconciliation');
+    }
     if ((await readOptionalJson(intentPath)) || (await readOptionalJson(receiptPath))) {
       fail('CAPTURE_RECOVERY_REQUIRED', 'Previous host capture is incomplete; inspect saved intent');
     }
