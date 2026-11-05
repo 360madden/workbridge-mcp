@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { createHash } from 'node:crypto';
 import {
   parseReloadRequest, inspectPhysicalRift, executePhysicalReloadOnce, createGuardedWinappSender,
+  readVerifiedChatEvidence, executePhysicalFocusOnce,
 } from '../scripts/physical-rift-reloadui.mjs';
 
 const BASE = ['--pid','32156','--hwnd','462734','--started-utc','2026-11-05T19:01:10.123Z',
@@ -15,7 +17,7 @@ const windowRecord = { hwnd:462734, processId:32156, processName:'rift_x64', tit
   className:'TWNClientFramework', ownerHwnd:0, width:1936, height:1048, isForeground:true };
 const treeRecord = { windows:[{hwnd:462734,elements:[{ type:'Window',name:'RIFT',
   className:'TWNClientFramework',isEnabled:true,isOffscreen:false,
-  x:-1928,y:-2,width:1936,height:1048 }]}] };
+  x:-1928,y:-2,width:1936,height:1048,selector:'win-rift-5475' }]}] };
 
 function fakes(windowOverrides = {}) {
   const calls = [];
@@ -208,7 +210,7 @@ test('staged sender refuses stale chat screenshot and never injects first key',a
   const sender=createGuardedWinappSender({runner,getProcess:base.getProcess,
     chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',
       pid:target.pid,hwnd:target.hwnd,startedUtc:target.startedUtc,sessionId:2,
-      capturedUtc:new Date(Date.now()-25000).toISOString(),imageSha256:'f'.repeat(64)}});
+      capturedUtc:new Date(Date.now()-50000).toISOString(),imageSha256:'f'.repeat(64)}});
   await assert.rejects(sender({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']}),
     {code:'CHAT_STATE_UNVERIFIED'});
   assert.equal(sent,0);
@@ -219,3 +221,165 @@ test('no default sender means zero game input and no durable intent',async()=>{
   await assert.rejects(executePhysicalReloadOnce(target,{...fakes(),root}),{code:'NO_VALIDATED_INPUT_TRANSPORT'});
   assert.deepEqual(await readdir(root),[]);
 });
+
+test('CLI modes require explicit flags and a captured visual attestation for live execution',()=>{
+  const execute=[...BASE,'--execute-once','--screenshot-request-id','chat_capture_001',
+    '--chat-visual-attestation','chat-closed-empty'];
+  const parsed=parseReloadRequest(execute);
+  assert.equal(parsed.executeOnce,true);
+  assert.equal(parsed.screenshotRequestId,'chat_capture_001');
+  assert.equal(parsed.chatVisualAttestation,'chat-closed-empty');
+  assert.equal(parseReloadRequest([...BASE,'--focus-only']).focusOnly,true);
+  assert.throws(()=>parseReloadRequest([...execute,'--focus-only']),{code:'INVALID_ARGUMENTS'});
+  assert.throws(()=>parseReloadRequest([...BASE,'--execute-once']),{code:'CHAT_STATE_GATE_REQUIRED'});
+  assert.throws(()=>parseReloadRequest([...BASE,'--chat-visual-attestation','chat-closed-empty']),
+    {code:'INVALID_ARGUMENTS'});
+});
+
+test('screenshot gate binds real receipt and PNG, rejects stale or corrupted input BEFORE any lock',async()=>{
+  const root=await temp();
+  const id='chat_capture_001';
+  const imagePath=path.join(root,'capture-'+id+'.png');
+  const metadataPath=path.join(root,'capture-'+id+'.json');
+  const bytes=Buffer.alloc(12000,0x71);
+  const sha=createHash('sha256').update(bytes).digest('hex');
+  const at=new Date().toISOString();
+  const request={...target,executeOnce:true,screenshotRequestId:id,
+    chatVisualAttestation:'chat-closed-empty'};
+  const receipt={schemaVersion:1,requestId:id,pid:target.pid,hwnd:target.hwnd,
+    process:'rift_x64',expectedClass:'TWNClientFramework',title:'RIFT',
+    capturedUtc:at,imagePath,width:1920,height:1032,sizeBytes:bytes.length,
+    sha256:sha,inputInjected:false};
+  await writeFile(imagePath,bytes);
+  await writeFile(metadataPath,JSON.stringify(receipt)+'\n');
+  const getProcess=async()=>({...processRecord});
+  const result=await readVerifiedChatEvidence(request,{root,getProcess,now:()=>Date.parse(at)+1000});
+  assert.equal(result.imageSha256,sha);
+  assert.equal(result.state,'chat-closed-empty');
+  assert.equal(result.sessionId,2);
+  await assert.rejects(readVerifiedChatEvidence(request,{root,getProcess,
+    now:()=>Date.parse(at)+16000}),{code:'CHAT_STATE_UNVERIFIED'});
+  assert.deepEqual((await readdir(root)).sort(),['capture-'+id+'.json','capture-'+id+'.png']);
+  await writeFile(imagePath,Buffer.alloc(12000,0x72));
+  await assert.rejects(readVerifiedChatEvidence(request,{root,getProcess,
+    now:()=>Date.parse(at)+1000}),{code:'CHAT_STATE_UNVERIFIED'});
+  await writeFile(imagePath,bytes);
+  await writeFile(metadataPath,JSON.stringify({...receipt,imagePath:undefined})+'\n');
+  await assert.rejects(readVerifiedChatEvidence(request,{root,getProcess,
+    now:()=>Date.parse(at)+1000}),{code:'CHAT_STATE_UNVERIFIED'});
+});
+
+test('focus-only dynamically selects exact RIFT UIA root, sends ZERO keys, and journals once',async()=>{
+  const root=await temp();
+  let focused=false;
+  let focusCalls=0;
+  const base=fakes();
+  const runner=async(args)=>{
+    if(args[1]==='list-windows')
+      return JSON.stringify([{...windowRecord,isForeground:focused}]);
+    if(args[1]==='focus') {
+      focusCalls++;
+      assert.deepEqual(args,['ui','focus','win-rift-5475','-w','462734','--json']);
+      focused=true;
+      return JSON.stringify({hwnd:target.hwnd});
+    }
+    if(args[1]==='send-keys') throw new Error('FOCUS_MODE_MUST_NOT_INJECT_KEYS');
+    return base.runner(args);
+  };
+  const request={...target,requestId:'physical_focus_test001',focusOnly:true};
+  const result=await executePhysicalFocusOnce(request,{runner,getProcess:base.getProcess,root});
+  assert.equal(result.ok,true);
+  assert.equal(result.focused,true);
+  assert.equal(result.inputSubmitted,false);
+  assert.equal(focusCalls,1);
+  const entries=await readdir(root);
+  assert(!entries.includes('desktop-input-turn.lock'));
+  assert(!entries.includes('desktop-turn-admission.lock'));
+  assert(entries.includes('physical-rift-focus-'+request.requestId+'.intent.json'));
+  assert(entries.includes('physical-rift-focus-'+request.requestId+'.receipt.json'));
+  const replay=await executePhysicalFocusOnce(request,{runner,getProcess:base.getProcess,root});
+  assert.equal(replay.replayed,true);
+  assert.equal(focusCalls,1);
+});
+
+test('uncertain focus retains linked quarantine and never performs a keyboard action',async()=>{
+  const root=await temp();
+  const base=fakes();
+  let focusCalls=0;
+  const runner=async(args)=>{
+    if(args[1]==='list-windows') return JSON.stringify([{...windowRecord,isForeground:false}]);
+    if(args[1]==='focus') { focusCalls++; return JSON.stringify({hwnd:target.hwnd}); }
+    if(args[1]==='send-keys') throw new Error('FORBIDDEN_KEY');
+    return base.runner(args);
+  };
+  const request={...target,requestId:'physical_focus_test002',focusOnly:true};
+  await assert.rejects(executePhysicalFocusOnce(request,
+    {runner,getProcess:base.getProcess,root}),{code:'NOT_FOREGROUND'});
+  assert.equal(focusCalls,1);
+  const entries=await readdir(root);
+  assert(entries.includes('desktop-input-turn.lock'));
+  assert(entries.some(n=>n.startsWith('desktop-turn-quarantine-')));
+  assert(entries.includes('physical-rift-focus-'+request.requestId+'.intent.json'));
+  assert(!entries.includes('physical-rift-focus-'+request.requestId+'.receipt.json'));
+});
+
+test('sender accepts fresh UIA root reply target, requires actionCount one, and waits 500ms',async()=>{
+  const base=fakes();
+  const waits=[];
+  let sends=0;
+  const sender=createGuardedWinappSender({
+    getProcess:base.getProcess,
+    settle:async(ms)=>{waits.push(ms);},
+    runner:async(args)=>{
+      if(args[1]==='send-keys') {
+        sends++;
+        return JSON.stringify({keys:args[2],via:'send-input',actionCount:1,
+          target:'win-rift-5475',hwnd:target.hwnd,warnings:[]});
+      }
+      return base.runner(args);
+    },
+    chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',
+      pid:target.pid,hwnd:target.hwnd,startedUtc:target.startedUtc,sessionId:2,
+      capturedUtc:new Date().toISOString(),imageSha256:'a'.repeat(64)},
+  });
+  const result=await sender({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']});
+  assert.equal(result.submitted,true);
+  assert.equal(sends,3);
+  assert.deepEqual(waits,[500]);
+  const bad=createGuardedWinappSender({
+    getProcess:base.getProcess,settle:async()=>{},
+    runner:async(args)=>args[1]==='send-keys'
+      ? JSON.stringify({keys:args[2],via:'send-input',actionCount:2,
+        target:'win-rift-5475',hwnd:target.hwnd,warnings:[]})
+      : base.runner(args),
+    chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',
+      pid:target.pid,hwnd:target.hwnd,startedUtc:target.startedUtc,sessionId:2,
+      capturedUtc:new Date().toISOString(),imageSha256:'b'.repeat(64)},
+  });
+  await assert.rejects(bad({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']}),
+    {code:'ACTION_RECOVERY_REQUIRED'});
+});
+
+test('window-target label is accepted only with exact HWND; unrelated label still fails closed',async()=>{
+  const base=fakes();
+  const proof={confirmed:true,state:'chat-closed-empty',pid:target.pid,hwnd:target.hwnd,
+    startedUtc:target.startedUtc,sessionId:2,capturedUtc:new Date().toISOString(),
+    imageSha256:'c'.repeat(64)};
+  const exact=createGuardedWinappSender({getProcess:base.getProcess,settle:async()=>{},
+    runner:async(args)=>args[1]==='send-keys'
+      ? JSON.stringify({keys:args[2],via:'send-input',actionCount:1,
+        target:'Window',hwnd:target.hwnd,warnings:[]})
+      : base.runner(args),
+    chatClosedEvidence:proof});
+  const passed=await exact({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']});
+  assert.equal(passed.submitted,true);
+  const unrelated=createGuardedWinappSender({getProcess:base.getProcess,settle:async()=>{},
+    runner:async(args)=>args[1]==='send-keys'
+      ? JSON.stringify({keys:args[2],via:'send-input',actionCount:1,
+        target:'OtherWindow',hwnd:target.hwnd,warnings:[]})
+      : base.runner(args),
+    chatClosedEvidence:proof});
+  await assert.rejects(unrelated({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']}),
+    {code:'ACTION_RECOVERY_REQUIRED'});
+});
+
