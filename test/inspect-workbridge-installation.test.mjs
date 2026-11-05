@@ -24,6 +24,7 @@ const desktopScripts = [
   'desktop-capture.mjs',
   'vmware-host-capture.mjs',
   'desktop-probe-act.mjs',
+  'desktop-turn-admission.mjs',
   'Check-DesktopWindowHandle.ps1',
 ];
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex').toUpperCase();
@@ -177,7 +178,7 @@ test(
     assert.equal(report.installation.builtVersion, version);
     assert.equal(report.candidate.sealed, true);
     assert.equal(report.candidate.checksPassed, true);
-    assert.equal(report.candidate.scripts.length, 9);
+    assert.equal(report.candidate.scripts.length, 10);
     assert.equal(report.candidate.scriptGaps.length, 0);
     assert.equal(report.marker.matchesDisk, true);
     assert.equal(report.live.status, 'not_requested');

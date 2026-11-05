@@ -55,7 +55,14 @@ try {
     Push-Location $payload
     try {
         $commands = @(
-            @{name='install'; args=@('ci','--no-audit','--no-fund')},
+            @{name='install'; args=@('ci','--no-audit','--no-fund')}
+        )
+        if ($requiresDesktopRuntime) {
+            # Fresh release payloads need a staged desktop helper before tests.
+            $commands += @{name='desktop-prebuild'; args=@('run','build')}
+            $commands += @{name='desktop-prestage'; args=@('scripts/stage-desktop-runtime.mjs','--repo-root',$payload)}
+        }
+        $commands += @(
             @{name='tests'; args=@('test')},
             @{name='startup'; args=@('run','test:startup')},
             @{name='updater'; args=@('run','test:updater')},
@@ -71,7 +78,7 @@ try {
             $previousPreference = $ErrorActionPreference
             try {
                 $ErrorActionPreference = 'Continue'
-                if ($command.name -eq 'desktop-stage') {
+                if ($command.name -in @('desktop-prestage','desktop-stage')) {
                     & node @arguments *> (Join-Path $release ($command.name + '.log'))
                 } else {
                     & npm @arguments *> (Join-Path $release ($command.name + '.log'))
