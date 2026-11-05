@@ -89,7 +89,7 @@ try {
     if ($probe.version -cne $package.version) { throw 'Built MCP server version differs from the package version.' }
     if ($requiresDesktopRuntime) {
     # Validate the desktop closure from the final payload, after all build-producing checks.
-    $desktopNames = @('desktop-ui.mjs', 'desktop-capture.mjs', 'vmware-host-capture.mjs', 'desktop-probe-act.mjs', 'Check-DesktopWindowHandle.ps1')
+    $desktopNames = @('desktop-ui.mjs', 'desktop-capture.mjs', 'vmware-host-capture.mjs', 'desktop-probe-act.mjs', 'desktop-turn-admission.mjs', 'Check-DesktopWindowHandle.ps1')
     $desktopDist = Get-WBChild $payload 'dist'
     foreach ($item in @(Get-ChildItem -LiteralPath $desktopDist -Force)) {
         if ($item.Name -ceq '.desktop-runtime-stage.lock' -or $item.Name.StartsWith('.desktop-stage-', [StringComparison]::Ordinal)) {

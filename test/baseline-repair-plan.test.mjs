@@ -52,6 +52,7 @@ async function seal(root, version) {
       'desktop-capture.mjs',
       'vmware-host-capture.mjs',
       'desktop-probe-act.mjs',
+      'desktop-turn-admission.mjs',
       'Check-DesktopWindowHandle.ps1',
     ];
     const desktopFiles = [];

@@ -53,7 +53,7 @@ function New-WBCase([string]$Name, [scriptblock]$Code) {
 function Set-WBGuiFixtureRelease([string]$ReleasePath) {
     $payload = Join-Path $ReleasePath 'payload'
     Write-WBJson (Join-Path $payload 'package.json') ([pscustomobject]@{name='workbridge-mcp'; version='0.16.4-dev'; type='module'})
-    $names = @('desktop-ui.mjs', 'desktop-capture.mjs', 'vmware-host-capture.mjs', 'desktop-probe-act.mjs', 'Check-DesktopWindowHandle.ps1')
+    $names = @('desktop-ui.mjs', 'desktop-capture.mjs', 'vmware-host-capture.mjs', 'desktop-probe-act.mjs', 'desktop-turn-admission.mjs', 'Check-DesktopWindowHandle.ps1')
     $entries = @()
     foreach ($name in $names) {
         $content = "fixture desktop runtime: $name"

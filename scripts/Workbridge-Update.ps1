@@ -158,7 +158,7 @@ function Get-WBRelease([string]$Path) {
                 throw "GUI release validation is missing or failed: $check"
             }
         }
-        $desktopNames = @('desktop-ui.mjs', 'desktop-capture.mjs', 'vmware-host-capture.mjs', 'desktop-probe-act.mjs', 'Check-DesktopWindowHandle.ps1')
+        $desktopNames = @('desktop-ui.mjs', 'desktop-capture.mjs', 'vmware-host-capture.mjs', 'desktop-probe-act.mjs', 'desktop-turn-admission.mjs', 'Check-DesktopWindowHandle.ps1')
         $desktopDist = Get-WBChild $payload 'dist'
         foreach ($item in @(Get-ChildItem -LiteralPath $desktopDist -Force)) {
             if ($item.Name -ceq '.desktop-runtime-stage.lock' -or $item.Name.StartsWith('.desktop-stage-', [StringComparison]::Ordinal)) {

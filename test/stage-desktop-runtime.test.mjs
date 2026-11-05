@@ -32,6 +32,7 @@ const expectedNames = [
   'desktop-capture.mjs',
   'vmware-host-capture.mjs',
   'desktop-probe-act.mjs',
+  'desktop-turn-admission.mjs',
   'Check-DesktopWindowHandle.ps1',
 ];
 
@@ -51,7 +52,7 @@ async function fixture(t, actual = false) {
   return root;
 }
 
-test('stages the complete five-file closure with deterministic manifest and stable replay', async (t) => {
+test('stages the complete six-file closure with deterministic manifest and stable replay', async (t) => {
   const root = await fixture(t, true);
   await writeFile(path.join(root, 'scripts', 'untrusted.mjs'), 'must not copy');
   await writeFile(path.join(root, 'dist', 'server.js'), 'existing compiled server');

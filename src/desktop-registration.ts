@@ -38,8 +38,8 @@ export async function withDesktopCaptureTurn<T>(
   lockPath: string = desktopTurnPath,
   owner?: DesktopCaptureTurnOwner,
 ): Promise<T> {
-  // Deployed dist shares the project-root scripts directory; isolated builds stage the helper.
-  const helperUrl: string = new URL('../scripts/desktop-turn-admission.mjs', import.meta.url).href;
+  // The sealed runtime stages this helper beside compiled dist, not from mutable source.
+  const helperUrl: string = new URL('./desktop-turn-admission.mjs', import.meta.url).href;
   const { withDesktopAdmission } = (await import(helperUrl)) as {
     withDesktopAdmission: (
       guiLockPath: string,

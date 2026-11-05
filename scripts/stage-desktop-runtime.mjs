@@ -12,6 +12,7 @@ export const DESKTOP_RUNTIME_FILES = Object.freeze([
   'desktop-capture.mjs',
   'vmware-host-capture.mjs',
   'desktop-probe-act.mjs',
+  'desktop-turn-admission.mjs',
   'Check-DesktopWindowHandle.ps1',
 ]);
 export const DESKTOP_RUNTIME_MANIFEST = 'desktop-runtime-manifest.json';

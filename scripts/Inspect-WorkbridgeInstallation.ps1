@@ -14,7 +14,7 @@ $issues = [Collections.Generic.List[object]]::new()
 # This is the current WB-001 copy boundary, not a proposed updater change.
 $runtimeNames = @('dist', 'node_modules', 'package.json', 'package-lock.json')
 $launcherScripts = @('Start-BackgroundTunnel.ps1', 'Start-Tunnel.ps1', 'Tunnel-Credential.ps1', 'Tunnel-ProcessLifetime.cs')
-$desktopScripts = @('desktop-ui.mjs', 'desktop-capture.mjs', 'vmware-host-capture.mjs', 'desktop-probe-act.mjs', 'Check-DesktopWindowHandle.ps1')
+$desktopScripts = @('desktop-ui.mjs', 'desktop-capture.mjs', 'vmware-host-capture.mjs', 'desktop-probe-act.mjs', 'desktop-turn-admission.mjs', 'Check-DesktopWindowHandle.ps1')
 
 function Add-Finding([string]$Code, [string]$Severity = 'error') {
     if (!@($issues | Where-Object { $_.code -ceq $Code }).Count) {
