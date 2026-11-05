@@ -56,7 +56,7 @@ This supports a service-owner change since November 4, **not** a claim of
 historical screenshot completion or safe automatic unlock. Inventory was incomplete
 at its 20,000-entry limit; no global absence of other jobs is inferred.
 
-## Unresolved: shared maintenance admission
+## Original maintenance admission design (implemented later in source; update below)
 
 Independent architecture review found a time-of-check/time-of-use race in a simple
 `freeze.json` approach. Before any real quarantine archive, build and test a **second
@@ -77,6 +77,33 @@ that the running system is frozen.
    prove all old producers quiescent, acquire admission freeze, archive sidecar first and
    original lock last with byte-exact recoverable receipts, then verify guard state.
    Only after this can a new, separately authorized GUI action be considered.
+
+## Later source-only continuation (13:49 EST, 2026-11-05)
+
+The earlier numbered steps above were the **pre-implementation roadmap**. Their source-code
+requirements have now been addressed; production deployment and live archive have **not**.
+
+| Workbridge commit | Narrow milestone | Validation |
+| --- | --- | --- |
+| `accee90fe2fb4d129d6894d6cb21ebfbbed8a388` | Atomic maintenance/producer admission and ownership-verified release; three GUI producers | 36/36 focused JavaScript tests, isolated compiled MCP 8/8, TypeScript and formatting pass |
+| `74d50de8bc1c43aa4084652cc922171ffe4b42d7` | Sealed staged desktop helper; upgrade-path closure checks | 55 pass / 1 skip staging, 37/37 updater, compiled MCP 8/8 |
+| `b6dac1ee0b196a72fa034619729cff4e9238e859` | C# DesktopProbe watchdog atomic admission before GUI-turn lease | .NET 10 publish, normal/uncertain/foreign-lock synthetic PASS |
+| `d3e98516becf24c2c3ad78afbf1c7c0f356ffd16` | Guard independent desktop-capture CLI via exact parent lease check while retaining MCP parent's unsettled-child quarantine | 56 pass / 1 skip; staged CLI negative and positive fake-backend child tests PASS |
+
+Read-only producer audit found five GUI-affecting entrypoints: the MCP window screenshot,
+VMware host capture, DesktopProbe action script, C# watchdog and standalone screenshot CLI.
+The four original guarded writers now use admission in source. The standalone CLI requires
+an exact current parent-owned admission+GUI lock (owner PID, producer, request/target identity,
+bounded regular files and no quarantine); it refuses unowned direct shell use. Existing
+snapshot-only samplers are not independent GUI writers.
+
+**Deployment boundary:** Production Workbridge 0.16.4-dev has **not** been upgraded through
+WB-001. No evidence yet proves every deployed/legacy producer uses the new gate.
+Source proof is not live quiescence, and the Nov 2 screenshot still has unknown outcome.
+Do not archive sidecar/guard until a reviewed WB-001 activation, verified live producer
+inventory, independently approved maintenance freeze and exact byte-preserving protocol.
+No Windows/game/service restart, GUI capture, lock change, or backfill success receipt
+was performed in these milestones.
 
 ## Non-actions / boundaries
 
