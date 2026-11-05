@@ -38,6 +38,24 @@ The source uses the existing lock as the mutex during sidecar checking; it does 
 - Tests used synthetic temporary evidence roots only; no physical RIFT or VM input, no live screenshot, and no lock archival/release.
 - Running Workbridge service was not restarted or upgraded. Editing the source does not mean the deployed service is protected by this change.
 
+## Fresh read-only host classification (after code commit)
+
+At 2026-11-05T18:18:48Z, invoked the existing
+`prototypes/gui-turn-reconcile-readonly.ps1` with **exact** historical lock SHA,
+lease ID and request ID. Result: `state: unknown`,
+`reasonCode: OWNER_PID_NOT_PRESENT`, `releaseEligible: false`.
+The pinned lock checksum and sidecar linkage checks succeeded; no file was moved,
+changed or released. Owner PID `43508` was absent in the current process snapshot,
+but the old child process-tree settlement and screenshot outcome remain **unknown**.
+
+Read-only Workbridge diagnostics immediately afterward reported version
+`0.16.4-dev`, current owner PID `15064`, instance
+`8eeaffd2-4e11-4228-8bac-daa06449b08c`, started
+`2026-11-05T15:27:35.161Z`; tunnel healthy, 36/36 command slots available.
+This supports a service-owner change since November 4, **not** a claim of
+historical screenshot completion or safe automatic unlock. Inventory was incomplete
+at its 20,000-entry limit; no global absence of other jobs is inferred.
+
 ## Unresolved: shared maintenance admission
 
 Independent architecture review found a time-of-check/time-of-use race in a simple
