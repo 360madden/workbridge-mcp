@@ -383,3 +383,134 @@ test('window-target label is accepted only with exact HWND; unrelated label stil
     {code:'ACTION_RECOVERY_REQUIRED'});
 });
 
+function integratedBackgroundFixture({retainBackground=false,dropAfterFirst=false,wrongFocusHwnd=false}={}) {
+  const base=fakes();
+  const calls=[];
+  let foreground=false,keys=0,focus=0;
+  const runner=async(args)=>{
+    calls.push(args);
+    if(args[1]==='list-windows')
+      return JSON.stringify([{...windowRecord,isForeground:foreground}]);
+    if(args[1]==='focus') {
+      focus++;
+      assert.deepEqual(args,['ui','focus','win-rift-5475','-w',String(target.hwnd),'--json']);
+      if(!retainBackground)foreground=true;
+      return JSON.stringify({hwnd:wrongFocusHwnd?target.hwnd+1:target.hwnd});
+    }
+    if(args[1]==='send-keys') {
+      keys++;
+      if(dropAfterFirst&&keys===1)foreground=false;
+      return JSON.stringify({keys:args[2],via:'send-input',actionCount:1,
+        target:'Window',hwnd:target.hwnd,warnings:[]});
+    }
+    return base.runner(args);
+  };
+  const sender=createGuardedWinappSender({runner,getProcess:base.getProcess,settle:async()=>{},
+    chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',pid:target.pid,
+      hwnd:target.hwnd,startedUtc:target.startedUtc,sessionId:2,
+      capturedUtc:new Date().toISOString(),imageSha256:'e'.repeat(64)}});
+  return {runner,sender,getProcess:base.getProcess,calls,
+    get state(){return {foreground,keys,focus};}};
+}
+
+test('integrated execute-once focuses background game inside fsynced exclusive reload intent then sends three keys',async()=>{
+  const fx=integratedBackgroundFixture();
+  const root=await temp();
+  const wrapped=async(input)=>{
+    const names=await readdir(root);
+    assert(names.includes('desktop-turn-admission.lock'));
+    assert(names.includes('desktop-input-turn.lock'));
+    const intent=JSON.parse(await readFile(path.join(root,'physical-rift-reloadui-singleton.intent.json'),'utf8'));
+    assert.deepEqual(intent.plannedActions,['uia-root-focus','Enter','/reloadui','Enter']);
+    assert.equal(intent.target.rootSelector,'win-rift-5475');
+    return fx.sender(input);
+  };
+  const request={...target,executeOnce:true};
+  const result=await executePhysicalReloadOnce(request,{runner:fx.runner,getProcess:fx.getProcess,
+    sender:wrapped,root});
+  assert.equal(result.submitted,true);
+  assert.deepEqual(fx.state,{foreground:true,keys:3,focus:1});
+  const actions=fx.calls.filter(a=>a[1]==='focus'||a[1]==='send-keys');
+  assert.deepEqual(actions.map(a=>a[1]),['focus','send-keys','send-keys','send-keys']);
+  assert.deepEqual(actions.filter(a=>a[1]==='send-keys').map(a=>a[2]),
+    ['enter','/reloadui','enter']);
+  const replay=await executePhysicalReloadOnce(request,{runner:fx.runner,getProcess:fx.getProcess,
+    sender:wrapped,root});
+  assert.equal(replay.replayed,true);
+  assert.deepEqual(fx.state,{foreground:true,keys:3,focus:1});
+});
+
+test('integrated focus failure quarantines after intent, injects zero keys and never retries',async()=>{
+  for(const config of [{retainBackground:true},{wrongFocusHwnd:true}]) {
+    const fx=integratedBackgroundFixture(config);
+    const root=await temp();
+    await assert.rejects(executePhysicalReloadOnce({...target,executeOnce:true},
+      {runner:fx.runner,getProcess:fx.getProcess,sender:fx.sender,root}),
+      {code:config.wrongFocusHwnd?'ACTION_RECOVERY_REQUIRED':'NOT_FOREGROUND'});
+    assert.equal(fx.state.focus,1);
+    assert.equal(fx.state.keys,0);
+    const files=await readdir(root);
+    assert(files.includes('desktop-input-turn.lock'));
+    assert(files.includes('physical-rift-reloadui-singleton.intent.json'));
+    assert(files.some(name=>name.startsWith('desktop-turn-quarantine-')));
+    await assert.rejects(executePhysicalReloadOnce({...target,executeOnce:true},
+      {runner:fx.runner,getProcess:fx.getProcess,sender:fx.sender,root}),
+      {code:'UI_TURN_RECOVERY_REQUIRED'});
+    assert.equal(fx.state.focus,1);
+  }
+});
+
+test('integrated focus never retries or types command after foreground loss following first Enter',async()=>{
+  const fx=integratedBackgroundFixture({dropAfterFirst:true});
+  const root=await temp();
+  await assert.rejects(executePhysicalReloadOnce({...target,executeOnce:true},
+    {runner:fx.runner,getProcess:fx.getProcess,sender:fx.sender,root}),{code:'NOT_FOREGROUND'});
+  assert.equal(fx.state.focus,1);
+  assert.equal(fx.state.keys,1);
+  const files=await readdir(root);
+  assert(files.includes('desktop-input-turn.lock'));
+  assert(files.some(name=>name.startsWith('desktop-turn-quarantine-')));
+});
+
+test('integrated reload rejects stale post-intent UIA root without focusing or typing',async()=>{
+  const fx=integratedBackgroundFixture();
+  let inspects=0;
+  const runner=async(args)=>{
+    if(args[1]==='inspect' && ++inspects>=3) {
+      const rootElement={...treeRecord.windows[0].elements[0],selector:'win-stale-root'};
+      return JSON.stringify({windows:[{hwnd:target.hwnd,elements:[rootElement]}]});
+    }
+    return fx.runner(args);
+  };
+  const sender=createGuardedWinappSender({runner,getProcess:fx.getProcess,settle:async()=>{},
+    chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',pid:target.pid,
+      hwnd:target.hwnd,startedUtc:target.startedUtc,sessionId:2,
+      capturedUtc:new Date().toISOString(),imageSha256:'d'.repeat(64)}});
+  const root=await temp();
+  await assert.rejects(executePhysicalReloadOnce({...target,executeOnce:true},
+    {runner,getProcess:fx.getProcess,sender,root}),{code:'FOCUS_SELECTOR_UNAVAILABLE'});
+  assert.equal(fx.state.focus,0);
+  assert.equal(fx.state.keys,0);
+  const entries=await readdir(root);
+  assert(entries.includes('desktop-input-turn.lock'));
+  assert(entries.some(name=>name.startsWith('desktop-turn-quarantine-')));
+});
+
+test('integrated reload treats explicit native focus failure as uncertain with zero keys',async()=>{
+  const fx=integratedBackgroundFixture();
+  const runner=async(args)=>args[1]==='focus'
+    ? JSON.stringify({success:false,hwnd:target.hwnd,error:'Cannot focus'})
+    : fx.runner(args);
+  const sender=createGuardedWinappSender({runner,getProcess:fx.getProcess,settle:async()=>{},
+    chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',pid:target.pid,
+      hwnd:target.hwnd,startedUtc:target.startedUtc,sessionId:2,
+      capturedUtc:new Date().toISOString(),imageSha256:'d'.repeat(64)}});
+  const root=await temp();
+  await assert.rejects(executePhysicalReloadOnce({...target,executeOnce:true},
+    {runner,getProcess:fx.getProcess,sender,root}),{code:'ACTION_RECOVERY_REQUIRED'});
+  assert.equal(fx.state.keys,0);
+  const entries=await readdir(root);
+  assert(entries.includes('desktop-input-turn.lock'));
+  assert(entries.some(name=>name.startsWith('desktop-turn-quarantine-')));
+});
+

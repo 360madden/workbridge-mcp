@@ -338,7 +338,7 @@ async function readBoundedJson(filename) {
 
 /**
  * One synthetic-testable, single-action transaction. sender is intentionally REQUIRED.
- * No production sender is wired until a separately validated same-session native route exists.
+ * In --execute-once, native root focus occurs after fsynced reload intent inside one lease.
  * Once intent exists, any exception is uncertain: do not delete intent or turn lock or retry.
  */
 export async function executePhysicalReloadOnce(request, {
@@ -370,21 +370,28 @@ export async function executePhysicalReloadOnce(request, {
         }
         refuse('ACTION_RECOVERY_REQUIRED', 'One physical RIFT reload already attempted; no second ID permitted');
       }
-      const observed = await inspectPhysicalRift(request, { runner, getProcess });
+      const observed = await inspectPhysicalRift(request, { runner, getProcess, requireForeground: request.executeOnce !== true });
       const turn = await createTurn(root, request, observed);
       let intentCreated = false;
       let intentSha256 = null;
       let actionStarted = false;
       try {
         await quarantineVeto(root);
-        // Recheck focus, visibility and creation immediately before journaling.
-        const latest = await inspectPhysicalRift(request, { runner, getProcess });
-        if (latest.sessionId !== observed.sessionId) refuse('STALE_PROCESS', 'Target session changed');
+        // Recheck exact process/window/root; focus is planned after durable intent.
+        const latest = await inspectPhysicalRift(request, { runner, getProcess, requireForeground: request.executeOnce !== true });
+        if (latest.sessionId !== observed.sessionId ||
+            latest.rootSelector !== observed.rootSelector ||
+            !/^[A-Za-z0-9_-]{3,96}$/.test(latest.rootSelector ?? '')) {
+          refuse('STALE_TARGET', 'Physical RIFT root selector/session changed');
+        }
         const intent = {
           schemaVersion: 1, kind: 'workbridge.physical-rift-reloadui-intent',
           requestId: request.requestId, target: {
             pid: request.pid, hwnd: request.hwnd, process: PROCESS, startedUtc: request.startedUtc,
-          }, phase: 'started', action: '/reloadui', startedUtc: new Date().toISOString(),
+            sessionId: observed.sessionId, className: CLASS, title: TITLE, rootSelector: latest.rootSelector,
+          }, phase: 'started', action: '/reloadui',
+          plannedActions: request.executeOnce ? ['uia-root-focus', ...ACTION] : [...ACTION],
+          startedUtc: new Date().toISOString(),
         };
         const intentJournal = await writeExclusiveJson(markerPath, intent);
         intentCreated = true;
@@ -394,11 +401,13 @@ export async function executePhysicalReloadOnce(request, {
         const response = await sender(Object.freeze({
           pid: request.pid, hwnd: request.hwnd,
           startedUtc: request.startedUtc, sessionId: observed.sessionId,
+          rootSelector: latest.rootSelector, allowInitialFocus: request.executeOnce === true,
           sequence: ACTION,
         }));
         if (response?.submitted !== true || response?.sequenceCount !== 3 ||
             response?.targetPid !== request.pid || response?.targetHwnd !== request.hwnd ||
-            response?.senderSessionId !== observed.sessionId) {
+            response?.senderSessionId !== observed.sessionId ||
+            (request.executeOnce === true && response?.focusPerformed !== true)) {
           refuse('ACTION_RECOVERY_REQUIRED', 'Native input delivery result was uncertain');
         }
         // A sender receipt is NOT proof RIFT interpreted/reloaded; external screenshot
@@ -406,7 +415,7 @@ export async function executePhysicalReloadOnce(request, {
         await writeExclusiveJson(path.join(root, 'physical-rift-reloadui-' + request.requestId + '.receipt.json'), {
           schemaVersion: 1, kind: 'workbridge.physical-rift-reloadui-receipt',
           requestId: request.requestId, pid: request.pid, hwnd: request.hwnd,
-          submittedUtc: new Date().toISOString(), submitted: true, verified: false,
+          submittedUtc: new Date().toISOString(), submitted: true, verified: false, integratedFocusVerified: request.executeOnce === true,
         });
         await releaseOwnedTurn(turn.filename, turn.original, turn.journal);
         return { ok: true, replayed: false, submitted: true,
@@ -588,7 +597,10 @@ export function createGuardedWinappSender({
       if (firstKeyStartedAt !== null && (now() - firstKeyStartedAt < 0 || now() - firstKeyStartedAt > 60000)) {
         refuse('INPUT_TURN_EXPIRED', 'A keyboard phase exceeded the bounded 60-second input turn');
       }
-      const current = await inspectPhysicalRift(target, { runner, getProcess });
+      const current = await inspectPhysicalRift(target, {
+        runner, getProcess,
+        requireForeground: !(phase === 0 && input.allowInitialFocus === true),
+      });
       if (current.sessionId !== input.sessionId ||
           (sessionId !== null && current.sessionId !== sessionId)) {
         refuse('SESSION_MISMATCH', 'Physical game or input session changed before a key phase');
@@ -604,7 +616,23 @@ export function createGuardedWinappSender({
           !/^[a-f0-9]{64}$/i.test(evidence.imageSha256 ?? '')) {
         refuse('CHAT_STATE_UNVERIFIED', 'Initial chat-closed screenshot proof is missing/stale');
       }
-      // Check foreground again immediately before sending this individual phase.
+      // Exactly one UIA focus after durable intent in this same exclusive lease.
+      // No full UIA inspection or external tool roundtrip after focus, and
+      // never refocus if any keyboard event may already have been delivered.
+      if (phase === 0 && input.allowInitialFocus === true) {
+        if (typeof input.rootSelector !== 'string' ||
+            !/^[A-Za-z0-9_-]{3,96}$/.test(input.rootSelector) ||
+            current.rootSelector !== input.rootSelector) {
+          refuse('FOCUS_SELECTOR_UNAVAILABLE', 'Physical RIFT root changed before focus');
+        }
+        const focusReply = parseJson(await runner([
+          'ui', 'focus', current.rootSelector, '-w', String(input.hwnd), '--json',
+        ]), 'Integrated native UIA focus');
+        if (focusReply?.ok === false || focusReply?.success === false || focusReply?.error || (focusReply?.hwnd !== undefined && Number(focusReply.hwnd) !== input.hwnd)) {
+          refuse('ACTION_RECOVERY_REQUIRED', 'Native focus targeted unexpected HWND');
+        }
+      }
+      // Verify exact foreground HWND + process/session immediately before key.
       const justBefore = parseJson(await runner([
         'ui', 'list-windows', '-a', String(input.pid), '--json',
       ]), 'Immediate foreground check');
@@ -637,7 +665,7 @@ export function createGuardedWinappSender({
       if (phase === 1) await settle(500);
     }
     return { submitted: true, sequenceCount: ACTION.length,
-      targetPid: input.pid, targetHwnd: input.hwnd, senderSessionId: sessionId,
+      targetPid: input.pid, targetHwnd: input.hwnd, senderSessionId: sessionId, focusPerformed: input.allowInitialFocus === true,
     };
   };
 }
