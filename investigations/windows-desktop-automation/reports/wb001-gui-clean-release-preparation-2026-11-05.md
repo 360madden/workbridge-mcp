@@ -110,4 +110,15 @@ See `C:\work\rre\docs\RRE-WORKBRIDGE-QUARANTINE-CLEARANCE-HANDOFF-2026-11-05.md`
 
 **Next boundary:** With the Nov2 protection artifacts archived, separately validate a fresh disposable GUI input/capture pilot under a new request ID. Do not infer end-to-end game automation from archival success. Only then consider Joey's previously approved one-time physical RIFT `/reloadui` and verify v0.4.11 with fresh independent evidence; do not automatically replay the old screenshot.
 
+## Fresh post-recovery capture validation (2026-11-05, 15:49–15:50 EST)
+
+**Status: SUCCESS — new Workbridge screenshot requests work without re-quarantining desktop input.** A fresh read-only WinApp 0.7.1 inventory identified physical RIFT PID `32156`, HWND `462734`, class `TWNClientFramework`, title `RIFT`, dimensions 1936×1048; UIA inspection confirmed it was an enabled, non-offscreen window. No old screenshot request ID was reused.
+
+- New disposable taskbar capture `manual_gui_postarchive_shell_capture_20261105a`: `replayed=false`, `inputInjected=false`, verified PNG **2560×48**, **47,943 bytes**, SHA256 `14fac3eafc42d77f4034cf6dba20de4320a920377b74e7e9ae28e8eaf7a4fcbd`.
+- New physical RIFT capture `manual_gui_postarchive_physical_rift_capture_20261105a`: `replayed=false`, `inputInjected=false`, verified PNG **1920×1032**, **3,513,513 bytes**, SHA256 `d092577ea808de0649a133e65a0f804d4081873910a6d914bea4bb830c3dc3e0`. Visible in-game window text independently confirms **`RRE v0.4.11 research`**. Capture can change foreground; no keyboard/mouse action was injected.
+- Independent `manual_gui_postcapture_health_20261105a` exit0: both capture PNG hashes match, physical RIFT PID still alive, no `desktop-input-turn.lock`, no `desktop-turn-admission.lock`, and **zero** top-level `desktop-turn-quarantine-*.json`. The active paths remained clear after both successful captures.
+
+**Still not performed:** the one-time physical RIFT `/reloadui` (game UI only) and fresh keyboard/input-adapter verification. Neither game nor Windows was restarted. This distinguishes a proven working screenshot/capture path from an as-yet unproven targeted command-injection path.
+
+
 
