@@ -1,10 +1,18 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
-Status: GUI-006 source/private-MCP integration completed October 26, 2026; 0.16.4-dev candidate passed seven release checks but **has not been deployed**. The first independent updater activation was safely refused at preflight; live owner remains 0.16.3-dev / 52 tools. See [the full GUI-006 evidence and recovery blocker](gui006-desktop-vmware-2026-10-26.md). Existing instructions prohibit force-restarting the deployed owner or bypassing its healthy-installation check.
+Status **updated November 5, 2026**: Workbridge **0.16.4-dev is the running deployed owner** (verified through live workspace diagnostics). The older October 26 GUI-006 candidate/0.16.3 deployment-blocker report below is historical evidence, not current owner state. No service rollout or owner restart was performed for the November 5 status-tool milestone.
 
 Standing autonomous blocker policy: `docs/autonomous-investigation-policy.md` (also referenced by repository `AGENTS.md`). After a failed adapter, investigate supported alternatives and keep making scoped, evidence-backed progress; escalate only irreducible credential or material-action dependencies.
 
-## Baseline (observed through running Workbridge 0.16.3-dev)
+## Latest verified milestone — November 5, 2026: GUI-007 physical-RIFT read-only doctor
+
+- **Recovery:** The stale November 2 desktop-input quarantine was hash-archived and safely cleared. Exactly one Joey-authorized physical-RIFT `/reloadui` was delivered at 17:21 EST through the guarded one-shot script, with fresh visual initialization evidence for RRECollector v0.4.11 and original game-process continuity. See `investigations/windows-desktop-automation/reports/2026-11-05-physical-rift-reloadui-v0411-success.md` (commit `86a3391`). Preserve the singleton and receipt; do not reset them to repeat input.
+- **Read-only status tool:** Run from the Workbridge project root: `node scripts/physical-rift-status.mjs`. It reuses existing service diagnostics, exact Windows RIFT process/window identity and start time, desktop lock/quarantine checks, one-shot receipt/capture-artifact hash checks, and account SavedVariables metadata including addon version, catalog, distinct pin IDs and SHA. It performs no game input, focus, screenshot capture, reload or restart.
+- **Meaning of healthy:** A `healthy` result is **host/tooling readiness**, not an automated visual interpretation of game state. The command deliberately reports `gameOutcome: not-assessed`, `inputAllowed: false`, `replayAllowed: false`. Do not treat a PNG artifact hash as proof of screenshot visual content.
+- **Implementation acceptance:** `scripts/physical-rift-status.mjs` and `test/physical-rift-status.test.mjs` committed as `0b2a9bf6af42fc4aeefc7a5c05fcae3e7b64c274`; **41/41** targeted regression assertions, syntax, Prettier, independent read-only code review and fresh physical-RIFT read-only smoke PASS. Physical process PID/HWND and all runtime numbers are *historical receipts*; rediscover before future interactive work.
+- **Next gates:** Consume the status tool in RRE test preflights, add optional PNG dimensional checks and wider duplicate/receipt fault fixtures, and hold any new physical-RIFT input or Workbridge service update behind its existing target-specific authorization and WB-001 deployment process.
+
+## Historical baseline (observed under Workbridge 0.16.3-dev in October 2026)
 
 - Primary root: `C:\work`; additional root: `C:\rift modding`.
 - Workbridge command jobs and VMware processes all run in Windows session 2; `UserInteractive=True` and one screen is enumerated. An interactive session alone does not prove input delivery or valid screenshot content.

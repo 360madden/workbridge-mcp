@@ -55,4 +55,4 @@ Do not put a VM password on a command line, in the repository or in diagnostics.
 
 The user has granted broad initiative for this project, including routine development and debugging. This policy does **not** authorize irreversible deletion of unrelated data, surprise VM resets, credential extraction, changing security settings to bypass authentication, remote publication beyond the established project workflow, or unverified interaction with the live Rift world. Seek confirmation only for material decisions or genuinely new access. While waiting, advance other project-safe work.
 
-Related source of truth: `docs/interactive-desktop-vm-roadmap.md`. Current installed Workbridge owner: 0.16.3-dev. Use WB-001 staged release and rollback for any future service deployment.
+Related source of truth: `docs/interactive-desktop-vm-roadmap.md`. As of November 5, 2026, the installed Workbridge owner is **0.16.4-dev**, verified by live diagnostics and physical-RIFT read-only doctor; the earlier 0.16.3-dev owner note is historical. Use WB-001 staged release and rollback for any future service deployment.
