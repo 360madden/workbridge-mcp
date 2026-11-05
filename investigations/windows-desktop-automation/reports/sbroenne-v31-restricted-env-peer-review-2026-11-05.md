@@ -40,6 +40,14 @@ The author reported **build-only** C# compiler and Node syntax-check exit 0; thi
 - Any missing stage, unexpected process, unexpected env mask, nonzero exit, unknown settlement or timeout is **HOLD**; retain evidence and investigate before any retry.
 - Even a successful oracle clears **environment inheritance only**. The Sbroenne vendor/UIA/screenshot/desktop piloting gate stays **HOLD** pending separate desktop lease/quarantine and privacy safety reviews.
 
+## Independently verified saved runtime receipt (post-review)
+
+After the author ran the **one approved synthetic** trial, this reviewer independently read Workbridge `command_status` and `command_output` for job `wda_m3p8_unicode_env_oracle_synthetic_20261105_a01`; **no rerun**:
+
+- Workbridge reports **passed, actual OS exit 0**, complete untruncated stdout **256 bytes**, stderr **0 bytes**, timeout bound **60s**, observed job from `2026-11-05T23:49:31.685Z` to `23:49:33.039Z`.
+- Complete six-line fixed receipt (no raw MCP payload): `HOST:PRIVATE_ENV_ROOTS:2`; `HOST:ASSIGNED_SUSPENDED:57844:ACTIVE:1`; `HOST:READY_MEMBERS:4:RUNNER:57844:SERVER:18332`; `RESULT:success:ENV_MASK_VERIFIED:none`; `HOST:PRIVATE_ITEMS:0:0:RETAINED_FOR_AUDIT:1`; `HOST:SETTLED:0:RUNNER:57844:SERVER:18332:DURATION_MS:860`.
+- This **confirms this one synthetic host run** achieved the expected enumerated environment-key mask, process Job settlement and zero private extracted/scratch items. It **does not** establish arbitrary-key absence, repeatability, provider stability, correct live UIA behavior or production deployment readiness. Sbroenne/live desktop **remains HOLD**.
+
 ## Sources
 
 Local pinned primary source paths and SHA above, especially `Sbroenne-SuspendedEnvNode-V31.cs` lines 103–193; `Sbroenne-EnvOracle-Host-V31.cs` lines 128–221; `Sbroenne-PrivateJob-V2.cs` lines 68–108, 169–218; `sbroenne-v31-env-oracle-runner.mjs` lines 17–124; `sbroenne-v31-env-oracle-stub.mjs` lines 7–35; and installed MCP SDK `stdio.mjs` lines 10–28, 74–86.
