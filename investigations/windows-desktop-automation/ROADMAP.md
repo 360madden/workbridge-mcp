@@ -87,3 +87,14 @@ Evidence: `reports/2026-11-04-investigation-sitrep-03.md`. Production deployment
 - [ ] Quiet desktop and exact fresh task/window/fixture identity gate; one **new** bounded read-only WinApp structural snapshot with native before/after proof, then Sbroenne actual `ui_snapshot` parity only if containment/recovery verified.
 - [ ] Synthetic modal-dialog benchmark, then VMware host/guest boundary-specific evaluation; no RIFT/guest input in this pilot.
 - [ ] Production provider selection/deployment only via M5/M6 and WB-001; Workbridge remains in daily service.
+
+## Fourth-wave verified closeout (2026-11-05)
+- [x] Native NTFS **private synthetic** handoff 6/6 OS exit0, exact FILE_ID/no-replace/owner sharing/guard-covered contender proof and six safe fixture cleanups; e01–e03 harness failures documented. This is **not** a live orphan archiver.
+- [x] Pinned Sbroenne v1.3.28 single-file .NET10 publish (one 59,893,792-byte EXE) and supervised **protocol-only** v3 run OS0/Job0; no tools/call. Environment default inheritance and extraction destination remain unproven, explicitly corrected in benchmark.
+- [x] M4 disposable owned-modal WinForms .NET10 fixture compiled clean; eugman FlaUI-MCP-Core pinned source review identifies owner-disabled/new-owned-HWND tracking and pending-status algorithms. No modal or UIA runtime test.
+- [x] Source/deployed GUI producer lock-release audit and filtered TaskScheduler/process census; Node path-unlink TOCTOU remains **source-possible but unobserved**, with separate FileId-token remediation roadmap.
+- [ ] Build and peer-review narrowly typed **read-only-first** watchdog orphan recovery utility; test fail-close then seek separate operator authorization before any live use.
+- [ ] Quiet user-coordinated Windows desktop interval; actual first disposable WinApp read-only snapshot, Sbroenne equivalent snapshot and modal observation remain **HOLD**.
+- [ ] No production backend switch or broad GUI input before M5/M6 and WB-001.
+
+Detailed evidence: `reports/2026-11-05-investigation-sitrep-04.md`.
