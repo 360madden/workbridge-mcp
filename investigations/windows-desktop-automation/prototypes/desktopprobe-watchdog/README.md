@@ -44,6 +44,16 @@ Workbridge build jobs `wda_watchdog_build_20261104_005`, `_006`, `_007` and `_00
 
 Synthetic tests do **not** prove TaskScheduler ownership, real WinForms UI startup/shown, COM/UIA hung-provider containment, or GUI focus safety. They prove native private-Job containment/timeout and atomic lock collision/settlement on this exact compiled WinExe test process only. No production service or active game was touched.
 
+### November 5 atomic maintenance-admission integration (source-only)
+
+- Before a GUI turn, `DesktopTurnLease.Acquire` now creates `desktop-turn-admission.lock` with Win32 `CREATE_NEW`, using the durable `workbridge.gui-admission` schema from `scripts/desktop-turn-admission.mjs`. The independent orphan-sidecar veto is checked again under admission.
+- Verified settlement removes the exact owned GUI guard first and admission second. On uncertain settlement, admission is released only after exact original GUI guard bytes and its matching quarantine sidecar are verified retained; otherwise it stays blocking. Abnormal `Dispose` retains both.
+- Synthetic mode uses per-run `desktop-turn-admission.mock.lock`, never the live `.tools/desktop-evidence` lock.
+- `wd_admission_csharp_publish_20261105_a01`: Windows .NET 10 publish PASS (exit 0).
+- `wd_admission_csharp_synthetic_ok_20261105_a01`: `--synthetic admgateok20261105a` PASS (exit 0); exact Job 1→2→1, child settled, both mock lock files absent.
+- `wd_admission_csharp_synthetic_uncertain_20261105_a01`: `--synthetic-uncertain admgateunc20261105a` PASS (exit 0); original mock GUI guard + linked quarantine retained, admission released after exact guard verification.
+- `wd_admission_csharp_synthetic_busy_20261105_a01`: preexisting foreign mock admission yielded expected exit 3 `UI_TURN_BUSY` in 89 ms; no child marker or GUI-turn file was created.
+
 ## Pending gates
 
 1. Independent source review of new lease P/Invoke, manifest and identity checks.
