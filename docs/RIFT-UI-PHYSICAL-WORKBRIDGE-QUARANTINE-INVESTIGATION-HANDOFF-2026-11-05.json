@@ -1,0 +1,362 @@
+{
+  "schemaVersion": 1,
+  "kind": "rift-ui.physical.workbridge-quarantine-investigation-handoff",
+  "title": "Physical RIFT Workbridge GUI quarantine — second read-only investigation and comparison",
+  "createdUtc": "2026-11-05T20:37:07.234Z",
+  "scope": {
+    "gameClient": "physical RIFT Live x64 on host Windows 11",
+    "vmwareExcluded": true,
+    "writeScope": "this documentation handoff only",
+    "researchWasReadOnly": true,
+    "gameInputPerformed": false,
+    "gameUiReloadPerformed": false,
+    "gameRestartPerformed": false,
+    "windowsRebootPerformed": false,
+    "quarantineAltered": false,
+    "serviceRestartPerformedByThisInvestigation": false
+  },
+  "executiveFinding": {
+    "confirmedPresentBlocker": "Persistent Workbridge desktop GUI-turn lock plus linked quarantine sidecar from an uncertain physical-RIFT screenshot on 2026-11-02; no verified manual reconciliation/archival of that incident.",
+    "confirmedOriginalErrorClassification": "DESKTOP_TREE_UNSETTLED",
+    "preciseUnderlyingScreenshotFailure": "unknown; no original request-specific success/error receipt found, and the classification covers multiple failure modes",
+    "historicalProcessStillRunningNow": false,
+    "basisForHistoricalProcessGone": "Fresh Win32_OperatingSystem.LastBootUpTime is 2026-11-05T15:26:47.500Z, after the 2026-11-02 incident; no original process can have survived continuously through this boot. This does not prove historical screenshot success or historical process-tree settlement.",
+    "runtimeSafetyFixStatus": "Deployed through authorized WB-001 at 2026-11-05T20:17:50.5294819Z; ten installed dist files independently SHA256-equal sealed payload. Old quarantine intentionally preserved.",
+    "generalPurposeGameInputInterface": "No supported general-purpose physical-RIFT keyboard/mouse MCP tool currently registered; this is a separate gap from the quarantine, and a /reloadui attempt was not made.",
+    "mostPlausibleImmediateTrigger": "An inner Microsoft WinApp CLI call hitting its default 15-second timeout is consistent with the 15.614-second lock-to-quarantine interval, but this is inference only; original suberror and deployed November 2 payload were not recovered.",
+    "recoveryProgress": "Subsequent separate approved Workbridge workflow has already prestaged and independently verified byte-exact backups of both Nov2 artifacts; originals remain active. A handle-bound no-replace archival mover has not been implemented/tested or used; release remains pending."
+  },
+  "originalIncident": {
+    "lockPath": "C:\\work\\workbridge-mcp\\.tools\\desktop-evidence\\desktop-input-turn.lock",
+    "sidecarPath": "C:\\work\\workbridge-mcp\\.tools\\desktop-evidence\\desktop-turn-quarantine-8aed4916-1cf3-4100-bc1b-d56f2308585f.json",
+    "lockBytes": 380,
+    "lockSha256": "635a367e41b80f9ad76fa1097c2ca8ece090315dc05dbf65deb4ebbfb28636b0",
+    "sidecarBytes": 425,
+    "sidecarSha256": "f1b37ebbeca97b4351d719786beb8c93dc678b76170f7e1a32b04bdecf0750a0",
+    "leaseId": "8aed4916-1cf3-4100-bc1b-d56f2308585f",
+    "requestId": "rc18-physical-rift-screenshot-20261102-postinstall-b1",
+    "producer": "desktop-capture-window",
+    "acquiredUtc": "2026-11-02T20:46:12.574Z",
+    "sidecarCreatedUtc": "2026-11-02T20:46:28.188Z",
+    "elapsedSecondsFromLockToQuarantine": 15.614,
+    "owner": {
+      "pid": 43508,
+      "processStartUtc": null,
+      "sessionId": null
+    },
+    "target": {
+      "process": "rift_x64",
+      "historicalPid": 17412,
+      "historicalHwnd": 1382178
+    },
+    "reasonCode": "DESKTOP_TREE_UNSETTLED",
+    "processTreeSettlement": "unknown",
+    "automaticRetryAllowed": false,
+    "intentSha256": null,
+    "originalScreenshotOutcome": "unknown_outcome",
+    "requestSpecificScreenshotReceiptFound": false
+  },
+  "investigation1": {
+    "checkedUtc": "2026-11-05T19:18:42.0692874Z",
+    "diagnosticJobId": "rift-ui-quarantine-readonly-20261105-001",
+    "diagnosticScript": "investigations/windows-desktop-automation/prototypes/gui-turn-reconcile-readonly.ps1",
+    "toolCommandExitCode": 0,
+    "scriptState": "unknown",
+    "scriptReasonCode": "OWNER_PID_NOT_PRESENT",
+    "verified": "Initial lock/sidecar identity and hashes matched; owner PID 43508 absent.",
+    "limitations": [
+      "Exit code 0 means JSON classification was emitted, not success or clearance.",
+      "releaseEligible and automaticRetryAllowed are initialized false and remain false for every classifier result.",
+      "The owner-absent branch at script line 160 exits before the descendant-closure analysis (lines 190-226) and the final hash reread (lines 228-230)."
+    ],
+    "earlierAnswerCorrections": [
+      "Replace 'root cause exactly identified' with 'persistent quarantine mechanism identified; initiating screenshot failure subtype remains unknown'.",
+      "Do not infer a currently living old screenshot helper from DESKTOP_TREE_UNSETTLED.",
+      "Earlier 'fixes not deployed' was time-correct then but is obsolete after later WB-001 deployment."
+    ]
+  },
+  "investigation2": {
+    "checkedUtc": "2026-11-05T20:32:11.7239735Z",
+    "diagnosticJobId": "riftui-quarantine-audit2-live-20261105-01",
+    "diagnosticJobExitCode": 0,
+    "diagnosticOutputTruncated": false,
+    "independentMethods": [
+      "Bounded exact two-file content and SHA-256 read before process/installation checks",
+      "Independent second read of lock and sidecar SHA-256, length and last-write timestamps",
+      "Win32_Process PID/parent/session/creation snapshot (420 processes)",
+      "Win32_OperatingSystem.LastBootUpTime",
+      "Exact top-level desktop-evidence filename inventory (<=2000 entries)",
+      "Installed dist SHA-256 versus immutable sealed release SHA-256"
+    ],
+    "osLastBootUtc": "2026-11-05T15:26:47.5000000Z",
+    "oldOwnerPid43508Present": false,
+    "oldTargetPid17412Present": false,
+    "currentOwner": {
+      "pid": 58580,
+      "instanceId": "be5f373a-8c98-4877-b5dd-dbea9e5728d5",
+      "version": "0.16.4-dev",
+      "startedUtc": "2026-11-05T20:17:49.814Z"
+    },
+    "processInventoryCount": 420,
+    "matchingHistoricalTimeWindowProcesses": 0,
+    "specificallyNamedAutomationHelpersObserved": 0,
+    "oldRequestNamedArtifactsBesidesLockAndSidecar": 0,
+    "topLevelQuarantineFiles": [
+      "desktop-turn-quarantine-8aed4916-1cf3-4100-bc1b-d56f2308585f.json"
+    ],
+    "topLevelEvidenceInventoryComplete": true,
+    "admissionLockCurrentlyPresent": false,
+    "originalLockHashMatchesHistoricalPin": true,
+    "originalSidecarHashMatchesHistoricalPin": true,
+    "evidenceHashLengthTimestampStableAcrossDoubleRead": true,
+    "releaseOperationId": "wb001_gui_prep03_apply_20261105a",
+    "releaseCompletedUtc": "2026-11-05T20:17:50.5294819Z",
+    "sealedReleaseDigest": "01D7C888B9297708B15D2133484C202019E138206D30C20FE295DA6B91225519",
+    "comparisonBase": "C:\\work\\workbridge-mcp\\.local\\wb001-gui-src-20261105c\\.local\\releases\\gui-quarantine-20261105-prep03\\payload\\dist\\",
+    "installedDistFilesCompared": 10,
+    "installedDistFilesMatchingSealedPayload": 10,
+    "installedDistFileNames": [
+      "desktop-ui.mjs",
+      "desktop-capture.mjs",
+      "vmware-host-capture.mjs",
+      "desktop-probe-act.mjs",
+      "desktop-turn-admission.mjs",
+      "Check-DesktopWindowHandle.ps1",
+      "desktop-runtime-manifest.json",
+      "desktop-registration.js",
+      "desktop-cli-runner.js",
+      "server.js"
+    ],
+    "syntheticPostDeploymentEvidenceFromRepo": {
+      "nodeTestsPassed": 74,
+      "nodeTestsFailed": 0,
+      "nodeTestsSkipped": 1,
+      "dotNetWatchdogSyntheticPass": true,
+      "liveRiftInputTested": false
+    },
+    "limitation": "Process absence after reboot proves old processes no longer run continuously; it does not reconstruct the November 2 helper failure, captured image or historical process-tree completion.",
+    "additionalSourceAudit": {
+      "readOnly": true,
+      "innerTimeoutDefaultMs": 15000,
+      "outerTimeoutDefaultMs": 45000,
+      "incidentTimeToQuarantineMs": 15614,
+      "timeoutHypothesisConfidence": "plausible_not_proven",
+      "errorSubcauseNotPersisted": true
+    },
+    "subsequentPreservation": {
+      "sourceCommit": "3e6fcb7dc0407bfaf168fa351805ed0c7f6c7ccf",
+      "sourceReport": "investigations/windows-desktop-automation/reports/wb001-gui-clean-release-preparation-2026-11-05.md",
+      "approvedLeaseSpecificRecoveryInSeparateConversation": true,
+      "backupPrestageOperation": "manual_gui_prestage_20261105a",
+      "independentBackupCheck": "manual_gui_prestage_independent_20261105a",
+      "inventoryCheck": "manual_gui_inventory_20261105a",
+      "quiescenceCheck": "manual_gui_quiescence_inventory_20261105a",
+      "recoveryArchiveBackupPath": "C:\\work\\workbridge-mcp\\.tools\\desktop-evidence\\recovery-archives\\manual-gui-20261105-prestage01\\backup",
+      "byteExactGuardAndSidecarBackupsVerified": true,
+      "originalGuardAndSidecarStillPresent": true,
+      "originalScreenshotOutcome": "unknown",
+      "originalsMoved": false,
+      "sharedMaintenanceAdmissionHeldOnlyDuringPrestageThenReleased": true,
+      "quiescenceSnapshot": {
+        "processes": 419,
+        "scheduledTasks": 238,
+        "knownGuiProducerCandidates": 0,
+        "durationMs": 1920,
+        "pointInTimeOnly": true
+      },
+      "moverReady": false,
+      "archivalExecuted": false,
+      "caution": "These are documented results from a separate approved workflow and are not changes made by the current handoff task; repeat checks under a held maintenance gate before future archival."
+    }
+  },
+  "diagnosis": {
+    "mechanism": {
+      "caller": "src/desktop-registration.ts withDesktopCaptureTurn: atomic open(lockPath,'wx') maps EEXIST to UI_TURN_BUSY; unsettled failures preserve lock and write matching sidecar.",
+      "runner": "src/desktop-cli-runner.ts createDesktopPrototypeInvoker runs child Node wrapper; timeout, force-kill, nonzero child exit or invalid output can yield DESKTOP_TREE_UNSETTLED because wrapper termination does not certify grandchildren.",
+      "timestampConstraint": "Quarantine sidecar created approximately 15.6s after lock; this is NOT evidence of reaching the default 45s timeout, because callers can supply a shorter timeout and other errors can trigger the same classification.",
+      "noAutomaticRelease": "The design lacks time-based expiry for uncertain operations; original lease is preserved across game and Workbridge restarts and OS boot.",
+      "innerWinApp": "scripts/desktop-ui.mjs runWinapp default timeout is 15000ms. On timeout it kills its direct child and waits for close, without independently certifying all descendants.",
+      "screenshotCallSequence": "scripts/desktop-capture.mjs performs version check, windows listing, UI inspect, second listing, and screenshot serially; these do not override the inner default timeout.",
+      "outerDefault": "The outer Node wrapper defaults to 45000ms in src/desktop-cli-runner.ts; src/desktop-capture-tool.ts does not supply an override. The 15.614-second incident is not evidence of the outer 45-second deadline.",
+      "lostSubcause": "src/desktop-cli-runner.ts collapses a nonzero Node-wrapper exit into DESKTOP_TREE_UNSETTLED before parsing its structured error output; DesktopPrototypeError.interruptedBy is not stored in the quarantine record. Persisted sidecar omits original WINAPP_* code, child PID, exit status, stage and timeout setting.",
+      "conservativeBranches": [
+        "outer deadline / forced kill",
+        "output limit",
+        "pipe errors",
+        "launch error after PID assigned",
+        "nonzero wrapper exit or signal",
+        "malformed UTF8 or JSON response",
+        "invalid response envelope"
+      ]
+    },
+    "proved": [
+      "The quarantine is Workbridge-owned and tied to one November 2 physical-RIFT screenshot request.",
+      "Original lock and sidecar remain linked, SHA-identical and unmodified in the second inspection.",
+      "Original owner no longer runs; the PC booted after incident.",
+      "Guarded source/runtime has now been deployed, but historical quarantine remains.",
+      "The four registered desktop MCP tools are windows, inspect, capture_window, capture_vmware_host; no general-purpose game keyboard action tool exists in this registered interface."
+    ],
+    "notProved": [
+      "Exact original nested helper error subtype: timeout versus abnormal exit versus invalid response versus output/stream failure.",
+      "Whether the 2026-11-02 image was successfully captured.",
+      "Historical Windows Job Object settlement at the time of the incident.",
+      "Whether a new post-reconciliation RIFT keyboard action would succeed; none was attempted.",
+      "Whether the 15-second inner WinApp timeout actually caused this specific incident; duration only makes it plausible.",
+      "The precise deployed November 2 runtime/payload bytes, which may differ from current source."
+    ],
+    "policyInvariantNotReadinessProof": "gui-turn-reconcile-readonly.ps1 releaseEligible=false is always emitted by design. A manual recovery readiness decision requires independent evidence and explicit operator approval."
+  },
+  "comparisonWithFirstInvestigation": [
+    {
+      "topic": "Quarantine exists",
+      "first": "confirmed",
+      "second": "confirmed with independent before/after hashes",
+      "change": "strengthened"
+    },
+    {
+      "topic": "Initiating failure subtype",
+      "first": "precise cause not proven",
+      "second": "still not proven, 15.6-second interval rules out simplistic default-timeout attribution",
+      "change": "clarified"
+    },
+    {
+      "topic": "Old helper alive",
+      "first": "not established",
+      "second": "continuous survival excluded by Nov5 OS boot and current process snapshot",
+      "change": "new evidence"
+    },
+    {
+      "topic": "Runtime fixes",
+      "first": "source-only / not deployed",
+      "second": "WB-001 deployment confirmed and 10/10 installed hashes match sealed payload",
+      "change": "status advanced"
+    },
+    {
+      "topic": "Read-only classifier",
+      "first": "exit0 sometimes described as clean/no errors",
+      "second": "state unknown is diagnostic output; owner-missing path skips descendant and final reread",
+      "change": "corrected overclaim"
+    },
+    {
+      "topic": "Input to RIFT",
+      "first": "no dedicated keyboard tool; /reloadui not attempted",
+      "second": "same, separately outstanding after clearance",
+      "change": "unchanged"
+    },
+    {
+      "topic": "Game and OS restarts",
+      "first": "none by investigation",
+      "second": "none by investigation; OS boot time shows a separate earlier boot occurred",
+      "change": "clarified attribution"
+    },
+    {
+      "topic": "Recovery preservation",
+      "first": "backup/release not performed",
+      "second": "separate approved pre-stage now has byte-exact hash-verified backups and quiescence audit, but live originals were not moved",
+      "change": "new milestone"
+    }
+  ],
+  "recoveryGates": [
+    {
+      "order": 1,
+      "action": "Confirm latest runtime/admission implementation and every currently deployed producer, including external C# watchdog and direct CLI paths.",
+      "status": "partially verified",
+      "mustNot": "Assume source-only tests guarantee every external producer is live-guarded."
+    },
+    {
+      "order": 2,
+      "action": "Retain the documented separate approval for exact historical lease; independently verify its scope and any current protected workflow requirements. Preserve unknown_outcome and prohibit replay.",
+      "status": "lease_specific_approval_reported_in_separate_conversation; verify scope/current decision before any future archive",
+      "mustNot": "Interpret user authorization for read-only investigation as approval to release lock."
+    },
+    {
+      "order": 3,
+      "action": "Establish verifiable, exclusive cross-producer maintenance admission; inspect no new active GUI owner and rehash exact records.",
+      "status": "admission demonstrated during backup prestage, but not currently held; live archival gate not executed",
+      "mustNot": "Use the absence of desktop-turn-admission.lock as evidence that all producers are quiescent."
+    },
+    {
+      "order": 4,
+      "action": "Reuse verified recoverable backup/manifest from manual_gui_prestage_20261105a, then implement and synthetically validate no-replace handle-bound mover and race/crash cases. Under a fresh exclusive maintenance admission, reverify and archive exact sidecar first, original guard last; then verify postconditions.",
+      "status": "byte-exact backups and manifest already independently verified; handle-bound no-replace mover and final sidecar-first/guard-last archival NOT executed",
+      "mustNot": "Delete/rename lock alone or recreate a fake success receipt."
+    },
+    {
+      "order": 5,
+      "action": "Separately implement or expose supported, bounded physical RIFT keyboard input, validate on disposable target, and obtain fresh game-specific approval before one /reloadui.",
+      "status": "not executed",
+      "mustNot": "Use SendKeys/alternate input merely to evade still-active shared GUI quarantine."
+    }
+  ],
+  "residualRisk": {
+    "lowerLevelExport": "scripts/desktop-capture.mjs exports captureWindow without independent admission validation. Known production callers and standalone entrypoint are guarded; hypothetical future direct module import remains a source hardening gap, not evidenced November 2 cause.",
+    "currentMaintenanceAdmission": false
+  },
+  "sources": [
+    {
+      "path": "C:\\work\\workbridge-mcp\\src\\desktop-cli-runner.ts",
+      "purpose": "classification of helper timeout/invalid response and tree uncertainty"
+    },
+    {
+      "path": "C:\\work\\workbridge-mcp\\src\\desktop-registration.ts",
+      "purpose": "exclusive lock, linked quarantine, registered desktop MCP surface"
+    },
+    {
+      "path": "C:\\work\\workbridge-mcp\\scripts\\desktop-turn-admission.mjs",
+      "purpose": "new atomic producer/maintenance admission"
+    },
+    {
+      "path": "C:\\work\\workbridge-mcp\\investigations\\windows-desktop-automation\\prototypes\\gui-turn-reconcile-readonly.ps1",
+      "purpose": "classifier behavior and limitations"
+    },
+    {
+      "path": "C:\\work\\workbridge-mcp\\investigations\\windows-desktop-automation\\reports\\wb001-gui-clean-release-preparation-2026-11-05.md",
+      "purpose": "completed deployment and post-deployment tests; latest appended sections override older not-deployed header"
+    },
+    {
+      "path": "C:\\work\\workbridge-mcp\\investigations\\windows-desktop-automation\\reports\\manual-gui-turn-archive-protocol-2026-11-04.md",
+      "purpose": "proposed sidecar-first guarded recovery; design not executed"
+    },
+    {
+      "path": "C:\\work\\workbridge-mcp\\investigations\\windows-desktop-automation\\reports\\gui-orphan-sidecar-veto-2026-11-05.md",
+      "purpose": "historical quarantine and five-producer admission gaps"
+    },
+    {
+      "path": "C:\\work\\workbridge-mcp\\AGENTS.md",
+      "purpose": "repository agent operating policy"
+    },
+    {
+      "path": "C:\\work\\workbridge-mcp\\scripts\\desktop-ui.mjs",
+      "sha256": "29a34aba1780dedf4369cca17eb250c733187d5c6f98ee3dd5023eee13fff145",
+      "purpose": "15-second inner WinApp launcher timeout and child kill behavior"
+    },
+    {
+      "path": "C:\\work\\workbridge-mcp\\scripts\\desktop-capture.mjs",
+      "sha256": "4c40821002442b35ec464644dc10d49db23b82ee7b85e3e33a2ac3bbbec91fc6",
+      "purpose": "serial screenshot call sequence and error propagation"
+    },
+    {
+      "path": "C:\\work\\workbridge-mcp\\src\\desktop-capture-tool.ts",
+      "sha256": "c8ad30cf30d856a6d954ada2450b5483e99c86dc37effd3c6815c0ba51da5574",
+      "purpose": "outer runner invocation without timeout override"
+    },
+    {
+      "path": "C:\\work\\workbridge-mcp\\investigations\\windows-desktop-automation\\reports\\wb001-gui-clean-release-preparation-2026-11-05.md",
+      "commit": "3e6fcb7dc0407bfaf168fa351805ed0c7f6c7ccf",
+      "purpose": "new appended section confirms separate approved manual prestage, verified backups and quiescence while originals stay quarantined"
+    }
+  ],
+  "repoState": {
+    "branch": "main",
+    "unrelatedUserOwnedModification": "scripts/freebuff-conpty-probe.py",
+    "preserveUnmodified": true,
+    "note": "The requested handoff is documentation only. Research remained read-only; only this handoff JSON was created/updated."
+  },
+  "nextSuggestedAction": "Use this handoff for a future approved recovery operation: verify current separate lease-specific approval, implement/test handle-bound no-replace mover, reacquire exclusive maintenance admission and refresh quiescence, archive the original sidecar then guard with postchecks; only after that separately add physical-RIFT input capability. This handoff task does not execute recovery.",
+  "validation": {
+    "jsonParseExpected": true,
+    "exactTargetDirectory": "C:\\work\\workbridge-mcp\\docs",
+    "otherFilesShouldRemainUnchanged": true
+  },
+  "updatedUtc": "2026-11-05T20:38:31.972Z"
+}
