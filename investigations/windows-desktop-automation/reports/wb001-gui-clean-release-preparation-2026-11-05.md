@@ -43,3 +43,19 @@ Original screenshot outcome remains **UNKNOWN**; quarantine is **ACTIVE**. Sourc
 4. Request distinct authorization before any RIFT-specific input, `/reloadui`, game restart, or reboot.
 
 See `C:\work\rre\docs\RRE-WORKBRIDGE-QUARANTINE-CLEARANCE-HANDOFF-2026-11-05.md` for the earlier controlled-clearance handoff.
+
+## Follow-up: historical catalog preflight and prep03 (2026-11-05)
+
+**Status: PASS — fix committed, new release sealed and independently verified; NOT DEPLOYED.**
+
+- Newly discovered predeployment blocker: running `diagnostics.jobs.inventory` scans only 20,000 historical entries, returning `complete=false` with `limitReached=true` and `timeLimitReached=false`, although live capacity was idle (0 occupied, 0 running, 0 retained).
+- New `Get-WBHistoricalJobCensus` read-only PowerShell fallback completed against **21,986 historical entries** (11,069 job records, 10,917 result receipts, 0 unknown). It bounds time and entry count and rejects link/directory/unrecognized entries without pruning history. `Assert-WBIdleDiagnostics` accepts only the exact limit-only case with valid counters and zero live capacity, and controller rechecks owner identity, capacity and census counts before any service stop.
+- Fix commit: `b0b8d6a643ed9d0a8deb8c25d6b9da145ca9f515`, scoped to `scripts/Workbridge-Update.ps1`, `scripts/Invoke-WorkbridgeUpdate.ps1`, `test/updater.test.ps1`, `docs/updates.md`. The unrelated user edit in `scripts/freebuff-conpty-probe.py` remains untouched.
+- Focused updater tests: **42/42 passed**. `git diff --check` passed. Independent safety audit found no concrete fail-open bug, while noting that tests do not yet exercise the full controller's two live CLI observations as an end-to-end synthetic.
+- Clean source archive from the exact fix commit: `C:\work\workbridge-mcp\.local\wb001-gui-src-20261105c` (no dirty working tree content).
+- Sealed candidate: `C:\work\workbridge-mcp\.local\wb001-gui-src-20261105c\.local\releases\gui-quarantine-20261105-prep03`.
+- Independent `Get-WBRelease` verifier **PASS**. Manifest SHA256: `01D7C888B9297708B15D2133484C202019E138206D30C20FE295DA6B91225519`; **3,183** files; all **11** validation checks zero, including desktop closure. Full tests: **1,054 total / 1,051 pass / 0 fail / 3 skip**. Version `0.16.4-dev`, `hostedVerified=false` as expected.
+- Live Workbridge still PID **15064**, instance `8eeaffd2-4e11-4228-8bac-daa06449b08c`, 0/36 occupied. Original quarantine lock and sidecar remain byte-identical. RIFT, Workbridge service, and Windows have not been reloaded or restarted.
+
+**Deployment remains separately gated:** The currently running older Workbridge owner does *not* honor the new updater admission lock. Therefore no Apply is permitted without Joey's explicit approval for a coordinated Workbridge-only maintenance window that suspends new jobs from other chats/automations. The standalone C# watchdog is not part of WB-001 payload and must be independently checked before any quarantine archival or GUI input pilot. Keep prep02 and prep03 sealed, and preserve original Nov2 evidence.
+
