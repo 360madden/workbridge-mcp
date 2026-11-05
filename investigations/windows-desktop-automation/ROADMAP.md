@@ -70,8 +70,20 @@ Never label the trial `PASS` simply because a tool says `success`.
 - [x] Protect November 2 RIFT GUI lock/quarantine. Read-only classifier 10/10 synthetic; current `conhost.exe` lineage likely diagnostic sidecars, not proof of Nov2 completion.
 - [x] Source-only future archival design: retain `unknown_outcome`, enforce cross-producer desktop admission freeze, archive exact sidecar first and lock last; **no release executed**.
 - [x] Preferred future host path: one on-demand no-AtLogon Limited/Interactive scheduled watchdog; WinApp first, Sbroenne only after native containment green.
-- [ ] Reconcile old quarantine under separately approved and technically proven release gates; no age-based auto release/replay.
+- [x] Reconcile old quarantine under separately approved and technically proven release gates; on Nov 5 the original artifacts were backed up and archived, outcome still unknown, no age-based release/replay.
 - [ ] Verify real interactive watchdog/fixture launch and teardown, then one read-only WinApp sample.
 - [x] Finish and independently review **synthetic** Sbroenne native Job supervisor v2; clean OS exit0 and forced-negative OS exit3 both prove Job empty. Evidence `benchmarks/sbroenne-private-job-v2-synthetic-2026-11-04.md`, commit `fb479175`. Real MCP/UIA fixture sample remains gated.
 
 Evidence: `reports/2026-11-04-investigation-sitrep-03.md`. Production deployment remains a separate M6 decision.
+
+## Fourth-wave checkpoint (2026-11-05)
+- [x] Confirm operational Workbridge 0.16.4-dev / 36-slot owner and independently distinguish the later authorized RIFT `/reloadui` from the older unknown screenshot.
+- [x] Independently source-review Sbroenne direct MCP stdio v2 child-in-Job protocol path; run one pinned protocol-only handshake with exact `ui_snapshot` inventory, zero `tools/call`, honest OS exit0 and full observed Job settlement to 0. **Actual UIA is still disabled.**
+- [x] Read-only pilot readiness checklist for Microsoft WinApp 0.7.1 and existing disposable DesktopProbe; a historical native-input probe is not a valid read-only comparison sample.
+- [x] Fix normal watchdog `DESKTOP_TREE_UNSETTLED` quarantine parser schema and run actual `Archive-DesktopQuarantine.ps1` **without Execute** against copied synthetic evidence: 1/1 passed. No live lock changed.
+- [x] Document source-only crash-before-sidecar orphan-admission recovery: original GUI guard covers admission handoff; require producer invariant audit and 16 negative/crash/race checks before implementation.
+- [ ] Verify source/deployed invariant that every permitted GUI producer honors the legacy guard, including standalone scheduled paths.
+- [ ] Test crash-before-sidecar orphan classifier and guarded handoff on private synthetic NTFS fixtures; admission-only orphan needs a separately proven solution.
+- [ ] Quiet desktop and exact fresh task/window/fixture identity gate; one **new** bounded read-only WinApp structural snapshot with native before/after proof, then Sbroenne actual `ui_snapshot` parity only if containment/recovery verified.
+- [ ] Synthetic modal-dialog benchmark, then VMware host/guest boundary-specific evaluation; no RIFT/guest input in this pilot.
+- [ ] Production provider selection/deployment only via M5/M6 and WB-001; Workbridge remains in daily service.
