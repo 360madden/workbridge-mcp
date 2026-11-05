@@ -210,7 +210,7 @@ test('staged sender refuses stale chat screenshot and never injects first key',a
   const sender=createGuardedWinappSender({runner,getProcess:base.getProcess,
     chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',
       pid:target.pid,hwnd:target.hwnd,startedUtc:target.startedUtc,sessionId:2,
-      capturedUtc:new Date(Date.now()-50000).toISOString(),imageSha256:'f'.repeat(64)}});
+      capturedUtc:new Date(Date.now()-61000).toISOString(),imageSha256:'f'.repeat(64)}});
   await assert.rejects(sender({...target,sessionId:2,sequence:['Enter','/reloadui','Enter']}),
     {code:'CHAT_STATE_UNVERIFIED'});
   assert.equal(sent,0);
@@ -253,12 +253,12 @@ test('screenshot gate binds real receipt and PNG, rejects stale or corrupted inp
   await writeFile(imagePath,bytes);
   await writeFile(metadataPath,JSON.stringify(receipt)+'\n');
   const getProcess=async()=>({...processRecord});
-  const result=await readVerifiedChatEvidence(request,{root,getProcess,now:()=>Date.parse(at)+1000});
+  const result=await readVerifiedChatEvidence(request,{root,getProcess,now:()=>Date.parse(at)+29000});
   assert.equal(result.imageSha256,sha);
   assert.equal(result.state,'chat-closed-empty');
   assert.equal(result.sessionId,2);
   await assert.rejects(readVerifiedChatEvidence(request,{root,getProcess,
-    now:()=>Date.parse(at)+16000}),{code:'CHAT_STATE_UNVERIFIED'});
+    now:()=>Date.parse(at)+31000}),{code:'CHAT_STATE_UNVERIFIED'});
   assert.deepEqual((await readdir(root)).sort(),['capture-'+id+'.json','capture-'+id+'.png']);
   await writeFile(imagePath,Buffer.alloc(12000,0x72));
   await assert.rejects(readVerifiedChatEvidence(request,{root,getProcess,
@@ -512,5 +512,60 @@ test('integrated reload treats explicit native focus failure as uncertain with z
   const entries=await readdir(root);
   assert(entries.includes('desktop-input-turn.lock'));
   assert(entries.some(name=>name.startsWith('desktop-turn-quarantine-')));
+});
+
+test('sender phase-zero screenshot TTL accepts 59 seconds and refuses 61 seconds before any key',async()=>{
+  for(const [ageMs,passes] of [[59000,true],[61000,false]]) {
+    const base=fakes();
+    let sent=0;
+    const capturedUtc=new Date().toISOString();
+    const sender=createGuardedWinappSender({
+      runner:async(args)=>{
+        if(args[1]==='send-keys') {
+          sent++;
+          return JSON.stringify({keys:args[2],via:'send-input',actionCount:1,
+            target:'Window',hwnd:target.hwnd,warnings:[]});
+        }
+        return base.runner(args);
+      },
+      getProcess:base.getProcess,
+      now:()=>Date.parse(capturedUtc)+ageMs,
+      settle:async()=>{},
+      chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',
+        pid:target.pid,hwnd:target.hwnd,startedUtc:target.startedUtc,sessionId:2,
+        capturedUtc,imageSha256:'f'.repeat(64)},
+    });
+    const input={...target,sessionId:2,sequence:['Enter','/reloadui','Enter']};
+    if(passes) {
+      assert.equal((await sender(input)).submitted,true);
+      assert.equal(sent,3);
+    } else {
+      await assert.rejects(sender(input),{code:'CHAT_STATE_UNVERIFIED'});
+      assert.equal(sent,0);
+    }
+  }
+});
+
+test('integrated sender rejects screenshot expiry during focus before first key',async()=>{
+  const fx=integratedBackgroundFixture();
+  const capturedUtc=new Date().toISOString();
+  let elapsed=59000;
+  const runner=async(args)=>{
+    if(args[1]==='focus') {
+      const response=await fx.runner(args);
+      elapsed=61000;
+      return response;
+    }
+    return fx.runner(args);
+  };
+  const sender=createGuardedWinappSender({runner,getProcess:fx.getProcess,
+    now:()=>Date.parse(capturedUtc)+elapsed,settle:async()=>{},
+    chatClosedEvidence:{confirmed:true,state:'chat-closed-empty',
+      pid:target.pid,hwnd:target.hwnd,startedUtc:target.startedUtc,sessionId:2,
+      capturedUtc,imageSha256:'f'.repeat(64)}});
+  await assert.rejects(sender({...target,sessionId:2,rootSelector:'win-rift-5475',
+    allowInitialFocus:true,sequence:['Enter','/reloadui','Enter']}),{code:'CHAT_STATE_UNVERIFIED'});
+  assert.equal(fx.state.focus,1);
+  assert.equal(fx.state.keys,0);
 });
 

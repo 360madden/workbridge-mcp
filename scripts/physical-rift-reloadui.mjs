@@ -249,8 +249,8 @@ export async function readVerifiedChatEvidence(request, {
       !Number.isFinite(receipt.height) || receipt.height < 500 ||
       !/^[a-f0-9]{64}$/i.test(receipt.sha256 ?? '') ||
       hash(bytes) !== receipt.sha256.toLowerCase() ||
-      !Number.isFinite(age) || age < -1000 || age > 15000) {
-    refuse('CHAT_STATE_UNVERIFIED', 'Screenshot receipt, pinned image, target identity or 15-second freshness did not match');
+      !Number.isFinite(age) || age < -1000 || age > 30000) {
+    refuse('CHAT_STATE_UNVERIFIED', 'Screenshot receipt, pinned image, target identity or 30-second freshness did not match');
   }
   const processRecord = await getProcess(request.pid);
   assertProcessIdentity(processRecord, request);
@@ -612,7 +612,7 @@ export function createGuardedWinappSender({
       if (evidence.confirmed !== true || evidence.state !== 'chat-closed-empty' ||
           evidence.pid !== input.pid || evidence.hwnd !== input.hwnd ||
           evidence.startedUtc !== input.startedUtc || evidence.sessionId !== input.sessionId ||
-          (phase === 0 && (!Number.isFinite(age) || age < -1000 || age > 45000)) ||
+          (phase === 0 && (!Number.isFinite(age) || age < -1000 || age > 60000)) ||
           !/^[a-f0-9]{64}$/i.test(evidence.imageSha256 ?? '')) {
         refuse('CHAT_STATE_UNVERIFIED', 'Initial chat-closed screenshot proof is missing/stale');
       }
@@ -648,6 +648,11 @@ export function createGuardedWinappSender({
         '--via', 'send-input'];
       if (literal) args.push('--verbatim');
       args.push('--json');
+      // Guard a slow focus/identity check: evidence remains fresh at first key.
+      const ageBeforeFirstKey = now() - Date.parse(evidence.capturedUtc ?? '');
+      if (phase === 0 && (!Number.isFinite(ageBeforeFirstKey) || ageBeforeFirstKey < -1000 || ageBeforeFirstKey > 60000)) {
+        refuse('CHAT_STATE_UNVERIFIED', 'Chat-closed evidence expired before the first physical RIFT key');
+      }
       if (firstKeyStartedAt === null) firstKeyStartedAt = now();
       const reply = parseJson(await runner(args), 'WinApp send-input response');
       if (reply?.via !== 'send-input' || reply?.keys !== keys ||
@@ -681,7 +686,7 @@ async function main() {
     }
     if (request.executeOnce) {
       // The specific Workbridge capture receipt+PNG is verified, hash-pinned,
-      // target-bound and <=15 seconds old BEFORE any GUI admission is acquired.
+      // target-bound and <=30 seconds old BEFORE any GUI admission is acquired.
       // The explicit chat-closed-empty assertion must come from visual review.
       const evidence = await readVerifiedChatEvidence(request);
       const sender = createGuardedWinappSender({ chatClosedEvidence: evidence });
