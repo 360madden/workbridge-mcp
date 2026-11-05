@@ -1,6 +1,7 @@
 // Disposable FlaUI click harness. All default/synthetic modes are no-GUI and no-input.
 // ONLY --dummy-live-once with its exact confirmation may open a self-owned WinForms target
 // and invoke FlaUI.Core.Input.Mouse.LeftClick on that target. Never targets RIFT.
+using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -19,6 +20,29 @@ internal static class Program
 
     [DllImport("user32.dll", ExactSpelling = true)]
     private static extern uint GetWindowThreadProcessId(nint hWnd, out uint processId);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    private static extern nint WindowFromPoint(NativePoint point);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    private static extern nint GetAncestor(nint hWnd, uint flags);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsChild(nint parent, nint child);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(nint hWnd);
+
+    private const uint GaRoot = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct NativePoint(Point point)
+    {
+        public readonly int X = point.X;
+        public readonly int Y = point.Y;
+    }
 
     [STAThread]
     private static int Main(string[] args)
@@ -54,6 +78,37 @@ internal static class Program
         return window.Contains(point) && button.Contains(point);
     }
 
+    // This predicate is deliberately pure so foreign HWND, foreground and session
+    // rejection can be verified without opening a window or injecting desktop input.
+    private static bool OwnButtonWitness(nint hit, nint root, nint expectedForm,
+        nint expectedButton, nint foreground, uint hitPid, int ownPid,
+        int hitSessionId, int ownSessionId, bool isButtonDescendant)
+    {
+        return hit != nint.Zero && expectedForm != nint.Zero && expectedButton != nint.Zero &&
+            root == expectedForm && foreground == expectedForm &&
+            hitPid == (uint)ownPid && hitSessionId == ownSessionId &&
+            (hit == expectedButton || isButtonDescendant);
+    }
+
+    // Read-only native witness. Require the precise point to be our Button or its
+    // descendant, with the same top-level root, foreground, PID and Windows session.
+    private static void AssertOwnButtonAt(DummyTargetForm form, Point point)
+    {
+        var hit = WindowFromPoint(new NativePoint(point));
+        if (hit == nint.Zero || !IsWindow(hit))
+            throw new InvalidOperationException("No native window at dummy button center");
+        var root = GetAncestor(hit, GaRoot);
+        if (GetWindowThreadProcessId(hit, out var hitPid) == 0 ||
+            hitPid > int.MaxValue)
+            throw new InvalidOperationException("Native dummy point owner unavailable");
+        using var ownProcess = Process.GetCurrentProcess();
+        using var hitProcess = Process.GetProcessById((int)hitPid);
+        if (!OwnButtonWitness(hit, root, form.Handle, form.TargetButton.Handle,
+            GetForegroundWindow(), hitPid, ownProcess.Id, hitProcess.SessionId,
+            ownProcess.SessionId, IsChild(form.TargetButton.Handle, hit)))
+            throw new InvalidOperationException("Native point is not the owned, foreground dummy button");
+    }
+
     private static int RunPureTests()
     {
         var checks = new[]
@@ -69,6 +124,20 @@ internal static class Program
             !TryPlanOwnButton(new Rectangle(0, 0, 100, 50),
                 new Rectangle(10, 10, 40, 20), out _),
             Volatile.Read(ref _liveCalls) == 0,
+            OwnButtonWitness((nint)21, (nint)10, (nint)10, (nint)21,
+                (nint)10, 42, 42, 1, 1, false),
+            OwnButtonWitness((nint)22, (nint)10, (nint)10, (nint)21,
+                (nint)10, 42, 42, 1, 1, true),
+            !OwnButtonWitness((nint)22, (nint)11, (nint)10, (nint)21,
+                (nint)10, 42, 42, 1, 1, true),
+            !OwnButtonWitness((nint)22, (nint)10, (nint)10, (nint)21,
+                (nint)99, 42, 42, 1, 1, true),
+            !OwnButtonWitness((nint)22, (nint)10, (nint)10, (nint)21,
+                (nint)10, 99, 42, 1, 1, true),
+            !OwnButtonWitness((nint)22, (nint)10, (nint)10, (nint)21,
+                (nint)10, 42, 42, 2, 1, true),
+            !OwnButtonWitness((nint)22, (nint)10, (nint)10, (nint)21,
+                (nint)10, 42, 42, 1, 1, false),
         };
         var passed = checks.Count(v => v);
         Print(new { ok = passed == checks.Length, mode = "pure-self-test",
@@ -105,11 +174,19 @@ internal static class Program
                 var windowBounds = form.Bounds;
                 if (!TryPlanOwnButton(windowBounds, buttonBounds, out var virtualScreenPoint))
                     throw new InvalidOperationException("Dummy button geometry outside its window");
+                AssertOwnButtonAt(form, virtualScreenPoint);
                 if (Interlocked.CompareExchange(ref _liveCalls, 1, 0) != 0)
                     throw new InvalidOperationException("One click already attempted");
-                // The only input call in this entire program; its point is derived from
-                // the one self-created button, never supplied by external CLI arguments.
-                Mouse.LeftClick(virtualScreenPoint);
+                // Use FlaUI's proven negative-monitor positioning, then check the
+                // actual cursor and native hit-test AFTER movement and IMMEDIATELY
+                // before clicking. There is no await, focus call or screenshot between.
+                Mouse.Position = virtualScreenPoint;
+                if (Mouse.Position != virtualScreenPoint)
+                    throw new InvalidOperationException("FlaUI cursor position mismatch");
+                AssertOwnButtonAt(form, virtualScreenPoint);
+                // Exact one vendor click of the currently verified, self-owned button.
+                // No arbitrary externally supplied PID/HWND or coordinate is accepted.
+                Mouse.LeftClick();
                 await Task.Delay(180).ConfigureAwait(true);
                 if (form.ClickCount != 1)
                     throw new InvalidOperationException("Native dummy button did not record exactly one click");
