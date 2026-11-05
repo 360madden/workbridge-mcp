@@ -21,9 +21,9 @@ function jobRow(job) {
       project: project.text,
       status: status.text,
       kind: kind.text,
-      nextAction: nextAction.text
+      nextAction: nextAction.text,
     },
-    shortened: [id, project, status, kind, nextAction].some(x => x.shortened)
+    shortened: [id, project, status, kind, nextAction].some((x) => x.shortened),
   };
 }
 
@@ -31,7 +31,7 @@ export function formatStatus(result, endpoint) {
   const capacity = result?.jobs?.capacity ?? {};
   const incoming = Array.isArray(capacity.jobs) ? capacity.jobs : [];
   const entries = incoming.slice(0, MAX_JOBS).map(jobRow);
-  const truncated = incoming.length > MAX_JOBS || entries.some(entry => entry.shortened);
+  const truncated = incoming.length > MAX_JOBS || entries.some((entry) => entry.shortened);
   return {
     ok: true,
     version: limitString(result?.version ?? endpoint?.version, 100).text,
@@ -41,13 +41,13 @@ export function formatStatus(result, endpoint) {
       limit: capacity.limit ?? null,
       occupied: capacity.occupied ?? null,
       available: capacity.available ?? null,
-      retainedResults: capacity.retainedResults ?? null
+      retainedResults: capacity.retainedResults ?? null,
     },
     runningJobs: result?.jobs?.runningJobs ?? null,
     // Never report a complete inventory if we shortened or dropped records.
     inventoryComplete: result?.jobs?.inventory?.complete === true && !truncated,
-    jobs: entries.map(entry => entry.row),
-    sampledUtc: new Date().toISOString()
+    jobs: entries.map((entry) => entry.row),
+    sampledUtc: new Date().toISOString(),
   };
 }
 
@@ -61,7 +61,7 @@ export function serializeStatus(data) {
     const compact = {
       ...data,
       inventoryComplete: false,
-      jobs: Array.isArray(data.jobs) ? [...data.jobs] : []
+      jobs: Array.isArray(data.jobs) ? [...data.jobs] : [],
     };
     do {
       json = JSON.stringify(compact);
@@ -72,9 +72,11 @@ export function serializeStatus(data) {
   }
 
   // No unchecked diagnostic data can make the monitor's transport unbounded.
-  return JSON.stringify({
-    ok: false,
-    error: 'Diagnostic sample exceeds desktop transport limit',
-    sampledUtc: new Date().toISOString()
-  }) + '\n';
+  return (
+    JSON.stringify({
+      ok: false,
+      error: 'Diagnostic sample exceeds desktop transport limit',
+      sampledUtc: new Date().toISOString(),
+    }) + '\n'
+  );
 }

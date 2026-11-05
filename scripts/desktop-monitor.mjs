@@ -37,7 +37,7 @@ if (process.env.WORKBRIDGE_DESKTOP_PARENT_PIPE === '1') {
   process.stdin.once('error', requestShutdown);
 }
 
-const emit = data => process.stdout.write(serializeStatus(data));
+const emit = (data) => process.stdout.write(serializeStatus(data));
 
 async function closeClient() {
   const current = client;
@@ -64,11 +64,12 @@ try {
       while (!lifecycle.signal.aborted) {
         const response = await client.callTool(
           { name: 'diagnostics', arguments: {} },
-          { signal: lifecycle.signal, timeout: 8000 }
+          { signal: lifecycle.signal, timeout: 8000 },
         );
         if (response.isError) throw new Error('Diagnostics unavailable');
-        const result = response.structuredContent ??
-          JSON.parse(response.content?.find(item => item.type === 'text')?.text ?? '{}');
+        const result =
+          response.structuredContent ??
+          JSON.parse(response.content?.find((item) => item.type === 'text')?.text ?? '{}');
         emit(formatStatus(result, endpoint));
         await waitInterval();
       }
