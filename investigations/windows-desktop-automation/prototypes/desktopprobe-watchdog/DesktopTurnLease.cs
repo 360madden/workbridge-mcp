@@ -23,6 +23,7 @@ internal sealed class DesktopTurnLease : IDisposable
     private readonly string _path;
     private readonly byte[] _stampBytes;
     private readonly DesktopAdmissionLease _admission;
+    private readonly string _runId;
     private bool _disposed;
 
     public string LeaseId { get; }
@@ -47,12 +48,13 @@ internal sealed class DesktopTurnLease : IDisposable
     private static extern bool SetFileInformationByHandle(
         SafeFileHandle handle, int fileInformationClass, ref FileDispositionInfo info, uint bufferSize);
 
-    private DesktopTurnLease(string path, FileStream stream, string leaseId, byte[] stampBytes,
+    private DesktopTurnLease(string path, FileStream stream, string runId, string leaseId, byte[] stampBytes,
         DesktopAdmissionLease admission)
     {
         _path = path;
         _stream = stream;
         _admission = admission;
+        _runId = runId;
         LeaseId = leaseId;
         _stampBytes = stampBytes;
         StampSha256 = Convert.ToHexString(SHA256.HashData(stampBytes)).ToLowerInvariant();
@@ -112,7 +114,7 @@ internal sealed class DesktopTurnLease : IDisposable
         {
             stream.Write(bytes);
             stream.Flush(true);
-            return new DesktopTurnLease(path, stream, leaseId, bytes, admission);
+            return new DesktopTurnLease(path, stream, runId, leaseId, bytes, admission);
         }
         catch
         {
@@ -229,7 +231,9 @@ internal sealed class DesktopTurnLease : IDisposable
             kind = "workbridge.gui-turn-quarantine",
             producer = "desktopprobe-watchdog",
             leaseId = LeaseId,
+            requestId = _runId,
             ownerStampSha256 = StampSha256,
+            intentSha256 = (string?)null,
             reasonCode,
             processTreeSettlement = "unknown",
             automaticRetryAllowed = false,

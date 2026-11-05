@@ -1,6 +1,6 @@
 # DesktopProbe independent watchdog — isolated prototype
 
-Status: **synthetic-only PASS** on 2026-11-04. **HOLD** for any GUI/VM/RIFT input or launch. An existing quarantined Workbridge physical-RIFT desktop GUI-turn lock remains in place and was never touched.
+Status: **synthetic-only PASS** on 2026-11-04, including fresh **Nov 5 dual-admission and recovery-parser compatibility**. **HOLD** for a real watchdog-driven disposable GUI pilot pending crash-orphan recovery and interactive-session gates. The historic physical-RIFT lock was separately archived on Nov 5 by an authorized Workbridge recovery lane; this prototype did not touch it.
 
 ## Purpose and ownership
 
@@ -44,7 +44,7 @@ Workbridge build jobs `wda_watchdog_build_20261104_005`, `_006`, `_007` and `_00
 
 Synthetic tests do **not** prove TaskScheduler ownership, real WinForms UI startup/shown, COM/UIA hung-provider containment, or GUI focus safety. They prove native private-Job containment/timeout and atomic lock collision/settlement on this exact compiled WinExe test process only. No production service or active game was touched.
 
-### November 5 atomic maintenance-admission integration (source-only)
+### November 5 atomic maintenance-admission integration (synthetic verified)
 
 - Before a GUI turn, `DesktopTurnLease.Acquire` now creates `desktop-turn-admission.lock` with Win32 `CREATE_NEW`, using the durable `workbridge.gui-admission` schema from `scripts/desktop-turn-admission.mjs`. The independent orphan-sidecar veto is checked again under admission.
 - Verified settlement removes the exact owned GUI guard first and admission second. On uncertain settlement, admission is released only after exact original GUI guard bytes and its matching quarantine sidecar are verified retained; otherwise it stays blocking. Abnormal `Dispose` retains both.
@@ -53,11 +53,13 @@ Synthetic tests do **not** prove TaskScheduler ownership, real WinForms UI start
 - `wd_admission_csharp_synthetic_ok_20261105_a01`: `--synthetic admgateok20261105a` PASS (exit 0); exact Job 1→2→1, child settled, both mock lock files absent.
 - `wd_admission_csharp_synthetic_uncertain_20261105_a01`: `--synthetic-uncertain admgateunc20261105a` PASS (exit 0); original mock GUI guard + linked quarantine retained, admission released after exact guard verification.
 - `wd_admission_csharp_synthetic_busy_20261105_a01`: preexisting foreign mock admission yielded expected exit 3 `UI_TURN_BUSY` in 89 ms; no child marker or GUI-turn file was created.
+- `wd_sidecar_compat_publish_20261105_e01`: refreshed .NET 10 publish after adding matching sidecar `requestId=runId` and explicit `intentSha256=null`; **exit 0**.
+- `wd_sidecar_archive_readonly_contract_20261105_e01`: **1/1 PASS, exit 0, 5.51s**. Synthetic uncertain Job 1→2→1, private mock guard+sidecar cloned into unique OS temp fixture, then the pinned actual `Archive-DesktopQuarantine.ps1` accepted them in **read-only mode without `-Execute`**, returning `readyForManualReview:true` and no archive or byte changes. This proves exact parser compatibility, **not manual recovery execution**. See `WatchdogQuarantineContract.test.mjs` and `../../reports/2026-11-05-desktop-turn-admission-independent-audit.md`.
 
 ## Pending gates
 
-1. Independent source review of new lease P/Invoke, manifest and identity checks.
-2. Resolve old RIFT lock quarantine through owner-approved recovery; never delete on age alone.
+1. Independent final review of native lease P/Invoke, real manifest and identity checks.
+2. **BLOCKER:** Develop and synthetically verify operator-reviewed exact-identity recovery for watchdog crash leaving admission + GUI guard with no sidecar, and admission-only orphan; historical physical-RIFT quarantine is separately archived and not a current preflight substitute.
 3. Operator approval for first GUI pilot, published disposable DesktopProbe hashes, TaskScheduler interactive token, watchdog process-tree ownership, separate sampler lock validation, and target foreground/freshness preflight.
 4. If >5-second sampling is needed, add a safe atomic fresh-manifest publisher or a new independently revalidated fresh-snapshot contract; do not treat an aged manifest as current.
 
