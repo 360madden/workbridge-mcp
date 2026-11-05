@@ -104,14 +104,38 @@ try {
         if (!$report -or $report.schemaVersion -ne 1 -or $report.index -ne 0 -or $report.tool -cne 'diagnostics' -or $report.ok -cne $true) {
             throw 'Live command diagnostics returned an unexpected result; refusing to stop Workbridge.'
         }
+        $census = $null
         if ($report.result.jobs.inventory.complete -cne $true) {
-            throw 'Live command inventory is incomplete; refusing to stop Workbridge.'
+            $census = Get-WBHistoricalJobCensus (Get-WBChild $install '.local')
         }
-        $capacity = $report.result.jobs.capacity
-        if (!$capacity -or $capacity.schemaVersion -ne 1) { throw 'Live command capacity is unavailable; refusing to stop Workbridge.' }
-        if ($capacity.occupied -ne 0 -or $capacity.inProgress -ne 0 -or $capacity.retainedResults -ne 0 -or $capacity.closing -cne $false -or @($capacity.jobs).Count -ne 0) {
-            throw "Workbridge is not idle (occupied=$($capacity.occupied), inProgress=$($capacity.inProgress), retained=$($capacity.retainedResults), closing=$($capacity.closing)); refusing to stop the service."
+        $assessment = Assert-WBIdleDiagnostics $report.result.jobs $census
+        if ($assessment.historicalInventoryLimitReached) {
+            # The old owner may not honor updater.lock. Recheck its live map
+            # and ensure the full historical census stayed unchanged.
+            $recheckOutput = Get-WBChild $operation 'job-idle-recheck.jsonl'
+            $recheckErrors = Get-WBChild $operation 'job-idle-recheck-stderr.log'
+            $oldPreference = $ErrorActionPreference
+            try {
+                $ErrorActionPreference = 'Continue'
+                & $node $cli --service-state (Get-WBChild $install '.local') --input $query --timeout 15 --json 1> $recheckOutput 2> $recheckErrors
+                $recheckCode = $LASTEXITCODE
+            } finally { $ErrorActionPreference = $oldPreference }
+            if ($recheckCode -ne 0) { throw 'Live command diagnostics recheck failed; refusing to stop Workbridge.' }
+            $again = Get-Content -LiteralPath $recheckOutput -Raw | ConvertFrom-Json
+            if (!$report.result.localCli -or $report.result.localCli.instanceId -isnot [string] -or
+                [string]::IsNullOrWhiteSpace($report.result.localCli.instanceId) -or
+                !$again -or $again.schemaVersion -ne 1 -or $again.index -ne 0 -or $again.tool -cne 'diagnostics' -or $again.ok -cne $true -or
+                $again.result.localCli.instanceId -cne $report.result.localCli.instanceId) {
+                throw 'Live command diagnostics owner identity changed; refusing to stop Workbridge.'
+            }
+            $censusAgain = Get-WBHistoricalJobCensus (Get-WBChild $install '.local')
+            if ($censusAgain.entries -ne $census.entries -or $censusAgain.records -ne $census.records -or
+                $censusAgain.resultFiles -ne $census.resultFiles) {
+                throw 'Historical job catalog changed during preflight; refusing to stop Workbridge.'
+            }
+            $assessment = Assert-WBIdleDiagnostics $again.result.jobs $censusAgain
         }
+        Write-WBJson (Get-WBChild $operation 'job-idle-assessment.json') $assessment
         return $true
     }
     $currentVersion = ''

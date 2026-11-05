@@ -85,6 +85,89 @@ function Read-WBJson([string]$Path) {
     }
 }
 
+# Check live owner capacity independently of the bounded historical catalog.
+# A size-only catalog truncation can be accepted only with a verified full census.
+function Assert-WBIdleDiagnostics($Jobs, $Census = $null) {
+    if ($Jobs -isnot [pscustomobject] -or $Jobs.inventory -isnot [pscustomobject] -or $Jobs.capacity -isnot [pscustomobject]) {
+        throw 'Live command diagnostics shape is invalid; refusing to stop Workbridge.'
+    }
+    $inventory = $Jobs.inventory
+    $capacity = $Jobs.capacity
+    foreach ($name in @('complete','limitReached','timeLimitReached')) {
+        if ($inventory.$name -isnot [bool]) { throw 'Historical inventory flags are invalid; refusing to stop Workbridge.' }
+    }
+    if ($inventory.scannedEntries -isnot [int] -and $inventory.scannedEntries -isnot [long]) { throw 'Historical inventory count is invalid.' }
+    if ($Jobs.storedJobs -isnot [int] -and $Jobs.storedJobs -isnot [long]) { throw 'Historical stored-job count is invalid.' }
+    if ($null -ne $inventory.errorCode) { throw 'Historical inventory has an error; refusing to stop Workbridge.' }
+    $limited = !$inventory.complete
+    if ($limited) {
+        if ($Census -is [pscustomobject]) {
+            foreach ($name in @('schemaVersion','entries','records','resultFiles')) {
+                if ($Census.$name -isnot [int] -and $Census.$name -isnot [long]) { throw 'Historical census count is invalid.' }
+            }
+        }
+        if (!$inventory.limitReached -or $inventory.timeLimitReached -or
+            $inventory.scannedEntries -ne 20000 -or
+            $Census -isnot [pscustomobject] -or $Census.schemaVersion -ne 1 -or
+            $Census.complete -cne $true -or $Census.entries -le 20000 -or
+            $Census.records -lt $Jobs.storedJobs -or $Census.records -lt 0 -or
+            $Census.resultFiles -lt 0 -or $Census.entries -ne ($Census.records + $Census.resultFiles)) {
+            throw 'Historical inventory is incomplete without a verified full census; refusing to stop Workbridge.'
+        }
+    } elseif ($inventory.limitReached -or $inventory.timeLimitReached -or $null -ne $Census) {
+        throw 'Historical inventory state is contradictory; refusing to stop Workbridge.'
+    }
+    if ($capacity.schemaVersion -isnot [int] -and $capacity.schemaVersion -isnot [long]) { throw 'Live capacity schema is invalid.' }
+    foreach ($name in @('limit','available','occupied','inProgress','retainedResults')) {
+        if ($capacity.$name -isnot [int] -and $capacity.$name -isnot [long]) { throw 'Live capacity counts are invalid.' }
+    }
+    if ($Jobs.runningJobs -isnot [int] -and $Jobs.runningJobs -isnot [long]) { throw 'Live running-job count is invalid.' }
+    if ($capacity.schemaVersion -ne 1 -or $capacity.limit -ne 36 -or
+        $capacity.available -ne $capacity.limit -or $capacity.occupied -ne 0 -or
+        $capacity.inProgress -ne 0 -or $capacity.retainedResults -ne 0 -or
+        $capacity.closing -cne $false -or $capacity.closing -isnot [bool] -or
+        $capacity.jobs -isnot [array] -or @($capacity.jobs).Count -ne 0 -or
+        $Jobs.runningJobs -ne 0) {
+        throw 'Workbridge live owner capacity is not conclusively idle; refusing to stop Workbridge.'
+    }
+    return [pscustomobject]@{
+        schemaVersion=1
+        verifiedIdle=$true
+        historicalInventoryLimitReached=$limited
+        inventoryScannedEntries=$inventory.scannedEntries
+        historicalCensus=$Census
+        liveOccupied=$capacity.occupied
+        liveRunningJobs=$Jobs.runningJobs
+    }
+}
+
+# Read-only fallback; never moves, prunes, rewrites, or parses job evidence.
+function Get-WBHistoricalJobCensus([string]$StateDirectory) {
+    $directory = Get-WBChild $StateDirectory 'jobs'
+    $root = Get-Item -LiteralPath $directory -Force -ErrorAction Stop
+    if (!$root.PSIsContainer -or ($root.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'Historical jobs directory is not a plain directory.'
+    }
+    $deadline = [DateTime]::UtcNow.AddSeconds(30)
+    $entries = 0
+    $records = 0
+    $results = 0
+    # Lazy enumeration ensures the entry/time ceiling is enforced before materialization.
+    foreach ($entryPath in [IO.Directory]::EnumerateFileSystemEntries($directory)) {
+        $entries++
+        if ($entries -gt 100000 -or [DateTime]::UtcNow -gt $deadline) {
+            throw 'Historical job census exceeded its entry or time limit.'
+        }
+        $item = Get-Item -LiteralPath $entryPath -Force -ErrorAction Stop
+        if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw 'Historical job census encountered a directory or link.'
+        }
+        if ($item.Name -cmatch '^[A-Za-z0-9_-]{1,100}\.json$') { $records++ }
+        elseif ($item.Name -cmatch '^[A-Za-z0-9_-]{1,100}\.result\.json$') { $results++ }
+        else { throw 'Historical job census encountered an unexpected filename.' }
+    }
+    return [pscustomobject]@{schemaVersion=1;complete=$true;entries=$entries;records=$records;resultFiles=$results}
+}
 function Get-WBManifest([string]$Root) {
     $rootPath = Assert-WBPath $Root
     foreach ($item in @(Get-WBFiles $rootPath | Sort-Object FullName)) {

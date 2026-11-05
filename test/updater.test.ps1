@@ -80,6 +80,14 @@ function Set-WBGuiFixtureSeal([string]$ReleasePath) {
     $receipt.manifestSha256 = (Get-FileHash -LiteralPath (Join-Path $ReleasePath 'manifest.json')).Hash
     Write-WBJson $receiptPath $receipt
 }
+function New-WBIdleFixtureJobs {
+    return [pscustomobject]@{
+        storedJobs=10057
+        runningJobs=0
+        inventory=[pscustomobject]@{complete=$false;scannedEntries=20000;limitReached=$true;timeLimitReached=$false;errorCode=$null}
+        capacity=[pscustomobject]@{schemaVersion=1;limit=36;occupied=0;available=36;inProgress=0;retainedResults=0;closing=$false;jobs=@()}
+    }
+}
 try {
     New-WBCase 'success-idempotence-and-manual-rollback' {
         $rootsFile = Join-Path $install '.local\workspace-roots.json'
@@ -406,6 +414,65 @@ Invoke-WBDeployment -InstallRoot $Install -ReleasePath $Release -OperationId upd
         $arguments.Action = 'Recover'
         $result = Invoke-WBDeployment @arguments
         Assert-WB ($result.phase -eq 'rolled_back') 'Same operation must recover after the transient failure clears.'
+    }
+    New-WBCase 'truncated-history-with-full-census-and-idle-capacity-accepted' {
+        $jobs = New-WBIdleFixtureJobs
+        $census = [pscustomobject]@{schemaVersion=1;complete=$true;entries=21978;records=11065;resultFiles=10913}
+        $result = Assert-WBIdleDiagnostics $jobs $census
+        Assert-WB ($result.verifiedIdle -eq $true -and $result.historicalInventoryLimitReached -eq $true) 'Limit-only history should be recorded without hiding idle capacity.'
+        Assert-WB ($result.historicalCensus.entries -eq 21978) 'Full census must be included in the assessment.'
+        Assert-WBThrows { Assert-WBIdleDiagnostics $jobs } '*without a verified full census*'
+        $census.entries--
+        Assert-WBThrows { Assert-WBIdleDiagnostics $jobs $census } '*without a verified full census*'
+    }
+    New-WBCase 'diagnostics-inventory-uncertainty-fails-closed' {
+        $jobs = New-WBIdleFixtureJobs
+        $census = [pscustomobject]@{schemaVersion=1;complete=$true;entries=21978;records=11065;resultFiles=10913}
+        $jobs.inventory.timeLimitReached = $true
+        Assert-WBThrows { Assert-WBIdleDiagnostics $jobs $census } '*without a verified full census*'
+        $jobs.inventory.timeLimitReached = $false
+        $jobs.inventory.errorCode = 'UNREADABLE_JOB_CATALOG'
+        Assert-WBThrows { Assert-WBIdleDiagnostics $jobs $census } '*inventory has an error*'
+        $jobs.inventory.errorCode = $null
+        $jobs.inventory.limitReached = $false
+        Assert-WBThrows { Assert-WBIdleDiagnostics $jobs $census } '*without a verified full census*'
+    }
+    New-WBCase 'diagnostics-busy-or-malformed-capacity-fails-closed' {
+        $jobs = New-WBIdleFixtureJobs
+        $census = [pscustomobject]@{schemaVersion=1;complete=$true;entries=21978;records=11065;resultFiles=10913}
+        $jobs.capacity.occupied = 1
+        Assert-WBThrows { Assert-WBIdleDiagnostics $jobs $census } '*not conclusively idle*'
+        $jobs.capacity.occupied = 0
+        $jobs.capacity.retainedResults = 1
+        Assert-WBThrows { Assert-WBIdleDiagnostics $jobs $census } '*not conclusively idle*'
+        $jobs.capacity.retainedResults = 0
+        $jobs.runningJobs = 1
+        Assert-WBThrows { Assert-WBIdleDiagnostics $jobs $census } '*not conclusively idle*'
+        $jobs.runningJobs = 0
+        $jobs.capacity.occupied = '0'
+        Assert-WBThrows { Assert-WBIdleDiagnostics $jobs $census } '*capacity counts are invalid*'
+        $jobs.capacity.occupied = 0
+        $jobs.capacity.closing = $true
+        Assert-WBThrows { Assert-WBIdleDiagnostics $jobs $census } '*not conclusively idle*'
+    }
+    New-WBCase 'complete-history-validates-owner-capacity-without-census' {
+        $jobs = New-WBIdleFixtureJobs
+        $jobs.inventory.complete = $true
+        $jobs.inventory.limitReached = $false
+        $result = Assert-WBIdleDiagnostics $jobs
+        Assert-WB ($result.verifiedIdle -eq $true -and $result.historicalInventoryLimitReached -eq $false) 'Complete history still needs the authoritative idle capacity.'
+    }
+    New-WBCase 'historical-job-census-is-read-only-and-strict' {
+        $directory = Join-Path $install '.local\jobs'
+        New-Item -ItemType Directory -Path $directory | Out-Null
+        Set-Content -LiteralPath (Join-Path $directory 'example.json') -Value '{}'
+        Set-Content -LiteralPath (Join-Path $directory 'example.result.json') -Value '{}'
+        $before = (Get-FileHash -LiteralPath (Join-Path $directory 'example.json')).Hash
+        $census = Get-WBHistoricalJobCensus (Join-Path $install '.local')
+        Assert-WB ($census.complete -eq $true -and $census.entries -eq 2 -and $census.records -eq 1 -and $census.resultFiles -eq 1) 'Census should count both record types.'
+        Assert-WB ((Get-FileHash -LiteralPath (Join-Path $directory 'example.json')).Hash -ceq $before) 'Census must not change a job record.'
+        Set-Content -LiteralPath (Join-Path $directory 'unrecognized.tmp') -Value 'leave alone'
+        Assert-WBThrows { Get-WBHistoricalJobCensus (Join-Path $install '.local') } '*unexpected filename*'
     }
     foreach ($script in Get-ChildItem -LiteralPath (Join-Path $repo 'scripts') -Filter '*.ps1') {
         $errors = $null
