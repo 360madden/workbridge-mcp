@@ -115,9 +115,21 @@ Latest coordinator evidence: `reports/2026-11-05-investigation-sitrep-05.md`.
 ## Sixth-wave source/offline checkpoint (2026-11-05 Eastern / 2026-11-06 UTC)
 
 - [x] Sbroenne V5 strict exact-HWND, approved fixture hash, watchdog start/session/SID/image, fixed seven-key env, pre-dispatch synced journal, private child Job supervisor: **default UIA-disabled C# compile OS0, Node syntax 2/2 OS0, pure Node tests 6/6 OS0**. Source+evidence commit `c1baeb9`; independent peer receipt `f0ddd32`. V5 EXE was NOT run and no real UIA has been invoked. Enabled screenshot/input/desktop access remains HOLD.
-- [x] Provider-neutral before/dispatch-once/wait/independently-verify outcome and latency design peer reviewed and committed `d7c97df`. Five terminal/pending/unknown outcomes, nine non-additive phases; **18 pure synthetic reducer tests proposed**, not yet executed.
+- [x] Provider-neutral before/dispatch-once/wait/independently-verify outcome and latency design peer reviewed and committed `d7c97df`. Five terminal/pending/unknown outcomes, nine non-additive phases; **18 pure synthetic reducer tests proposed at this sixth-wave cutoff** (the later D1 implementation executed 22/22 in the seventh wave).
 - [x] Host VMware vs OneDrive guest Windows session/latency delta documented `386ee5c`. Guest UIA is not host UIA and historical vmrun command availability does not establish interactive OneDrive desktop. One-lab read-only metadata-only trial remains gated.
 - [x] Admission-only orphan no-guard handoff threat documented `1060ece`; no live recovery authority, process/stamp+census incomplete. Retain unknown and HOLD all live release.
-- [ ] Build and peer-review minimal pure outcome reducer and WinApp/Sbroenne structural parity normalizer offline (no UIA).
-- [ ] Source review passive owned-modal native oracle before controlled test on disposable window.
+- [x] Build and peer-review pure outcome reducer (**22/22** synthetic, commit `159dd1f`) and WinApp/Sbroenne structural parity normalizer (**18/18** synthetic, commit `9a1c2a5`). Both OS exit0 with independently audited receipts; **no real GUI/UIA/parity or latency result**. Actual producer-bound typed-ID witness attestation remains HOLD.
+- [x] Source review passive owned-modal native oracle: .NET 10 WinExe compiled, pure modal state model **8/8** offline tests (commit `1c6a961`); actual native oracle/WinForms GUI **not launched**, real owner/HWND timing unverified.
 - [ ] **Quiet user-coordinated Windows foreground interval required** for the first actual WinApp/Sbroenne comparable read-only DesktopProbe snapshots, with fresh owner watchdog/lease and postcondition receipts. No production backend change before measured M5/M6 decision and WB-001.
+
+## Seventh-wave pure evaluation checkpoint (Thursday evening, 2026-11-05 Eastern / 2026-11-06 UTC)
+
+- [x] Verify and commit **D1 22/22** fail-closed provider-neutral action-outcome reducer (OS0, saved untruncated 1,951-byte stdout, stderr0, 349ms terminal job). FLAUI/WinApp independently inspected receipt, VMware independently reviewed source. `prototypes/outcome-reconciler/`, commit `159dd1f`.
+- [x] Verify and commit **M3-P12 18/18** strict privacy-preserving typed-control comparison model (OS0, saved untruncated 1,757-byte stdout, stderr0; `--check` 2/2). `prototypes/desktopprobe-snapshot-parity.mjs`, benchmark/report, commit `9a1c2a5`. Actual WinApp/Sbroenne producers do **not** yet generate authenticated provider-time typed-ID witness receipts; runtime parity must remain UNKNOWN.
+- [x] Confirm native modal **8/8** pure model; no WinExe/modal/GUI launch, commit `1c6a961`.
+- [x] Read-only triage of separate `prototypes/wgc-no-focus-pilot/`: offline BGRA-to-PNG self-test source and optional visible 420-by-260 WinForms WGC capture branch; no autorun, generic RIFT target or observed launch by this investigation. A concurrent workflow committed its evolving source as `03af169`; latest reviewed source fixes output to its own `pilot.png`. It still lacks this investigation's verified desktop lease/watchdog/user quiet-window admission. **No WGC/window launch by this investigation; do not touch the other workflow's tracked or dirty files**.
+- [ ] Coordinate WGC's separate concurrent owner and confirm exact native desktop lease/watchdog, visible-window and fixed output safety before any separately approved GUI experiment; no authorization in this investigation.
+- [ ] Complete evidence-rated function-by-function M5 keep/wrap/replace/defer report and identify smallest user-coordinated disposable GUI proof.
+- [ ] Ask Joey to coordinate a quiet desktop interval before a newly approved read-only GUI/UIA pilot; preserve host RIFT, VMware, Workbridge's deployed desktop integration, and live locks.
+
+Checkpoint summary: `reports/2026-11-05-investigation-sitrep-06.md`. No production backend switch, GUI/VM/game input or service restart in this seventh-wave checkpoint.
