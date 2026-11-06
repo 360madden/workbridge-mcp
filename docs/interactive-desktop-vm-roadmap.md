@@ -2,6 +2,13 @@
 
 ## M2 scheduled child-owned desktop observations — November 6, 2026 (headless, read-only)
 
+### M2 native Windows lock-state sample (third headless acceptance)
+
+- Added a **read-only** `WTSSessionInfoEx` (class 25) session-lock query to the disposable heartbeat. The parser accepts only a bounded x64 `WTSINFOEXW` level-1 response whose embedded Session ID and connection state match the separately queried `WTSConnectState`; a malformed buffer, mismatch, old Windows release, unknown flag or query error yields `UNKNOWN`. Windows 10+ flag **0** means locked, flag **1** means unlocked; Microsoft documents a Windows 7/Server 2008 R2 reversed-flag defect. Reference: [WTSINFOEXW](https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ns-wtsapi32-wtsinfoexw), [WTSINFOEX_LEVEL1_W](https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ns-wtsapi32-wtsinfoex_level1_w).
+- **PASS:** .NET 10 Release publish, **17/17** pure classifier cases (desktop, connected and lock), new disposable Task Scheduler fixture `sessprobe20261106f` exit **0**, PID **16464**, Session **1**, heartbeat sequence **1→2**. Both instantaneous child samples reported `WinSta0/Default`, `WTSActive`, `sessionLocked=UNLOCKED` with verified lock-query provenance, `safeForInput=false`. Published executable SHA-256: `11075fb6e3f73a6f7df897617fb796976f51570f7073071421f4efb83bf69a43`.
+- **Independent cleanup:** later read-only census confirmed temporary task absent, PID absent, last heartbeat sequence **4**, five established helper tasks present; no focus, UI interaction, RIFT/VM access, service update, restart, or reboot.
+- **Remaining gate:** two lock samples are **not** a continuous lock/desktop transition trace; the test receipt still declares `sessionLockVerified=false`, `intervalVerified=false`, `desktopSamplesAuthorizeInput=false`. An independent event-backed interval witness and the actual disposable GUI pilot have **not** happened; M2 GUI remains **HOLD**.
+
 ### M2 native Windows connection signal (second headless acceptance)
 
 - Extended the same read-only heartbeat with `WTSQuerySessionInformationW(WTSConnectState=8)`, checking an exact four-byte response and freeing the WTS buffer. It reports the raw connect-state code and bounded query status; Microsoft documents `WTSActive=0` as a signed-in user actively connected, while `WTSDisconnected=4` denotes a disconnected session. See [WTSQuerySessionInformationW](https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/nf-wtsapi32-wtsquerysessioninformationw), [WTS_INFO_CLASS](https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ne-wtsapi32-wts_info_class), and [WTS_CONNECTSTATE_CLASS](https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ne-wtsapi32-wts_connectstate_class).

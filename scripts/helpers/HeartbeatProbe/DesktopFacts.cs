@@ -69,6 +69,55 @@ internal static class DesktopFacts
         }
     }
 
+    internal static string ClassifyLockSample(int? flags, int osMajor)
+    {
+        // Avoid the documented Windows 7/Server 2008 R2 reversed-flag defect;
+        // this probe only interprets the lock flags on Windows 10+.
+        if (osMajor < 10)
+            return "UNKNOWN";
+        return flags switch
+        {
+            0 => "LOCKED",
+            1 => "UNLOCKED",
+            _ => "UNKNOWN",
+        };
+    }
+
+    private static (string lockSample, int? flags, int? win32Error, bool validResponse)
+        ReadLockSample(int processSessionId, int? independentlyQueriedConnection)
+    {
+        if (IntPtr.Size != 8 || Environment.OSVersion.Version.Major < 10
+            || independentlyQueriedConnection is null)
+            return ("UNKNOWN", null, null, false);
+        IntPtr buffer = IntPtr.Zero;
+        try
+        {
+            // WTSSessionInfoEx = 25, WTSINFOEXW.Level=1, its union starts at
+            // x64 offset 8 because WTSINFOEX_LEVEL1 includes LARGE_INTEGERs.
+            const int dataOffset = 8;
+            const int requiredBytes = dataOffset + 3 * sizeof(int);
+            bool queried = WTSQuerySessionInformation(
+                IntPtr.Zero, checked((uint)processSessionId), 25, out buffer, out uint returnedBytes);
+            if (!queried)
+                return ("UNKNOWN", null, Marshal.GetLastWin32Error(), false);
+            if (buffer == IntPtr.Zero || returnedBytes < requiredBytes
+                || Marshal.ReadInt32(buffer, 0) != 1)
+                return ("UNKNOWN", null, null, false);
+            int returnedSession = Marshal.ReadInt32(buffer, dataOffset);
+            int returnedState = Marshal.ReadInt32(buffer, dataOffset + sizeof(int));
+            int flags = Marshal.ReadInt32(buffer, dataOffset + 2 * sizeof(int));
+            if (returnedSession != processSessionId || returnedState != independentlyQueriedConnection)
+                return ("UNKNOWN", null, null, false);
+            string classified = ClassifyLockSample(flags, Environment.OSVersion.Version.Major);
+            return (classified, flags, null, classified != "UNKNOWN");
+        }
+        finally
+        {
+            if (buffer != IntPtr.Zero)
+                WTSFreeMemory(buffer);
+        }
+    }
+
     private static string? ReadName(IntPtr handle)
     {
         if (handle == IntPtr.Zero)
@@ -134,6 +183,7 @@ internal static class DesktopFacts
         int? activeConsoleSessionId = consoleId == uint.MaxValue ? null : checked((int)consoleId);
         bool userInteractive = Environment.UserInteractive;
         var connection = ReadConnectionState(processSessionId);
+        var lockInfo = ReadLockSample(processSessionId, connection.rawState);
         return new
         {
             observedAtUtc = DateTimeOffset.UtcNow,
@@ -146,7 +196,10 @@ internal static class DesktopFacts
             sampleStatus = Classify(
                 userInteractive, windowStation, threadDesktop, inputDesktop,
                 processSessionId, activeConsoleSessionId),
-            sessionLocked = "UNKNOWN",
+            sessionLocked = lockInfo.lockSample,
+            wtsLockFlags = lockInfo.flags,
+            wtsLockQueryWin32Error = lockInfo.win32Error,
+            wtsLockResponseVerified = lockInfo.validResponse,
             sessionConnected = ClassifyConnectionState(connection.rawState),
             wtsConnectState = connection.rawState,
             wtsQueryWin32Error = connection.win32Error,
@@ -182,6 +235,15 @@ internal static class DesktopFacts
         foreach (var item in connectionCases)
             if (ClassifyConnectionState(item.raw) != item.expected)
                 return -1;
-        return cases.Length + connectionCases.Length;
+        var lockCases = new (int? flags, int osMajor, string expected)[]
+        {
+            (0, 10, "LOCKED"), (1, 10, "UNLOCKED"),
+            (-1, 10, "UNKNOWN"), (null, 10, "UNKNOWN"),
+            (1, 6, "UNKNOWN"),
+        };
+        foreach (var item in lockCases)
+            if (ClassifyLockSample(item.flags, item.osMajor) != item.expected)
+                return -1;
+        return cases.Length + connectionCases.Length + lockCases.Length;
     }
 }

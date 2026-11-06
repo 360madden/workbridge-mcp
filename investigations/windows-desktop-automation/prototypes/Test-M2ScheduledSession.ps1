@@ -27,6 +27,8 @@ $firstDesktopStatus = $null
 $secondDesktopStatus = $null
 $firstConnectionState = $null
 $secondConnectionState = $null
+$firstLockSample = $null
+$secondLockSample = $null
 $taskRemoved = $false
 $processStopped = $false
 
@@ -82,12 +84,14 @@ try {
         $first.desktop.userInteractive -eq $true -and $first.desktop.windowStation -ceq 'WinSta0' -and
         $first.desktop.threadDesktop -ceq 'Default' -and $first.desktop.inputDesktop -ceq 'Default' -and
         $first.desktop.activeConsoleSessionId -eq $ExpectedSessionId -and
-        $first.desktop.safeForInput -eq $false -and $first.desktop.sessionLocked -ceq 'UNKNOWN' -and
+        $first.desktop.safeForInput -eq $false -and $first.desktop.sessionLocked -ceq 'UNLOCKED' -and
+        $first.desktop.wtsLockFlags -eq 1 -and $first.desktop.wtsLockResponseVerified -eq $true -and
         $first.desktop.sessionConnected -ceq 'ACTIVE' -and $first.desktop.wtsConnectState -eq 0 -and
         $first.desktop.wtsResponseValid -eq $true -and
         $first.desktop.intervalContinuity -ceq 'UNKNOWN') 'FIRST_DESKTOP_SAMPLE_MISMATCH'
     $firstDesktopStatus = [string]$first.desktop.sampleStatus
     $firstConnectionState = [string]$first.desktop.sessionConnected
+    $firstLockSample = [string]$first.desktop.sessionLocked
     $processId = [int]$first.pid
     $proc = [Diagnostics.Process]::GetProcessById($processId)
     Require (-not $proc.HasExited -and $proc.ProcessName -ceq 'HeartbeatProbe' -and
@@ -105,13 +109,15 @@ try {
         $second.desktop.userInteractive -eq $true -and $second.desktop.windowStation -ceq 'WinSta0' -and
         $second.desktop.threadDesktop -ceq 'Default' -and $second.desktop.inputDesktop -ceq 'Default' -and
         $second.desktop.activeConsoleSessionId -eq $ExpectedSessionId -and
-        $second.desktop.safeForInput -eq $false -and $second.desktop.sessionLocked -ceq 'UNKNOWN' -and
+        $second.desktop.safeForInput -eq $false -and $second.desktop.sessionLocked -ceq 'UNLOCKED' -and
+        $second.desktop.wtsLockFlags -eq 1 -and $second.desktop.wtsLockResponseVerified -eq $true -and
         $second.desktop.sessionConnected -ceq 'ACTIVE' -and $second.desktop.wtsConnectState -eq 0 -and
         $second.desktop.wtsResponseValid -eq $true -and
         $second.desktop.intervalContinuity -ceq 'UNKNOWN') 'SECOND_DESKTOP_SAMPLE_MISMATCH'
     Require ([DateTimeOffset]$second.desktop.observedAtUtc -gt [DateTimeOffset]$first.desktop.observedAtUtc) 'DESKTOP_SAMPLE_TIME_NOT_ADVANCING'
     $secondDesktopStatus = [string]$second.desktop.sampleStatus
     $secondConnectionState = [string]$second.desktop.sessionConnected
+    $secondLockSample = [string]$second.desktop.sessionLocked
     $secondSequence = [long]$second.sequence
     $verified = $true
 } catch {
@@ -158,6 +164,8 @@ $reason = if ($failure -and $failure -match '^[A-Z][A-Z_]{2,65}$') { $failure } 
     secondDesktopStatus=$secondDesktopStatus
     firstConnectionState=$firstConnectionState
     secondConnectionState=$secondConnectionState
+    firstLockSample=$firstLockSample
+    secondLockSample=$secondLockSample
     desktopSamplesAuthorizeInput=$false
     sessionLockVerified=$false
     intervalVerified=$false
