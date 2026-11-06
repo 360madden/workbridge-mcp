@@ -1,5 +1,9 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## LuaPadModern physical /lp reopen preflight — November 5, 2026, 21:13 EST
+
+- Source-only guarded helper `scripts/physical-rift-luapad-open.mjs` and synthetic test `test/physical-rift-luapad-open.test.mjs` prepared: strict target/capture/closed-editor gates, shared admission/GUI lock, one-shot journal, no-replay and quarantine; **4/4 synthetic tests + syntax PASS**, physical read-only identity preflight PASS. The fresh 21:09 EST screenshot showed LuaPad already OPEN, so live `/lp` input was deliberately **NOT SENT**. Next: Joey clicks the custom-drawn LuaPad Close control, then a fresh capture and one guarded `/lp` run can prove reopen. See `investigations/windows-desktop-automation/reports/2026-11-05-luapad-reopen-preflight.md`. Existing RIFT `/reloadui` singleton/receipt remain untouched.
+
 ## P3.5 source-only G1/G2/G3 trust-boundary audit — November 5, 2026, 21:04 EST
 
 - **G2 admission reuse:** `scripts/desktop-turn-admission.mjs` already provides atomic `wx` ownership for `desktop-turn-admission.lock`; `src/desktop-registration.ts` supplies a second fsynced `desktop-input-turn.lock` and quarantine veto. `scripts/desktop-capture.mjs` validates parent stamps but the low-level capture function is not intrinsically admission guarded. `scripts/physical-rift-status.mjs` only lists current lock names and **cannot certify an interval lease**. Reuse both canonical locks in a future explicitly authorized WGC adapter; capture-independent controller must revalidate same request/owner/target, file identity/stamps and quarantine before and after a bounded interval. Unknown/abandoned locks are BUSY/UNKNOWN; never clear by elapsed age.
