@@ -1,5 +1,12 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## M2 after-action proof — November 6, 2026 (first source-only subgate)
+
+- `src/desktop-action-postcondition.ts` now requires exact stable before/after target-window rectangles and equivalent monitor geometry (monitor enumeration order is ignored). Two valid individual session observations no longer imply unchanged pixel-to-control mapping across the action interval.
+- New `test/desktop-action-postcondition.test.mjs` adversarial cases cover x/y/width/height drift and monitor topology changes. Focused postcondition/session/image suites: **53 tests, 52 pass, 1 pre-existing skip, 0 fail**. TypeScript `tsc --noEmit` passed.
+- **Not an M2 completion claim:** postcondition verification is still offline and consumes supplied observations; independent screenshot capture pairing, native modal detection, DPI evidence and live disposable-fixture verification remain pending. A PNG hash alone cannot establish visible Lua output.
+
+
 ## Workbridge-first LuaPad acceleration — November 6, 2026 (source-only)
 
 - Joey's Workbridge-first M1–M5 plan was saved and committed as `b129f3f`: `docs/2026-11-06-workbridge-first-luapad-automation-plan.md`. Physical LuaPad Run/Output remains **live unverified**.

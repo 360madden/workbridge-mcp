@@ -181,6 +181,22 @@ function ordered(values: number[], code: string) {
   if (values.some((value, i) => i > 0 && value < values[i - 1]!)) fail(code);
 }
 
+function sameRect(a: { x: number; y: number; width: number; height: number }, b: typeof a) {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
+// Monitor enumeration order is not a display change; geometry/membership is.
+function sameMonitorTopology(
+  a: readonly { x: number; y: number; width: number; height: number }[],
+  b: typeof a,
+) {
+  if (a.length !== b.length) return false;
+  const key = (r: (typeof a)[number]) => [r.x, r.y, r.width, r.height].join(':');
+  const left = a.map(key).sort();
+  const right = b.map(key).sort();
+  return left.every((value, index) => value === right[index]);
+}
+
 /**
  * expectedFence is the captured dispatch fence, not a new lease request. Timing
  * and every observation must share the same trusted wall/monotonic origins.
@@ -295,6 +311,11 @@ export function verifyDesktopProbeActionPostcondition(
     });
     if (!decision.allowed) fail(decision.reason);
   }
+  // Both desktop observations must describe one stable display/target surface.
+  // Passing the individual session policy twice does not establish continuity.
+  if (!sameRect(e.beforeDesktop.window.bounds, e.afterDesktop.window.bounds)) fail('WINDOW_GEOMETRY_CHANGED');
+  if (!sameMonitorTopology(e.beforeDesktop.monitors, e.afterDesktop.monitors))
+    fail('DISPLAY_TOPOLOGY_CHANGED');
   for (const l of [e.beforeLease, e.afterLease]) {
     if (
       !sameFence(expected, l) ||

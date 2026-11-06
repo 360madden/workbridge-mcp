@@ -515,6 +515,27 @@ test('before and after desktop must independently match full identity, session a
   }
 });
 
+test('M2 refuses a changed window rectangle despite individually valid before/after snapshots', () => {
+  for (const field of ['x', 'y', 'width', 'height']) {
+    const f = fixture();
+    f.evidence.afterDesktop.window.bounds[field] += 1;
+    denied(f, 'WINDOW_GEOMETRY_CHANGED');
+  }
+});
+
+test('M2 refuses monitor topology changes but ignores observer enumeration order', () => {
+  for (const field of ['x', 'y', 'width', 'height']) {
+    const f = fixture();
+    f.evidence.afterDesktop.monitors[0][field] += 1;
+    denied(f, 'DISPLAY_TOPOLOGY_CHANGED');
+  }
+  const reordered = fixture();
+  const second = { x: 1920, y: 0, width: 1920, height: 1080 };
+  reordered.evidence.beforeDesktop.monitors.push(second);
+  reordered.evidence.afterDesktop.monitors.unshift({ ...second });
+  assert.equal(run(reordered).postconditionVerified, true);
+});
+
 test('timestamp regressions, future evidence, stale verification and clock jumps fail', () => {
   for (const [section, key, value, code] of [
     ['beforeDesktop', 'observedAtMs', NOW - 1, 'EVENT_ORDER_MISMATCH'],
