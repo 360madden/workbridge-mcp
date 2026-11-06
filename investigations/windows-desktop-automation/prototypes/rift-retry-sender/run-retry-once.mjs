@@ -181,6 +181,65 @@ const EXPECTED_DLL_SHA256='1ac2699148ec089ef69631d4b590f492646ba288f97959fddc3b6
 const SOURCE=fileURLToPath(new URL('./Program.cs',import.meta.url));
 const CSPROJ=fileURLToPath(new URL('./RiftRetrySender.csproj',import.meta.url));
 
+// Fixed Windows PowerShell 5.1 launcher. Hash the actual DLL through a held
+// FileShare.Read handle, retain that handle until the C# --contract-check child exits.
+// This closes the primary DLL read/hash -> .NET load replacement race. No live CLI.
+// Transitive FlaUI.Core/deps/runtimeconfig are not hash-pinned or handle-held here.
+const POWERSHELL='C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+const LOCKED_CONTRACT_PS=String.raw`$ErrorActionPreference='Stop'
+$dll=$env:RRE_RETRY_DLL_PATH
+$dotnet=$env:RRE_RETRY_DOTNET_PATH
+$witness=$env:RRE_RETRY_VALIDATED_PATH
+$expected=$env:RRE_RETRY_DLL_SHA256
+$held=$null
+$hasher=$null
+$child=$null
+try {
+  if([string]::IsNullOrWhiteSpace($dll) -or [string]::IsNullOrWhiteSpace($dotnet) -or
+     [string]::IsNullOrWhiteSpace($witness) -or $dll.Contains('"') -or
+     $witness.Contains('"') -or $dotnet.Contains('"')) { throw 'LOCKED_CONTRACT_PATH_INVALID' }
+  # Windows FileShare.Read denies replacement/rename/write for the entire child lifetime.
+  $held=[System.IO.File]::Open($dll,[System.IO.FileMode]::Open,
+    [System.IO.FileAccess]::Read,[System.IO.FileShare]::Read)
+  $hasher=[System.Security.Cryptography.SHA256]::Create()
+  $digest=([System.BitConverter]::ToString($hasher.ComputeHash($held))).Replace('-','').ToLowerInvariant()
+  if($digest -cne $expected) { throw 'LOCKED_SENDER_DLL_HASH_CHANGED' }
+  $psi=New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName=$dotnet
+  $psi.Arguments='"'+$dll+'" --contract-check "'+$witness+'"'
+  $psi.UseShellExecute=$false
+  $psi.RedirectStandardOutput=$true
+  $psi.RedirectStandardError=$true
+  $psi.CreateNoWindow=$true
+  $child=New-Object System.Diagnostics.Process
+  $child.StartInfo=$psi
+  if(-not $child.Start()){throw 'LOCKED_CONTRACT_START_FAILED'}
+  $outTask=$child.StandardOutput.ReadToEndAsync()
+  $errTask=$child.StandardError.ReadToEndAsync()
+  if(-not $child.WaitForExit(15000)){
+    $child.Kill()
+    if(-not $child.WaitForExit(2000)){throw 'LOCKED_CONTRACT_UNREAPED'}
+    throw 'LOCKED_CONTRACT_TIMEOUT'
+  }
+  $childOut=$outTask.Result
+  $childErr=$errTask.Result
+  if($child.ExitCode -ne 0){throw 'LOCKED_CONTRACT_CHILD_REJECTED'}
+  if($childErr.Length -ne 0 -or $childOut.Length -gt 8192){throw 'LOCKED_CONTRACT_OUTPUT_INVALID'}
+  $receipt=[pscustomobject]@{guard='win32-filestream-shareread-v1';dllSha256=$digest;
+    childExit=$child.ExitCode;childStdout=$childOut}
+  [System.Console]::Out.Write(($receipt|ConvertTo-Json -Compress))
+} catch {
+  [System.Console]::Error.WriteLine('LOCKED_CONTRACT_REJECTED')
+  if($null -ne $child){
+    try{if(-not $child.HasExited){$child.Kill();[void]$child.WaitForExit(2000)}}catch{}
+  }
+  exit 2
+} finally {
+  if($null -ne $child){$child.Dispose()}
+  if($null -ne $hasher){$hasher.Dispose()}
+  if($null -ne $held){$held.Dispose()}
+}`;
+
 export async function sendFixedContractCheck(validatedPath){
   if(!path.isAbsolute(validatedPath)||
      !path.basename(validatedPath).endsWith('.validated.json'))
@@ -195,19 +254,28 @@ export async function sendFixedContractCheck(validatedPath){
     stop('SENDER_DLL_HASH_CHANGED','Pinned offline C# sender binary hash differs');
   let stdout;
   try{
-    ({stdout}=await execFileAsync(DOTNET,[DLL,'--contract-check',validatedPath],
-      {cwd:ROOT,timeout:15000,maxBuffer:16384,windowsHide:true}));
-  }catch(e){
-    stop('CONTRACT_CHECK_REJECTED','C# contract-check rejected evidence or failed without input');
+    ({stdout}=await execFileAsync(POWERSHELL,['-NoProfile','-NonInteractive',
+      '-EncodedCommand',Buffer.from(LOCKED_CONTRACT_PS,'utf16le').toString('base64')],{
+        cwd:ROOT,timeout:21000,maxBuffer:16384,windowsHide:true,
+        env:{...process.env,RRE_RETRY_DLL_PATH:DLL,RRE_RETRY_DOTNET_PATH:DOTNET,
+          RRE_RETRY_VALIDATED_PATH:validatedPath,RRE_RETRY_DLL_SHA256:EXPECTED_DLL_SHA256}
+      }));
+  }catch{
+    stop('CONTRACT_CHECK_REJECTED','Locked C# contract-check rejected evidence without input');
   }
-  let output;
-  try{output=JSON.parse(stdout.trim());}
-  catch{stop('CONTRACT_RECEIPT_INVALID','C# contract JSON unavailable');}
+  let guarded,output;
+  try{
+    guarded=JSON.parse(stdout.trim());
+    if(guarded.guard!=='win32-filestream-shareread-v1'||
+       guarded.dllSha256!==EXPECTED_DLL_SHA256||guarded.childExit!==0||
+       typeof guarded.childStdout!=='string')throw Error();
+    output=JSON.parse(guarded.childStdout.trim());
+  }catch{stop('CONTRACT_RECEIPT_INVALID','Locked C# contract JSON unavailable or unverified');}
   if(output?.status!=='CONTRACT_ONLY_OK_NATIVE_NOT_CHECKED'||
      output?.nativeVerified!==false||output?.liveInputAllowed!==false||
      output?.inputInjected!==false)
     stop('CONTRACT_RECEIPT_INVALID','C# did not explicitly prove no native/input path');
-  return {output,dllSha256:dllSha};
+  return {output,dllSha256:guarded.dllSha256,senderLockGuard:guarded.guard};
 }
 
 // Before creating a C#-readable envelope, recheck the actual Workbridge screenshot
@@ -252,6 +320,7 @@ export async function contractCheckOfflineOnce(envelopePath,opts={}){
           requestId:id,validatedEnvelopeSha256:sealedSha256,
           screenshotSha256:latest.screenshotSha256,
           senderDllSha256:response.dllSha256??null,
+          senderLockGuard:response.senderLockGuard??null,
           nativeVerified:false,liveAuthorized:false,inputAttempted:false,
           point:latest.plan.virtualScreenPoint,
           completedUtc:new Date().toISOString()});

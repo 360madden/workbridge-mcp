@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {execFile as execNative} from 'node:child_process';
+import {promisify} from 'node:util';
+const execNativeAsync=promisify(execNative);
 import {tmpdir} from 'node:os';
 import {mkdtemp,writeFile,readFile,lstat,readdir,rm} from 'node:fs/promises';
 import path from 'node:path';
@@ -218,7 +221,38 @@ test('P2.1 actual Node-to-C# synthetic JSON/PNG contract (NO Win32, NO input)',a
     assert.deepEqual(r.plan.virtualScreenPoint,{x:-406,y:465});
     const receipt=JSON.parse(await readFile(r.receiptPath,'utf8'));
     assert.match(receipt.senderDllSha256,/^[0-9a-f]{64}$/);
+    assert.equal(receipt.senderLockGuard,'win32-filestream-shareread-v1');
   }finally{await rm(a.root,{recursive:true,force:true});}
+});
+
+
+test('Windows held FileShare.Read DLL blocks disposable replacement and rename race', {
+  skip:process.platform!=='win32'
+},async()=>{
+  const root=await mkdtemp(path.join(tmpdir(),'rift-retry-lock-race-'));
+  const dll=path.join(root,'disposable-synthetic.dll');
+  try{
+    await writeFile(dll,Buffer.from('synthetic DLL bytes, never a game binary'));
+    const script=String.raw`$ErrorActionPreference='Stop'
+$f=$env:RRE_TEST_SHARE_FILE
+$renamed=$f+'.renamed'
+$held=[System.IO.File]::Open($f,[System.IO.FileMode]::Open,
+  [System.IO.FileAccess]::Read,[System.IO.FileShare]::Read)
+try {
+  $writeDenied=$false
+  $renameDenied=$false
+  try{[System.IO.File]::WriteAllText($f,'replacement')}catch [System.IO.IOException]{$writeDenied=$true}
+  try{[System.IO.File]::Move($f,$renamed)}catch [System.IO.IOException]{$renameDenied=$true}
+  [pscustomobject]@{writeDenied=$writeDenied;renameDenied=$renameDenied}|ConvertTo-Json -Compress
+} finally {$held.Dispose()}`;
+    const {stdout}=await execNativeAsync(
+      'C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+      ['-NoProfile','-NonInteractive','-EncodedCommand',
+        Buffer.from(script,'utf16le').toString('base64')],
+      {timeout:15000,windowsHide:true,maxBuffer:4096,
+        env:{...process.env,RRE_TEST_SHARE_FILE:dll}});
+    assert.deepEqual(JSON.parse(stdout.trim()),{writeDenied:true,renameDenied:true});
+  }finally{await rm(root,{recursive:true,force:true});}
 });
 
 test('exclusive offline journal records inputAttempted=false once, forbids replay and clears both locks',async()=>{
