@@ -24,4 +24,12 @@
 
 **Source caveats:** This is the first launch of real vendor binary under restricted seven-variable Win32 environment; application startup could fail due missing APPDATA/USERPROFILE, .NET bundle dependencies or local security product. Parent/caller must keep an outer ≤60–90-second deadline, no concurrent GUI pilot or desktop focus. As in M3-P8, `Job0` proves only members of the private job settled; it does not prove vendor made zero side effects, no out-of-job child existed, or that UIA snapshot actually works. In particular, **listing `ui_snapshot` does not invoke it** and cannot validate modal hangs, camera capture, DPI, per-window accuracy, input or latency.
 
+## Independently verified saved M3-P9 receipts
+
+After the source-only GO, the author ran one scoped actual vendor **protocol-only** case. This reviewer independently retrieved Workbridge **existing saved jobs only; no rerun**:
+
+- Hash job `wda_m3p9_vendor_pinned_hash_20261105_a01`: `certutil.exe` OS exit0, nontruncated 258-byte stdout, verified vendor single-file executable SHA-256 `ce18a73e6bdf5d82df8880c36de245936a698ff1a4ba50fbb759163819343128`.
+- Vendor MCP job `wda_m3p9_vendor_restricted_protocol_smoke_20261105_a01`: status `passed`, **actual OS exit0**, complete stdout **253 bytes** and stderr0, Workbridge timeout **90s**, start `2026-11-05T23:58:42.821Z`, end `23:58:44.646Z`. Exact six fixed stages: `HOST:PRIVATE_ENV_ROOTS:2`; `HOST:ASSIGNED_SUSPENDED:69224:ACTIVE:1`; `HOST:READY_MEMBERS:4:RUNNER:69224:SERVER:62892`; `RESULT:success:PROTOCOL_ONLY:none`; `HOST:PRIVATE_ITEMS:0:0:RETAINED_FOR_AUDIT:1`; `HOST:SETTLED:0:RUNNER:69224:SERVER:62892:DURATION_MS:1328`.
+- **Verified limited result:** The pinned real vendor process started with the restricted environment, returned exactly the one-tool protocol catalog, and its private Job reached zero remaining members with no private retained items counted. The reported 1328 ms is **one protocol-only process lifetime**, **not** snapshot/action latency. No desktop/UIA calls were made, and this does **not** authorize them.
+
 **Acceptance for ONE author-controlled bounded protocol-only run:** Exact hashes and source unchanged, actual OS exit0, untruncated fixed `HOST:PRIVATE_ENV_ROOTS:2`, `HOST:ASSIGNED_SUSPENDED`, `HOST:READY_MEMBERS` with server image/Job, `RESULT:success:PROTOCOL_ONLY:none`, `HOST:PRIVATE_ITEMS:n:n:RETAINED_FOR_AUDIT:1`, `HOST:SETTLED:0`. Otherwise **HOLD**, retain evidence, classify first. No vendor/UIA tool invocation or live desktop lease action is authorized by this gate.
