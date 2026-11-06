@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "handoffId": "workbridge-m2-lab1-controller-readonly-2026-11-06",
+  "title": "Lab 1 existing RiftReader2 controller: read-only recovery and M2 WTS preflight",
+  "createdUtc": "2026-11-06T15:20:00Z",
+  "asOf": "2026-11-06; evidence sampled 14:30-14:35 UTC, not a persistent health guarantee",
+  "project": {
+    "name": "workbridge-mcp",
+    "root": "C:\\work\\workbridge-mcp",
+    "relatedRepository": "C:\\work\\RiftReader2",
+    "workbridgeOwnerVersion": "0.16.4-dev",
+    "workbridgeOwnerPid": 58580,
+    "workbridgeOwnerInstance": "be5f373a-8c98-4877-b5dd-dbea9e5728d5"
+  },
+  "userAuthorization": {
+    "approved": "Read-only Lab 1 controller diagnostics after verifying pending input; start only if needed and safe",
+    "selectedFallback": "Use Lab 1 if Lab 2 is unavailable",
+    "notAuthorizedByThisApproval": [
+      "Windows guest lock/disconnect",
+      "RIFT game or UI input",
+      "VM or RIFT restart",
+      "controller replacement or competing launch",
+      "clearing quarantine or queue",
+      "service deployment"
+    ]
+  },
+  "outcome": {
+    "verdict": "EXISTING_LAB1_CONTROLLER_RESPONSIVE; M2_GUEST_WTS_GATE_HOLD",
+    "controllerStartedByThisInvestigation": false,
+    "controllerStoppedOrRestartedByThisInvestigation": false,
+    "workspaceFilesChangedDuringDiagnostics": false,
+    "gameOrVMInteraction": false,
+    "checks": [
+      {
+        "id": "lab1-controller-task",
+        "status": "VERIFIED",
+        "evidence": "Task Scheduler task 'Workbridge Helper rr2-controller-lab1' Running; recent run ceeea4152b034164866d469e7d3f04a2 had process receipt PID 31016, no failure or exit receipt as sampled.",
+        "evidenceId": "m2_lab1_existing_startup_census_20261106_a"
+      },
+      {
+        "id": "lab1-queue",
+        "status": "VERIFIED_SNAPSHOT_ONLY",
+        "evidence": "SQLite read-only URI mode and PRAGMA query_only: resource vm:rift-lab-1 blocked=false, generation=5197, holder absent, cleanup receipt present, zero queued/active/cleanup requests; historic terminal states cancelled=3 expired=48 failed=60 stale=4 succeeded=197. No normal AccessQueue.status() used because it may expire/sweep records.",
+        "evidenceId": "m2_lab1_queue_readonly_20261106_a"
+      },
+      {
+        "id": "lab1-authenticated-controller",
+        "status": "VERIFIED_SNAPSHOT_ONLY",
+        "evidence": "--no-auto-start status returned exit 0 with host.connected=true, coordination.state=ready, supervisor.state=running, initialCleanupVerified=true, consoleReservation.held=true. Guest armed=false, busy=false, desktopInputsDown empty, recoveryRequired=false; RIFT-LAB-1 target process PID 7164 and executable SHA256 1935A05C9DB6D468E34E0055014A4A99C1B5AFCEB1695884E24600F5C20A4BE8.",
+        "evidenceId": "m2_lab1_no_autostart_status_20261106_a"
+      },
+      {
+        "id": "lab1-vmx",
+        "status": "VERIFIED_SNAPSHOT_ONLY",
+        "evidence": "Passive preflight verified VMX identity and VM running; task Running.",
+        "evidenceId": "m2_lab1_passive_guest_preflight_20261106_a"
+      },
+      {
+        "id": "lab1-port-census",
+        "status": "CONFLICTING_OBSERVATIONS",
+        "evidence": "Configured uiPort=49811. Get-NetTCPConnection -LocalPort 49811 -State Listen yielded no matching objects; independent netstat had no LISTEN row. Yet Python socket.connect(127.0.0.1,49811) succeeded and authenticated HTTP status succeeded. Causes unresolved; a port inventory miss is not proof controller absent.",
+        "evidenceIds": [
+          "m2_lab1_config_ports_readonly_20261106_a",
+          "m2_lab1_socket_netstat_readonly_20261106_a",
+          "m2_lab1_gettcp_error_probe_readonly_20261106_a",
+          "m2_lab1_no_autostart_status_20261106_a"
+        ]
+      },
+      {
+        "id": "m2-passive-preflight",
+        "status": "EXPECTED_HOLD",
+        "evidence": "Script -Lab lab1 intentionally returned exit 2: vmxIdentityMatches=true, vmxRunning=true, controllerTaskState=Running, controllerPortListening=false, guestSessionVerified=false, eventDeliveryVerified=false, readyForGuestLockTest=false, status=BLOCKED, blocker=CONTROLLER_NOT_LISTENING.",
+        "evidenceId": "m2_lab1_passive_guest_preflight_20261106_a"
+      },
+      {
+        "id": "real-wts-event",
+        "status": "NOT_TESTED",
+        "evidence": "No genuine guest Windows lock/disconnect was triggered; earlier synthetic WTS-post tests verify a hidden message-handler path only, not OS-origin event delivery."
+      }
+    ]
+  },
+  "sourceEvidence": {
+    "preflight": "C:\\work\\workbridge-mcp\\investigations\\windows-desktop-automation\\prototypes\\Test-M2Lab2GuestPreflight.ps1",
+    "preflightSha256": "80b2d3acfcb3aa5dd83cba6b309d467431dcd7d9b828eed4e8019fc43faa109d",
+    "controllerClient": "C:\\work\\RiftReader2\\scripts\\control_client.py",
+    "clientStatusCommand": [
+      "C:\\Python314\\python.exe",
+      "scripts\\control_client.py",
+      "--config",
+      "artifacts\\control-fleet-live\\lab1\\host.json",
+      "--no-auto-start",
+      "status"
+    ],
+    "m2Roadmap": "C:\\work\\workbridge-mcp\\docs\\interactive-desktop-vm-roadmap.md",
+    "controllerQueue": "C:\\work\\RiftReader2\\artifacts\\native-coordination-live\\queue.sqlite3"
+  },
+  "nextAuthorizedWork": [
+    {
+      "priority": 1,
+      "task": "Investigate false-negative or visibility limits in Get-NetTCPConnection using bounded, read-only comparison with loopback connect and authenticated status; test against negative port cases.",
+      "guard": "Do not remove VM identity, task-owner, guest-session, or event-delivery proof gates."
+    },
+    {
+      "priority": 2,
+      "task": "Add narrow PowerShell 5.1-compatible diagnostic/fallback fields for port-reachability if the source distinction is established; run AST and focused regressions.",
+      "guard": "Keep status HOLD/exit 2, guestSessionVerified=false, eventDeliveryVerified=false, readyForGuestLockTest=false unless independently proven."
+    },
+    {
+      "priority": 3,
+      "task": "Reacquire current Lab 1 exact task/PID, guest RIFT PID/start/SHA and queue state; use existing controller, never start duplicate.",
+      "guard": "No input and do not call mutating queue.status() for read-only diagnostics."
+    },
+    {
+      "priority": 4,
+      "task": "Independently prove guest Windows interactive-session identity using an authorized read-only observer and actual event witness presence.",
+      "guard": "Do not infer from VM-running or controller host status alone."
+    }
+  ],
+  "separateApprovalRequired": [
+    {
+      "task": "Controlled genuine guest Windows WTS lock/disconnect test",
+      "condition": "Confirm lab-specific maintenance handoff, active guest/session ownership, pending-input cleanup, no competing controller, and no RIFT disruption before seeking approval."
+    }
+  ],
+  "noGo": [
+    "Do not repeat/start controller while task Running",
+    "Do not clear a blocked coordination resource or pending input silently",
+    "Do not treat synthetic WTS event as real OS transition",
+    "Do not infer absence of listener from Get-NetTCPConnection alone",
+    "Do not restart Workbridge owner, VM, or game for this handoff"
+  ],
+  "repoPreservation": {
+    "unrelatedModifiedFile": "scripts/freebuff-conpty-probe.py",
+    "instruction": "Keep unrelated changes unmodified and unstaged; commit only new handoff file if committing."
+  },
+  "provenanceNote": "Evidence is timestamped, point-in-time, and from tool outputs; no token/credential values or raw private logs included."
+}
