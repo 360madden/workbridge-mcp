@@ -1,5 +1,11 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## M2 existing scheduled-helper principal audit — November 6, 2026 (read-only)
+
+- `scripts/Manage-HelperTask.ps1` already specifies `New-ScheduledTaskPrincipal -LogonType Interactive -RunLevel Limited`, and its ownership check independently requires `Principal.LogonType=3` and `RunLevel=0`. Microsoft's Task Scheduler contract defines 3 as `TASK_LOGON_INTERACTIVE_TOKEN`, which runs only while the principal user is logged on.
+- **Live registry census at 11:31 UTC:** five root `Workbridge Helper *` scheduled tasks exist: `pc-health` (Running), `rr2-controller-lab1`, `rr2-controller-lab2`, `rr2-receiver-lab1`, `rr2-receiver-lab2` (four Ready). Each reports `LogonType=3`, `RunLevel=0` and one trigger. These are existing user tasks, not M2 test tasks; registration, triggers, task states and principals were only read.
+- **Scope:** this confirms the known helper task registrations use an interactive-token principal; `Ready` is not proof of receiver health or a running process. No disposable `DesktopProbe` task was registered or started, and no token/session association for a *new* M2 child has been observed. The M2 live launch gate remains HOLD.
+
 ## M2 input-desktop identity — November 6, 2026 (read-only host observation)
 
 - Added `investigations/windows-desktop-automation/prototypes/Observe-InputDesktopReadOnly.ps1`, a bounded, no-input PowerShell/Win32 observer. It reuses the existing native station/thread name approach but independently samples `OpenInputDesktop` with `DESKTOP_READOBJECTS` only, closes its opened handle, and samples the active console session. There is no focus, screenshot, hook, scheduled task, window launch, desktop switch or service update.
