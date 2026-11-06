@@ -2,6 +2,10 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { loadDesktopImage } from './desktop-image.js';
 import {
+  DesktopActionSurfaceProofError,
+  verifyDesktopProbeAfterCaptureSurface,
+} from './desktop-action-surface-proof.js';
+import {
   desktopActionPostconditionEvidenceSchema,
   verifyDesktopProbeActionPostcondition,
 } from './desktop-action-postcondition.js';
@@ -46,15 +50,17 @@ const FRAME_DELTA_PX = 96;
 
 export class DesktopActionCaptureProofError extends Error {
   readonly code: string;
+  readonly status: 'REJECTED' | 'UNKNOWN';
   readonly retryAllowed = false;
-  constructor(code: string) {
+  constructor(code: string, status: 'REJECTED' | 'UNKNOWN' = 'UNKNOWN') {
     super('M2 after-action capture evidence could not be verified; no retry is authorized.');
     this.name = 'DesktopActionCaptureProofError';
     this.code = code;
+    this.status = status;
   }
 }
-function fail(code: string): never {
-  throw new DesktopActionCaptureProofError(code);
+function fail(code: string, status: 'REJECTED' | 'UNKNOWN' = 'UNKNOWN'): never {
+  throw new DesktopActionCaptureProofError(code, status);
 }
 
 /** Deterministically bind a separate one-shot capture ID to the action ID. */
@@ -74,6 +80,7 @@ export async function verifyDesktopProbeActionCaptureProof(
   actionEvidence: unknown,
   timing: unknown,
   captureReceipt: unknown,
+  surfaceEvidence: unknown,
   imageLoader: ImageLoader = loadDesktopImage,
 ) {
   // Native postcondition must succeed BEFORE touching a screenshot or trusting
@@ -87,7 +94,7 @@ export async function verifyDesktopProbeActionCaptureProof(
   const evidence = desktopActionPostconditionEvidenceSchema.safeParse(actionEvidence);
   const clock = clockSchema.safeParse(timing);
   const capture = captureSchema.safeParse(captureReceipt);
-  if (!evidence.success || !clock.success || !capture.success) fail('INVALID_CAPTURE_EVIDENCE');
+  if (!evidence.success || !clock.success || !capture.success) fail('INVALID_CAPTURE_EVIDENCE', 'REJECTED');
   const c = capture.data;
   const target = post.target;
   if (
@@ -98,7 +105,7 @@ export async function verifyDesktopProbeActionCaptureProof(
     c.title !== target.title ||
     c.expectedClass !== target.className
   )
-    fail('CAPTURE_TARGET_MISMATCH');
+    fail('CAPTURE_TARGET_MISMATCH', 'REJECTED');
 
   const capturedMs = Date.parse(c.capturedUtc);
   if (
@@ -118,7 +125,23 @@ export async function verifyDesktopProbeActionCaptureProof(
     Math.abs(c.width - bounds.width) > FRAME_DELTA_PX ||
     Math.abs(c.height - bounds.height) > FRAME_DELTA_PX
   )
-    fail('CAPTURE_GEOMETRY_MISMATCH');
+    fail('CAPTURE_GEOMETRY_MISMATCH', 'REJECTED');
+
+  // A screenshot may change the foreground. Recheck host/session/geometry and
+  // independent UIA/Win32 surface signals AFTER capture, before reading bytes.
+  let surface;
+  try {
+    surface = verifyDesktopProbeAfterCaptureSurface(
+      target,
+      evidence.data,
+      clock.data,
+      capturedMs,
+      surfaceEvidence,
+    );
+  } catch (error) {
+    if (error instanceof DesktopActionSurfaceProofError) fail(error.code, error.status);
+    fail('SURFACE_UNVERIFIED');
+  }
 
   let image;
   try {
@@ -136,13 +159,15 @@ export async function verifyDesktopProbeActionCaptureProof(
     image.height !== c.height ||
     image.sizeBytes !== c.sizeBytes
   )
-    fail('CAPTURE_IMAGE_MISMATCH');
+    fail('CAPTURE_IMAGE_MISMATCH', 'REJECTED');
 
   return Object.freeze({
     schemaVersion: 1 as const,
     status: 'VERIFIED' as const,
     nativeActionEffectVerified: true as const,
     pngArtifactVerified: true as const,
+    afterCaptureSurfaceVerified: surface.surfaceVerified,
+    afterCaptureObservedAtMs: surface.afterCaptureObservedAtMs,
     screenshotContentSemanticsVerified: false as const,
     authorizesAction: false as const,
     retryAllowed: false as const,

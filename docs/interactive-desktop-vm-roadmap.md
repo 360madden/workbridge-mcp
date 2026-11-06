@@ -1,5 +1,12 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## M2 post-capture surface witnesses — November 6, 2026 (third source-only subgate)
+
+- New `src/desktop-action-surface-proof.ts` requires three bounded, exact-target Win32/UIA-style surface observations (before action, after action, after screenshot), plus a fresh independent post-screenshot desktop/session observation before a PNG receipt can become `VERIFIED`. A missing/incomplete observer is `UNKNOWN`; a confirmed focus loss, minimize/hide, cloak, owned modal, occlusion, screen/client-geometry or DPI drift is `REJECTED`. Neither state permits retry.
+- The existing `src/desktop-action-capture-proof.ts` now invokes this surface gate **before image file I/O** and exposes compact `afterCaptureSurfaceVerified` metadata. Client rectangles are compared for stability and containment in the target's physical-screen bounds; monitor enumeration order is ignored.
+- **Verification:** focused postcondition, session, image and surface tests **61 total, 60 passed, 1 pre-existing symlink-privilege skip, 0 failed**; TypeScript and Prettier passed. Adversarial cases cover absent observers, modal coverage gaps, unknown/actual occlusion, cloaking, DPI drift, target reuse, moved/resized surfaces, session lock and foreground changes.
+- **Not deployed / not live:** these are source-only contracts over supplied evidence, not independent Windows observer implementations. No actual modal/occlusion sensor, trusted observer provenance, full-interval transition trace, disposable-GUI live acceptance, WB-001 service update or RIFT Lua Run proof yet. `screenshotContentSemanticsVerified=false` remains explicit; never interpret a PNG checksum as proving visible Output.
+
 ## M2 after-action capture binding — November 6, 2026 (second source-only subgate)
 
 - New `src/desktop-action-capture-proof.ts` fails closed unless the existing native-action postcondition verifies first, then a non-replayed, one-shot screenshot receipt matches the same process/PID/HWND/class/title, deterministic derived capture ID, causal observation timestamps, target dimensions and validated PNG metadata.

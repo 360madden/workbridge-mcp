@@ -12,6 +12,7 @@ import { deflateSync } from 'node:zlib';
 const names = new Set([
   'desktop-action-postcondition',
   'desktop-action-capture-proof',
+  'desktop-action-surface-proof',
   'desktop-image',
   'desktop-action-policy',
   'desktop-action-guard',
@@ -655,6 +656,34 @@ test('initial shown count zero verifies but incremented count zero is contradict
   denied(f, 'COUNTER_TRANSITION_MISMATCH');
 });
 
+function surfaceFixture(f) {
+  const ui = (offset) => ({
+    observedAtMs: NOW + offset,
+    observedAtMonotonicMs: 1000 + offset,
+    pid: f.request.target.pid,
+    hwnd: f.request.target.hwnd,
+    sessionId: f.request.target.sessionId,
+    processStartedAt: f.request.target.processStartedAt,
+    clientRect: { x: 410, y: 345, width: 700, height: 400 },
+    windowDpi: 96,
+    monitorDpi: 96,
+    ownedModalCount: 0,
+    modalCoverage: 'complete',
+    occlusion: 'clear',
+    cloaked: false,
+  });
+  const afterCaptureDesktop = structuredClone(f.evidence.afterDesktop);
+  afterCaptureDesktop.observedAtMs = NOW + 180;
+  afterCaptureDesktop.observedAtMonotonicMs = 1180;
+  return {
+    schemaVersion: 1,
+    beforeAction: ui(30),
+    afterAction: ui(150),
+    afterCapture: ui(185),
+    afterCaptureDesktop,
+  };
+}
+
 function captureFixture(f) {
   const sha256 = 'a'.repeat(64);
   const capture = {
@@ -685,17 +714,18 @@ function captureFixture(f) {
     sizeBytes: record.sizeBytes,
     data: 'private-image-bytes-not-for-result',
   });
-  return { capture, imageLoader };
+  return { capture, imageLoader, surface: surfaceFixture(f) };
 }
 async function assessCapture(f, c, loader = c.imageLoader) {
-  return verifyCapture(f.request, f.fence, f.evidence, f.timing, c.capture, loader);
+  return verifyCapture(f.request, f.fence, f.evidence, f.timing, c.capture, c.surface, loader);
 }
-async function captureDenied(f, c, code, loader = c.imageLoader) {
+async function captureDenied(f, c, code, loader = c.imageLoader, expectedStatus = null) {
   await assert.rejects(
     () => assessCapture(f, c, loader),
     (error) => {
       assert.ok(error instanceof CaptureError);
       assert.equal(error.code, code);
+      if (expectedStatus) assert.equal(error.status, expectedStatus);
       assert.equal(error.retryAllowed, false);
       assert.ok(!error.message.includes('private-image'));
       return true;
@@ -710,6 +740,8 @@ test('M2 capture bundle binds one non-replayed PNG to verified native action eff
   assert.equal(result.status, 'VERIFIED');
   assert.equal(result.nativeActionEffectVerified, true);
   assert.equal(result.pngArtifactVerified, true);
+  assert.equal(result.afterCaptureSurfaceVerified, true);
+  assert.equal(result.afterCaptureObservedAtMs, NOW + 180);
   assert.equal(result.screenshotContentSemanticsVerified, false);
   assert.equal(result.authorizesAction, false);
   assert.equal(result.retryAllowed, false);
@@ -843,4 +875,214 @@ test('M2 default PNG validator reads real local bytes and refuses a tampered nat
   modified[40] ^= 0x1;
   await fs.writeFile(imagePath, modified);
   await captureDenied(f, c, 'CAPTURE_IMAGE_UNVERIFIED', readValidated);
+});
+
+test('M2 missing or incomplete post-capture observers classify UNKNOWN before PNG I/O', async () => {
+  const cases = [
+    [
+      'missing',
+      (c) => {
+        delete c.surface;
+      },
+      'SURFACE_EVIDENCE_MISSING',
+    ],
+    [
+      'unexpected field',
+      (c) => {
+        c.surface.untrusted = true;
+      },
+      'SURFACE_EVIDENCE_MISSING',
+    ],
+    [
+      'incomplete modal scan',
+      (c) => {
+        c.surface.afterAction.modalCoverage = 'unknown';
+      },
+      'MODAL_OBSERVER_INCOMPLETE',
+    ],
+    [
+      'unknown occlusion',
+      (c) => {
+        c.surface.afterCapture.occlusion = 'unknown';
+      },
+      'OCCLUSION_UNOBSERVED',
+    ],
+    [
+      'late observer',
+      (c) => {
+        c.surface.afterCapture.observedAtMs = NOW + 201;
+      },
+      'SURFACE_TIME_UNCERTAIN',
+    ],
+    [
+      'clock regression',
+      (c) => {
+        c.surface.afterCapture.observedAtMonotonicMs = 1100;
+      },
+      'SURFACE_TIME_UNCERTAIN',
+    ],
+    [
+      'capture-before-observation',
+      (c) => {
+        c.surface.afterCaptureDesktop.observedAtMs = NOW + 159;
+      },
+      'SURFACE_TIME_UNCERTAIN',
+    ],
+  ];
+  for (const [name, mutate, code] of cases) {
+    const f = fixture(),
+      c = captureFixture(f);
+    mutate(c);
+    let reads = 0;
+    await captureDenied(
+      f,
+      c,
+      code,
+      async () => {
+        reads++;
+        return {};
+      },
+      'UNKNOWN',
+    );
+    assert.equal(reads, 0, name);
+  }
+});
+
+test('M2 rejects post-capture focus, minimize, cloaking, occlusion, owned modal and DPI drift', async () => {
+  const cases = [
+    [
+      'focus lost',
+      (c) => {
+        c.surface.afterCaptureDesktop.window.isForeground = false;
+      },
+      'POST_CAPTURE_DESKTOP_FOREGROUND_MISMATCH',
+    ],
+    [
+      'window hidden',
+      (c) => {
+        c.surface.afterCaptureDesktop.window.isVisible = false;
+      },
+      'POST_CAPTURE_DESKTOP_TARGET_NOT_VISIBLE',
+    ],
+    [
+      'window minimized',
+      (c) => {
+        c.surface.afterCaptureDesktop.window.isMinimized = true;
+      },
+      'POST_CAPTURE_DESKTOP_TARGET_NOT_VISIBLE',
+    ],
+    [
+      'desktop locked',
+      (c) => {
+        c.surface.afterCaptureDesktop.session.locked = true;
+      },
+      'POST_CAPTURE_DESKTOP_SESSION_LOCKED',
+    ],
+    [
+      'window position',
+      (c) => {
+        c.surface.afterCaptureDesktop.window.bounds.x++;
+      },
+      'POST_CAPTURE_GEOMETRY_CHANGED',
+    ],
+    [
+      'display resolution',
+      (c) => {
+        c.surface.afterCaptureDesktop.monitors[0].width++;
+      },
+      'POST_CAPTURE_GEOMETRY_CHANGED',
+    ],
+    [
+      'changed client geometry',
+      (c) => {
+        c.surface.afterCapture.clientRect.width++;
+      },
+      'CLIENT_GEOMETRY_CHANGED',
+    ],
+    [
+      'client outside target',
+      (c) => {
+        for (const key of ['beforeAction', 'afterAction', 'afterCapture']) {
+          c.surface[key].clientRect.x = 0;
+        }
+      },
+      'CLIENT_OUTSIDE_TARGET',
+    ],
+    [
+      'changed window DPI',
+      (c) => {
+        c.surface.afterCapture.windowDpi = 120;
+      },
+      'SURFACE_DPI_CHANGED',
+    ],
+    [
+      'changed monitor DPI',
+      (c) => {
+        c.surface.afterCapture.monitorDpi = 120;
+      },
+      'SURFACE_DPI_CHANGED',
+    ],
+    [
+      'owned modal',
+      (c) => {
+        c.surface.afterAction.ownedModalCount++;
+      },
+      'UNEXPECTED_OWNED_MODAL',
+    ],
+    [
+      'target occluded',
+      (c) => {
+        c.surface.afterCapture.occlusion = 'occluded';
+      },
+      'TARGET_OCCLUDED',
+    ],
+    [
+      'target cloaked',
+      (c) => {
+        c.surface.afterCapture.cloaked = true;
+      },
+      'TARGET_CLOAKED',
+    ],
+    [
+      'reused PID',
+      (c) => {
+        c.surface.afterCapture.processStartedAt = '2026-10-26T11:59:01.000Z';
+      },
+      'SURFACE_TARGET_CHANGED',
+    ],
+    [
+      'retargeted HWND',
+      (c) => {
+        c.surface.afterCapture.hwnd++;
+      },
+      'SURFACE_TARGET_CHANGED',
+    ],
+  ];
+  for (const [name, mutate, code] of cases) {
+    const f = fixture(),
+      c = captureFixture(f);
+    mutate(c);
+    let reads = 0;
+    await captureDenied(
+      f,
+      c,
+      code,
+      async () => {
+        reads++;
+        return {};
+      },
+      'REJECTED',
+    );
+    assert.equal(reads, 0, name);
+  }
+});
+
+test('M2 equivalent monitor order remains verified across post-capture observation', async () => {
+  const f = fixture(),
+    c = captureFixture(f);
+  const monitor = { x: 1920, y: 0, width: 1920, height: 1080 };
+  f.evidence.beforeDesktop.monitors.push({ ...monitor });
+  f.evidence.afterDesktop.monitors.push({ ...monitor });
+  c.surface.afterCaptureDesktop.monitors.unshift({ ...monitor });
+  assert.equal((await assessCapture(f, c)).afterCaptureSurfaceVerified, true);
 });
