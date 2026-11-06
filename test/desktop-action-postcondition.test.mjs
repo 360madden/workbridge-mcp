@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import fs from 'node:fs/promises';
 import { registerHooks } from 'node:module';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
+import { deflateSync } from 'node:zlib';
 
 // Exercise current source without building/writing shared dist or loading any
 // Windows, command, GUI, service, VM or MCP adapters.
 const names = new Set([
   'desktop-action-postcondition',
+  'desktop-action-capture-proof',
+  'desktop-image',
   'desktop-action-policy',
   'desktop-action-guard',
   'desktop-session-policy',
@@ -19,7 +25,15 @@ const hook = registerHooks({
     return nextResolve(specifier, context);
   },
 });
-let verify, EvidenceSchema, PostconditionError, POLICY, plan;
+let verify,
+  EvidenceSchema,
+  PostconditionError,
+  POLICY,
+  plan,
+  verifyCapture,
+  captureId,
+  CaptureError,
+  loadImage;
 try {
   ({
     verifyDesktopProbeActionPostcondition: verify,
@@ -28,6 +42,12 @@ try {
   } = await import('../src/desktop-action-postcondition.ts'));
   ({ DESKTOP_PROBE_ACTION_POLICY: POLICY, planDesktopProbeAction: plan } =
     await import('../src/desktop-action-policy.ts'));
+  ({
+    verifyDesktopProbeActionCaptureProof: verifyCapture,
+    desktopActionCaptureId: captureId,
+    DesktopActionCaptureProofError: CaptureError,
+  } = await import('../src/desktop-action-capture-proof.ts'));
+  ({ loadDesktopImage: loadImage } = await import('../src/desktop-image.ts'));
 } finally {
   hook.deregister();
 }
@@ -633,4 +653,194 @@ test('initial shown count zero verifies but incremented count zero is contradict
   assert.equal(run(f).afterCount, 1);
   f.evidence.beforeCounter.stage = 'incremented';
   denied(f, 'COUNTER_TRANSITION_MISMATCH');
+});
+
+function captureFixture(f) {
+  const sha256 = 'a'.repeat(64);
+  const capture = {
+    schemaVersion: 1,
+    ok: true,
+    replayed: false,
+    requestId: captureId(f.request.requestId),
+    pid: f.request.target.pid,
+    hwnd: f.request.target.hwnd,
+    process: f.request.target.process,
+    title: f.request.target.title,
+    expectedClass: f.request.target.className,
+    capturedUtc: new Date(NOW + 160).toISOString(),
+    imagePath: 'test-owned-path-validated-by-image-loader',
+    width: 702,
+    height: 442,
+    sizeBytes: 2000,
+    sha256,
+    inputInjected: false,
+    foregroundMayChange: true,
+  };
+  const imageLoader = async (record) => ({
+    mimeType: 'image/png',
+    requestId: record.requestId,
+    sha256: record.sha256,
+    width: record.width,
+    height: record.height,
+    sizeBytes: record.sizeBytes,
+    data: 'private-image-bytes-not-for-result',
+  });
+  return { capture, imageLoader };
+}
+async function assessCapture(f, c, loader = c.imageLoader) {
+  return verifyCapture(f.request, f.fence, f.evidence, f.timing, c.capture, loader);
+}
+async function captureDenied(f, c, code, loader = c.imageLoader) {
+  await assert.rejects(
+    () => assessCapture(f, c, loader),
+    (error) => {
+      assert.ok(error instanceof CaptureError);
+      assert.equal(error.code, code);
+      assert.equal(error.retryAllowed, false);
+      assert.ok(!error.message.includes('private-image'));
+      return true;
+    },
+  );
+}
+
+test('M2 capture bundle binds one non-replayed PNG to verified native action effect', async () => {
+  const f = fixture();
+  const c = captureFixture(f);
+  const result = await assessCapture(f, c);
+  assert.equal(result.status, 'VERIFIED');
+  assert.equal(result.nativeActionEffectVerified, true);
+  assert.equal(result.pngArtifactVerified, true);
+  assert.equal(result.screenshotContentSemanticsVerified, false);
+  assert.equal(result.authorizesAction, false);
+  assert.equal(result.retryAllowed, false);
+  assert.equal(result.requestId, f.request.requestId);
+  assert.equal(result.captureRequestId, c.capture.requestId);
+  assert.equal(result.imageSha256, c.capture.sha256);
+  assert.deepEqual(result.imageDimensions, { width: 702, height: 442 });
+  assert.ok(Object.isFrozen(result) && Object.isFrozen(result.imageDimensions));
+  assert.ok(!Object.hasOwn(result, 'data'));
+  assert.notEqual(captureId('another_action_001'), c.capture.requestId);
+  assert.equal(captureId(f.request.requestId), captureId(f.request.requestId));
+});
+
+test('M2 refuses stale, replayed, retargeted and different-size screenshot receipts before file I/O', async () => {
+  const cases = [
+    ['pid', 9912, 'CAPTURE_TARGET_MISMATCH'],
+    ['hwnd', 123456, 'CAPTURE_TARGET_MISMATCH'],
+    ['process', 'other', 'CAPTURE_TARGET_MISMATCH'],
+    ['title', 'other', 'CAPTURE_TARGET_MISMATCH'],
+    ['expectedClass', 'OtherClass', 'CAPTURE_TARGET_MISMATCH'],
+    ['requestId', 'unrelated_capture_001', 'CAPTURE_TARGET_MISMATCH'],
+    ['replayed', true, 'INVALID_CAPTURE_EVIDENCE'],
+    ['inputInjected', true, 'INVALID_CAPTURE_EVIDENCE'],
+    ['foregroundMayChange', false, 'INVALID_CAPTURE_EVIDENCE'],
+    ['capturedUtc', new Date(NOW + 129).toISOString(), 'CAPTURE_NOT_FRESH'],
+    ['capturedUtc', new Date(NOW + 201).toISOString(), 'CAPTURE_NOT_FRESH'],
+    ['width', 500, 'CAPTURE_GEOMETRY_MISMATCH'],
+    ['height', 300, 'CAPTURE_GEOMETRY_MISMATCH'],
+    ['sha256', 'not-a-sha256', 'INVALID_CAPTURE_EVIDENCE'],
+  ];
+  for (const [field, value, code] of cases) {
+    const f = fixture(),
+      c = captureFixture(f);
+    c.capture[field] = value;
+    let loads = 0;
+    await captureDenied(f, c, code, async () => {
+      loads++;
+      throw new Error('never called');
+    });
+    assert.equal(loads, 0, field + ' must fail before image load');
+  }
+});
+
+test('M2 refuses missing or mismatched PNG bytes and never leaks loaded image content', async () => {
+  const f = fixture(),
+    c = captureFixture(f);
+  await captureDenied(f, c, 'CAPTURE_IMAGE_UNVERIFIED', async () => {
+    throw new Error('private-image-file-path');
+  });
+  await captureDenied(f, c, 'CAPTURE_IMAGE_MISMATCH', async (receipt) => ({
+    ...(await c.imageLoader(receipt)),
+    sha256: 'b'.repeat(64),
+  }));
+  await captureDenied(f, c, 'CAPTURE_IMAGE_MISMATCH', async (receipt) => ({
+    ...(await c.imageLoader(receipt)),
+    width: 701,
+  }));
+});
+
+test('M2 refuses native uncertainty before reading even a valid screenshot', async () => {
+  const f = fixture(),
+    c = captureFixture(f);
+  f.evidence.receipt.uncertain = true;
+  let loads = 0;
+  await captureDenied(f, c, 'NATIVE_POSTCONDITION_UNVERIFIED', async () => {
+    loads++;
+    return {};
+  });
+  assert.equal(loads, 0);
+});
+
+function crc32(bytes) {
+  let sum = 0xffffffff;
+  for (const value of bytes) {
+    sum ^= value;
+    for (let bit = 0; bit < 8; bit++) sum = (sum >>> 1) ^ (sum & 1 ? 0xedb88320 : 0);
+  }
+  return (sum ^ 0xffffffff) >>> 0;
+}
+function pngChunk(kind, content) {
+  const type = Buffer.from(kind, 'ascii');
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(content.length);
+  const body = Buffer.concat([type, content]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body));
+  return Buffer.concat([length, body, crc]);
+}
+function nativeSizedPng(width, height) {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8; // grayscale, 8 bits per channel
+  const scanline = Buffer.concat([Buffer.alloc(1), Buffer.alloc(width, 180)]);
+  const pixels = Buffer.concat(Array.from({ length: height }, () => scanline));
+  return Buffer.concat([
+    Buffer.from('89504e470d0a1a0a', 'hex'),
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', deflateSync(pixels)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+test('M2 default PNG validator reads real local bytes and refuses a tampered native-sized capture', async (t) => {
+  const f = fixture();
+  const c = captureFixture(f);
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'wb-m2-capture-'));
+  t.after(async () => {
+    assert.ok(directory.startsWith(path.resolve(os.tmpdir()) + path.sep));
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+  const evidenceRoot = path.join(directory, '.tools', 'desktop-evidence');
+  await fs.mkdir(evidenceRoot, { recursive: true });
+  const bytes = nativeSizedPng(720, 460);
+  const imagePath = path.join(evidenceRoot, 'capture-' + c.capture.requestId + '.png');
+  await fs.writeFile(imagePath, bytes, { flag: 'wx' });
+  Object.assign(c.capture, {
+    imagePath,
+    width: 720,
+    height: 460,
+    sizeBytes: bytes.length,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+  });
+  const readValidated = (receipt) => loadImage(receipt, { evidenceRoot });
+  const proof = await assessCapture(f, c, readValidated);
+  assert.equal(proof.status, 'VERIFIED');
+  assert.equal(proof.imageSha256, c.capture.sha256);
+  assert.deepEqual(proof.imageDimensions, { width: 720, height: 460 });
+  assert.equal(proof.screenshotContentSemanticsVerified, false);
+  const modified = Buffer.from(bytes);
+  modified[40] ^= 0x1;
+  await fs.writeFile(imagePath, modified);
+  await captureDenied(f, c, 'CAPTURE_IMAGE_UNVERIFIED', readValidated);
 });

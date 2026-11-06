@@ -1,10 +1,17 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
-## M2 after-action proof — November 6, 2026 (first source-only subgate)
+## M2 after-action capture binding — November 6, 2026 (second source-only subgate)
+
+- New `src/desktop-action-capture-proof.ts` fails closed unless the existing native-action postcondition verifies first, then a non-replayed, one-shot screenshot receipt matches the same process/PID/HWND/class/title, deterministic derived capture ID, causal observation timestamps, target dimensions and validated PNG metadata.
+- Reuses `src/desktop-image.ts` to open the exact permitted evidence file and check its real bytes, file identity, PNG structure, dimensions and SHA-256. A synthetic native-sized **720 × 460 PNG** successfully verifies; a same-path tampered image correctly fails. Raw image bytes and private paths are not returned in the compact proof.
+- Focused desktop postcondition, session and image tests: **58 total, 57 pass, 1 pre-existing symlink-privilege skip, 0 fail**. TypeScript and Prettier passed.
+- **Boundary:** `screenshotContentSemanticsVerified=false` by design. This is an offline evidence assembler, not a production capture driver, independent source of native evidence, UI/modal observer, or proof that LuaPad displayed the requested Lua result. Live disposable-fixture testing, screenshot-after-session/focus continuity, DPI and modal witnesses, WB-001 rollout and physical RIFT Run testing remain pending. No game or VM input/restart was performed.
+
+## M2 after-action proof — November 6, 2026 (first source-only subgate; historical)
 
 - `src/desktop-action-postcondition.ts` now requires exact stable before/after target-window rectangles and equivalent monitor geometry (monitor enumeration order is ignored). Two valid individual session observations no longer imply unchanged pixel-to-control mapping across the action interval.
 - New `test/desktop-action-postcondition.test.mjs` adversarial cases cover x/y/width/height drift and monitor topology changes. Focused postcondition/session/image suites: **53 tests, 52 pass, 1 pre-existing skip, 0 fail**. TypeScript `tsc --noEmit` passed.
-- **Not an M2 completion claim:** postcondition verification is still offline and consumes supplied observations; independent screenshot capture pairing, native modal detection, DPI evidence and live disposable-fixture verification remain pending. A PNG hash alone cannot establish visible Lua output.
+- **Not an M2 completion claim:** postcondition verification is still offline and consumes supplied observations; screenshot capture pairing, native modal detection, DPI evidence and live disposable-fixture verification were still pending at this first checkpoint. A PNG hash alone cannot establish visible Lua output.
 
 
 ## Workbridge-first LuaPad acceleration — November 6, 2026 (source-only)
