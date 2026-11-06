@@ -1,5 +1,12 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## M2 input-desktop identity — November 6, 2026 (read-only host observation)
+
+- Added `investigations/windows-desktop-automation/prototypes/Observe-InputDesktopReadOnly.ps1`, a bounded, no-input PowerShell/Win32 observer. It reuses the existing native station/thread name approach but independently samples `OpenInputDesktop` with `DESKTOP_READOBJECTS` only, closes its opened handle, and samples the active console session. There is no focus, screenshot, hook, scheduled task, window launch, desktop switch or service update.
+- **Verified at 11:27:50 UTC:** a new read-only terminal child in Session **1** observed `UserInteractive=true`, `WinSta0`, thread `Default`, active input desktop `Default`, and active console Session **1**. Its `sampleStatus` was `DEFAULT_INPUT_DESKTOP_SAMPLE`, with `safeForInput=false`. This supersedes only the earlier *unknown input-desktop name* in the 11:21 inventory; it is one instantaneous observation, not a continuous lease.
+- **Tests:** self-test **8/8 PASS** without native calls; real read-only Windows sample exit **0**; deliberately wrong `-ExpectedSessionId 9999` returned `EXPECTED_SESSION_MISMATCH`, exit **2**, and `safeForInput=false`.
+- **Still HOLD:** actual locked/connected state independent of this sample, Task Scheduler interactive-token ownership, full-interval desktop/session/foreground continuity and disposable GUI Run/Output postcondition remain unverified. `OpenInputDesktop` alone is explicitly insufficient for an input grant, especially across RDP/connection changes. Physical RIFT and both VMware guests were untouched.
+
 ## M2 watchdog crash-orphan recovery — November 6, 2026 (synthetic-only subgate)
 
 - `Archive-WatchdogOrphanFixture.ps1` reads or archives only unique OS-temp synthetic lock fixtures. It pins SHA-256 and NTFS file IDs; dual case moves GUI guard first, admission last. Live `.tools/desktop-evidence` is structurally excluded.
