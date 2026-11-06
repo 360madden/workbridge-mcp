@@ -1,0 +1,42 @@
+# VMware host/guest OneDrive automation boundary — Nov 6 source delta
+
+Status: **READ-ONLY SOURCE REVIEW ONLY** (2026-11-06). No VM or guest command, credential access, guest process launch, UIA tool call, OneDrive interaction, screenshot, foreground change, service restart, or production edit. Supplements rather than supersedes reports/onedrive-vm-readonly-triage-2026-11-04.md, reports/guest-uia-boundary-2026-11-04.md, and benchmarks/guest-latency-proof-plan.md.
+
+## Decision: make the first pilot a guest identity and status probe, not a click
+
+| Target surface | Host WinApp 0.7.1 | Host sbroenne / FlaUI | Future guest-side provider |
+| --- | --- | --- | --- |
+| Physical Windows and VMware Workstation chrome | Suitable after exact native PID/start/HWND/desktop checks | Candidate, currently research-only | Not needed |
+| OneDrive dialog or tray INSIDE Lab1/Lab2 | Cannot see semantic guest elements through the VMware framebuffer | Cannot cross VM boundary by running only on the host | Must run in the correct interactive guest Windows session |
+| Guest network cost / OneDrive process identity | Host cannot independently assert effective guest state | Same limitation | Narrow passive native guest status, NO UI required |
+| GPU-rendered RIFT HUD | Only host VMware pixels, not game/UIA truth | Same boundary | Keep current RR2-specific telemetry/capture path, never turn its input protocol into generic OneDrive control |
+
+Source facts establishing the boundary:
+
+1. riftreader2/scripts/vmware_guest_session.py:304-346 checks allowed vmrun operations, VM identity before/after, and guest-credential identity for each session. Its runProgramInGuest PowerShell helper is NONINTERACTIVE and does **not** prove that the process entered the logged-in WinSta0/Default desktop. A returned command stdout is evidence of a VMware Tools command response, not guest UIA accessibility.
+2. riftreader2/scripts/Ensure-GuestAgentTask.ps1:47-90 validates a foreground-capable game/explorer SESSION, creates a Limited interactive-user triggerless task and checks duplicate ownership. It ALSO rejects a missing RIFT game and uses a fixed RIFT-specific launcher/hash/port. **Do not reuse this task/action** to read OneDrive: use only its exact-principal/session/IgnoreNew/identity lifecycle as a pattern for a separately owned generic guest inspector.
+3. riftreader2/scripts/guest_receiver_startup.ps1:25-72 requires an interactive logon and a game-specific target, and docs/workflows/operation-dependencies.md:64-81 distinguishes host-only read-only telemetry receivers (49813/49923) from guest control agents. Neither an open receiver TCP port nor a healthy RIFT controller proves OneDrive is signed in, syncing, or accessible.
+4. Historical riftreader2/docs/validation/guest-agent-launcher-2026-10-25.md:34-41 measured approximately **1.688s** per 512 KiB host-to-guest transfer and **1.671s** guest-to-host, including vmrun/identity checks. This is NOT a OneDrive/UIA latency measurement, but argues against repeating tiny host→vmrun→guest commands for each UI property. A bounded one-pass guest inventory followed by an independently owned persistent read-only guest observer is the candidate architecture to benchmark.
+5. Nov4 OneDrive triage proved only an earlier screenshot of paused/Resume syncing, not current pause or cause. It also documented an Offline cloud-file addon placeholder. Public Windows network category ≠ ConnectionCost, and examining/hashing Offline placeholders can hydrate files. No new present-time status is claimed here.
+
+## Smallest separately authorized test: one guest at a time, no focus
+
+**G0 identity/readiness only:** First independently reconcile each VMX and its running VM instance/epoch, cached guest-login validation through the existing authorized helper, current guest logon/session and OneDrive/explorer process PID+start/session/owner SID (publish only SID hash). Lab1's historically blocked RIFT input queue and Lab2's foreground RIFT are NOT overridden by this passive work. Do not invoke an input queue, recover/clear it, or start existing RIFT dependencies merely to read metadata. If authorization/session is missing, stop with blocked.
+
+**G1 one-shot passive OneDrive state** (after separate guest-command approval): In the correctly attributed guest user session, collect only OneDrive process executable/version, PID/start time and owner/session, *effective* Windows.Networking.Connectivity ConnectionCost (NetworkCostType/roaming/over-data/background restriction or explicitly unknown), power/saver indicators, and bounded OneDrive status/error categories from currently available non-token-bearing sources. For a short fixed allowlist of known RIFT addon files, enumerate only local file attributes (Offline, Pinned/Unpinned, ReparsePoint, size/timestamp); refuse opening/hashing any Offline file. No tray-opening, task execution, OneDrive menu interaction, sync change, account/error-body dump, or file hydration.
+
+**G2 first UIA admission test** (future approval, distinct from G1): Deploy a small hash-pinned no-input guest helper as a separately named LIMITED interactive Scheduled Task with exact user SID, session, WinSta0/Default, boot/VM epoch and independent process-start/HWND checks. Inspect one already-visible titled disposable window/Explorer panel without bringing it to foreground; if none is visible, stop until a separately authorized disposable fixture launch. Do not infer UIA reachability from the successful G1 vmrun PowerShell command. Do not use host taskbar discovery as a cross-provider benchmark, since sbroenne's window enumerator filters Shell_TrayWnd; fair comparisons require a titled fixture and exact HWND.
+
+**G3 OneDrive UI-only observation** (later, informed approval): If the existing panel is already visible, snapshot accessible window/text and native owner/modal chain with a read-only in-guest provider. If it is NOT open, return **uiStatus=unknown/hidden**, never click the cloud icon merely to make the text readable. A separately authorized tray/menu opening is a distinct state-changing step and must be timed and verified independently. 'Settings greyed out' alone cannot diagnose a cause.
+
+## Minimum latency and feedback receipts (reuse existing H0–H8 / G0–G11 model)
+
+- Host immutable request/VMX epoch + per-lab GUI/resource owner, request timestamp, approved scope, source hashes; guest process start/session/boot, a separate source-specific monotonic clock, UTC solely for correlation. Never subtract raw host and guest monotonic ticks.
+- Time **vmrun authentication/bootstrap and guest command**, guest native inspection, optional guest UIA tree, independent unchanged-after observation, disk flush, result transfer and Workbridge MCP output separately. A vendor/VMware Tools return only proves delivery/transport; OneDrive cloud backlog convergence is its own external duration, often not bounded by a GUI action timeout.
+- Receipt must distinguish observed_paused, observed_active, observed_attention, observed_signed_out, observed_hidden_or_unavailable, denied, timed_out_unknown. For numeric backlog changes use two separately dated samples; absent counters are null, not zero. No second click/replay after an ambiguous first action.
+- Keep full title/email/account/path text private; public results list state categories, counts, redacted owner identity, source SHA, exact lab, elapsed per-phase min/median/p95/max with n and timeouts. Start with **one** sample per lab rather than claiming 30 statistical trials; pilot numbers do not prove typical latency.
+- Short-term provider decision: WinApp remains host GUI backend; sbroenne and FlaUI are guest candidates only if installed/launched **inside** the user session. For earliest guest evidence, a tiny native read-only .NET inspector with source-pinned Win32/WinRT primitives is the least disruptive feasible option; evaluate MCP/UIA provider overhead only after G0/G1 status and same-session proof.
+
+## Stop conditions
+
+VM identity drift, unexpected guest account/session, missing/uncertain cached credential approval, Lab1 resource quarantine conflict for any proposed input, RIFT foreground disruption, OneDrive panel hidden when UI-only evidence required, Offline placeholder, guest time/VM epoch change, non-default desktop, uncertain vmrun result or missing observer receipt: STOP and record a bounded unknown/blocked status. No changes to VM power, network policy, OneDrive synchronization, installed addons, or RR2 input supervision are authorized by this document.
