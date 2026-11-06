@@ -2,7 +2,7 @@
 
 Date: 2026-11-05 (America/New_York); source/test preparation crossed 2026-11-06 UTC.
 Owner: Joey Delfierro. Target: **physical** RIFT only; VMware excluded.
-Status: **SOURCE/SYNTHETIC READY; LIVE INPUT NOT ATTEMPTED**.
+Status: **SOURCE/SYNTHETIC PASS; PHYSICAL CLOSE → /lp REOPEN VERIFIED 2026-11-06**.
 
 ## Scope and reason
 
@@ -35,3 +35,12 @@ A new narrowly scoped helper, scripts/physical-rift-luapad-open.mjs, prepares **
 5. Test editor key focus only after separate focus-specific tooling and visual input-target confirmation. Do not assume opening gives the RiftTextfield focus.
 
 No changes were made to Workbridge's running owner/service, the physical game, LuaPad installed addon, game process, or Windows settings in this preparation.
+
+## Live run and independent postcondition — 2026-11-06
+
+- Joey manually closed LuaPad, leaving RIFT running. Physical identity unchanged: PID 32156 / HWND 462734.
+- Prestate: screenshot `luapad_lp_closed_pre_20261106_005` at 05:21:52.831Z, 1920×1032, SHA256 `7b4a7a2a15e307c8bf9dec88c5d65824d396350bceef72ef5bb08d750c353749`. LuaPad absent, chat inactive, no active modal.
+- An earlier attempt `luapad_physical_open_20261106_once01` was rejected by 30-second freshness gate as `CHAT_STATE_UNVERIFIED`, with `inputSubmitted:false`; **not** a sent input.
+- Guarded one-shot `luapad_physical_open_20261106_once02` returned `SUBMITTED_PENDING_INDEPENDENT_SCREENSHOT`, exit 0: exact `Enter`, `/lp`, `Enter`; no replay or other input.
+- Postcondition screenshot `luapad_lp_reopen_post_20261106_001` at 05:22:36.482Z, SHA256 `50d8232d83d1745e2e80b4e1c6ab263b815377b38808d536e726ea9fcfb3bef9`: LuaPad Preview 20 visibly reopened centered, in front of competing addon frames, with correct title/author and editor help text. **Physical acceptance PASS**.
+- No `/reloadui`, game restart, active-addon deployment, or Windows restart. Editor key-focus and outbound log transport remain distinct pending tests. Never replay the once02 intent.
