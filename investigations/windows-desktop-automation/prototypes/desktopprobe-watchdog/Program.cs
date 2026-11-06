@@ -50,6 +50,8 @@ internal static class Program
                 ["--synthetic-child", var marker] => SyntheticChild(marker),
                 ["--synthetic", var runId] => RunSynthetic(runId, false),
                 ["--synthetic-uncertain", var runId] => RunSynthetic(runId, true),
+                ["--synthetic-abandon-dual", var runId] => RunSyntheticAbandon(runId, true),
+                ["--synthetic-abandon-admission", var runId] => RunSyntheticAbandon(runId, false),
                 ["--desktopprobe", var runId, var exeSha, var dllSha] => RunDesktopProbe(runId, exeSha, dllSha),
                 _ => throw new ArgumentException("INVALID_ARGUMENTS"),
             };
@@ -63,6 +65,31 @@ internal static class Program
             }));
             return 3;
         }
+    }
+
+    // Research-only abrupt-exit fault injection: no child, Job or GUI target.
+    // Actual DesktopTurnLease/AdmissionLease writes survive process exit.
+    private static int RunSyntheticAbandon(string runId, bool includeGuiGuard)
+    {
+        AssertSafeId(runId);
+        var self = Environment.ProcessPath ?? throw new InvalidOperationException("SELF_PATH_MISSING");
+        if (!PathEquals(self, Path.Combine(ExpectedPublish, "DesktopProbeWatchdog.exe")))
+            throw new InvalidOperationException("SELF_PATH_MISMATCH");
+        var dir = Path.Combine(Temp, "desktopprobe-watchdog-abandon-" + runId);
+        Directory.CreateDirectory(dir);
+        var guiPath = Path.Combine(dir, "desktop-input-turn.mock.lock");
+        if (includeGuiGuard)
+        {
+            _ = DesktopTurnLease.Acquire(guiPath, runId, Environment.ProcessId,
+                Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture),
+                Process.GetCurrentProcess().SessionId, true);
+        }
+        else
+        {
+            _ = DesktopAdmissionLease.Acquire(guiPath, runId, Environment.ProcessId, true);
+        }
+        Environment.Exit(includeGuiGuard ? 71 : 72);
+        return 3;
     }
 
     private static int RunSynthetic(string runId, bool forceQuarantine)

@@ -1,6 +1,6 @@
 # DesktopProbe independent watchdog — isolated prototype
 
-Status: **synthetic-only PASS** on 2026-11-04, including fresh **Nov 5 dual-admission and recovery-parser compatibility**. **HOLD** for a real watchdog-driven disposable GUI pilot pending crash-orphan recovery and interactive-session gates. The historic physical-RIFT lock was separately archived on Nov 5 by an authorized Workbridge recovery lane; this prototype did not touch it.
+Status: **synthetic-only PASS** through November 6, including actual watchdog-stamp abrupt-exit recovery in OS-temp fixtures. **HOLD** for a real watchdog-driven GUI pilot pending historical Job-tree settlement, live recovery authorization and interactive-session gates. Physical RIFT was untouched.
 
 ## Purpose and ownership
 
@@ -59,7 +59,7 @@ Synthetic tests do **not** prove TaskScheduler ownership, real WinForms UI start
 ## Pending gates
 
 1. Independent final review of native lease P/Invoke, real manifest and identity checks.
-2. **BLOCKER:** Develop and synthetically verify operator-reviewed exact-identity recovery for watchdog crash leaving admission + GUI guard with no sidecar, and admission-only orphan; historical physical-RIFT quarantine is separately archived and not a current preflight substitute.
+2. **PARTIAL / STILL BLOCKED:** `Archive-WatchdogOrphanFixture.ps1` plus `WatchdogOrphanFixture.test.mjs` have **6/6 PASS** for dual/admission-only OS-temp archival, including actual .NET watchdog-written stamps after abrupt synthetic exit. Hash/file-ID pins, backup and admission-last move are tested; negative inputs refuse. The script cannot operate on live shared locks. Independent descendant/Job settlement and a separately reviewed, authorized production recovery remain missing.
 3. Operator approval for first GUI pilot, published disposable DesktopProbe hashes, TaskScheduler interactive token, watchdog process-tree ownership, separate sampler lock validation, and target foreground/freshness preflight.
 4. If >5-second sampling is needed, add a safe atomic fresh-manifest publisher or a new independently revalidated fresh-snapshot contract; do not treat an aged manifest as current.
 

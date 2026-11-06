@@ -36,7 +36,7 @@ function runOwned(executable, args, deadlineMs) {
   });
   assert.equal(result.error?.code ?? null, null, 'owned synthetic child returned process error/timeout');
   assert.equal(result.signal, null, 'owned synthetic child signal/timeout');
-  assert.equal(result.status, 0, 'owned synthetic child reported nonzero exit');
+  assert.equal(result.status, 0, 'owned synthetic child reported nonzero exit: ' + result.stderr + ' ' + result.stdout);
   return result.stdout;
 }
 

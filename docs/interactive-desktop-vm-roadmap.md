@@ -1,5 +1,12 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## M2 watchdog crash-orphan recovery — November 6, 2026 (synthetic-only subgate)
+
+- `Archive-WatchdogOrphanFixture.ps1` reads or archives only unique OS-temp synthetic lock fixtures. It pins SHA-256 and NTFS file IDs; dual case moves GUI guard first, admission last. Live `.tools/desktop-evidence` is structurally excluded.
+- The .NET watchdog gained `--synthetic-abandon-dual` and `--synthetic-abandon-admission`: abrupt process exit after creating real watchdog-shaped mock stamps, without child launch, GUI, focus or input.
+- **Verified:** .NET 10 Release publish PASS; Windows `WatchdogOrphanFixture.test.mjs` **6/6 PASS**, including both actual-watchdog-stamp archival paths, hash drift, unexpected sidecars, live/reused owner PID, extra guard and forbidden roots. Original GUI outcome remains unknown; no replay.
+- **Live pilot remains HOLD:** independent historical descendant/Job settlement, Task Scheduler interactive-token and production manual recovery are not proven. No RIFT/VM interaction, service update, screenshot, restart or reload occurred.
+
 ## M2 C# → JavaScript contract handshake — November 6, 2026 (fifth source-only subgate)
 
 - The disposable-only native observer now has a `--contract-fixture` synthetic command that runs the **same JSON envelope serializer** as `--snapshot` without any Win32 calls or window launch. `native-contract-pipeline.test.mjs` executes the actual compiled .NET binary and validates its output through the real strict JavaScript schema and conservative classifier.
