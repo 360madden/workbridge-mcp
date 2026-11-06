@@ -1,0 +1,206 @@
+{
+  "schema": "workbridge.physical-rift.wgc-capture-contract",
+  "schemaVersion": 2,
+  "recordedDate": "2026-11-06",
+  "status": "DESIGN_ONLY_NOT_IMPLEMENTED",
+  "authorization": {
+    "capturePhysicalRift": false,
+    "focus": false,
+    "keyboard": false,
+    "mouse": false,
+    "retryClick": false,
+    "reload": false,
+    "restart": false
+  },
+  "scope": {
+    "target": "physical-rift-host-window-only",
+    "notVmware": true,
+    "mode": "read-only-capture-proposal",
+    "userChoiceRequiredBeforeLiveTargetCapture": true
+  },
+  "provenance": {
+    "pilot": {
+      "source": "investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/Program.cs",
+      "sha256": "2df6d1174dd3eb490e9a10d148327f552595eb54e4284feb64a938174893d82d",
+      "evidence": "investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/evidence-disposable-2026-11-05.json",
+      "evidenceSha256": "961559708d27a0303b8b476ffb04d699309220835743bcd3ae647b7f473e33f8",
+      "result": "disposable_frame_verified_but_wrapper_exit1_child_exit_unknown",
+      "physicalRiftCaptured": false
+    },
+    "legacyCapture": {
+      "source": "scripts/desktop-capture.mjs",
+      "sha256": "4c40821002442b35ec464644dc10d49db23b82ee7b85e3e33a2ac3bbbec91fc6",
+      "foregroundMayChange": true,
+      "compatibleReceipt": false
+    },
+    "retryWrapper": {
+      "source": "investigations/windows-desktop-automation/prototypes/rift-retry-sender/run-retry-once.mjs",
+      "sha256": "ca8527cfc8df5f85ee18c58b499560549fc94dc1b0141568bfebc441c4ad683b",
+      "requiresLegacyReceipt": true,
+      "liveRefusal": "LIVE_DISABLED_PENDING_P3"
+    },
+    "proposedVendor": {
+      "package": "Microsoft.Windows.SDK.BuildTools.WinApp.UIAutomation",
+      "version": "0.7.1",
+      "api": [
+        "IWindowCapture.StartFrameGrabber",
+        "IFrameGrabber.WaitForFirstFrameAsync",
+        "IFrameGrabber.TryGetLatest"
+      ],
+      "backend": "WGC-only",
+      "noPrintWindowGdiFallback": true
+    }
+  },
+  "receiptV2Contract": {
+    "kind": "workbridge.physical-rift-wgc-capture-receipt",
+    "schemaVersion": 2,
+    "uniqueRequestId": "bounded-new-id",
+    "target": {
+      "pid": "int",
+      "hwnd": "int",
+      "startedUtc": "strict-UTC",
+      "sessionId": "int",
+      "process": "rift_x64",
+      "title": "RIFT",
+      "className": "TWNClientFramework",
+      "ownerHwnd": 0
+    },
+    "source": {
+      "vendorPackage": "Microsoft.Windows.SDK.BuildTools.WinApp.UIAutomation",
+      "vendorVersion": "0.7.1",
+      "applicationAssemblySha256": "sha256",
+      "lockedDependencyManifestSha256": "sha256",
+      "backendVerified": "WGC-only",
+      "fallbackUsed": false,
+      "sourceCommit": "pinned"
+    },
+    "timing": {
+      "captureBeginUtc": "strict-UTC",
+      "grabberCreatedMonotonicTicks": "int64",
+      "firstFrameObservedMonotonicTicks": "int64",
+      "firstFrameObservedUtc": "strict-UTC",
+      "captureEndUtc": "strict-UTC",
+      "maxFirstFrameWaitMs": 7000,
+      "frameVersionMinimum": 1
+    },
+    "foreground": {
+      "beforeHwnd": "int",
+      "afterHwnd": "same-int",
+      "eventHookInstalled": true,
+      "eventHookCoverageComplete": true,
+      "foregroundChangeEventCount": 0,
+      "hookStartUtc": "strict-UTC",
+      "hookStopUtc": "strict-UTC",
+      "proofScope": "instrumented-interval",
+      "observedUnchanged": true
+    },
+    "frame": {
+      "width": "positive-int",
+      "height": "positive-int",
+      "colorVariation": true,
+      "frameSource": "new-frame-from-new-grabber",
+      "mappingToPhysicalScreen": "UNVERIFIED_UNTIL_SYNTHETIC_CALIBRATION"
+    },
+    "artifact": {
+      "relativeEvidencePath": "fixed-root/capture-wgc-ID.png",
+      "receiptPath": "fixed-root/capture-wgc-ID.json",
+      "createExclusive": true,
+      "sha256": "sha256",
+      "sizeBytes": "bounded-int",
+      "pngHeaderVerified": true,
+      "decodedDimensionsVerified": true,
+      "immutableReceipt": true
+    },
+    "operation": {
+      "readOnly": true,
+      "inputInjected": false,
+      "focusAttempted": false,
+      "windowRestored": false,
+      "windowActivated": false,
+      "foregroundMayChange": "not_assumed_false_without_instrumented_proof",
+      "liveRetryAllowed": false
+    },
+    "settlement": {
+      "wrapperExitCode": 0,
+      "childExitCode": 0,
+      "timeout": false,
+      "unknownOutcome": false,
+      "postTargetIdentityMatches": true,
+      "receiptPngRehashMatches": true
+    }
+  },
+  "gates": [
+    {
+      "id": "G0",
+      "name": "source-and-backend",
+      "pass": "Pinned compiled source and transitive DLL hashes; v0.7.1 WGC frame-grabber only; no picker/PrintWindow/GDI fallback; keep Retry LIVE_DISABLED_PENDING_P3."
+    },
+    {
+      "id": "G1",
+      "name": "exact-target",
+      "pass": "Fresh physical-rift PID/HWND/process-start/session, class/title/owner, visible unminimized top-level, before capture; no VM or arbitrary target."
+    },
+    {
+      "id": "G2",
+      "name": "exclusive-admission",
+      "pass": "Shared Workbridge admission+desktop turn acquired, quarantine veto clean, no focus/input; deterministic lease/receipt and no stale-lock override."
+    },
+    {
+      "id": "G3",
+      "name": "pre-capture-witness",
+      "pass": "Process/start/session and DWM/UIA geometry captured; foreground baseline and passive event hook installed before grabber."
+    },
+    {
+      "id": "G4",
+      "name": "WGC-no-foreground",
+      "pass": "Direct WGC window handle; no focus/show/restore/click/keys; foreground event stream complete and no transition, before/during/after snapshots consistent."
+    },
+    {
+      "id": "G5",
+      "name": "fresh-bounded-frame",
+      "pass": "New grabber, first frame post-create within 7s and version>=1; monotonic/UTC frame timing; post-frame exact process/window identity."
+    },
+    {
+      "id": "G6",
+      "name": "immutable-artifacts",
+      "pass": "Fixed destination, exclusive PNG+receipt, bounded nonblank BGRA/PNG dimensions, SHA256 and readback; origin-to-physical-pixels remains unverified until separate calibration."
+    },
+    {
+      "id": "G7",
+      "name": "independent-settlement",
+      "pass": "No unexplained foreground events, final identity and hash match, wrapper AND child exit0; missing/unknown status is not success; no fallback or auto-retry."
+    },
+    {
+      "id": "G8",
+      "name": "read-only-integration",
+      "pass": "New v2 schema separately consumed; do not relabel legacy foregroundMayChange:true receipts; physical Retry remains uncallable and needs later P3 gate+target-specific approval."
+    }
+  ],
+  "negativeTests": [
+    "wrong_pid_hwnd_process_start_session_class_title_or_owner",
+    "missing_or_foreign_admission_or_quarantine",
+    "minimized_offscreen_or_changed_dwm_uia_geometry",
+    "WGC_unsupported_or_backend_fallback_requested",
+    "native_foreground_change_event_or_hook_gap",
+    "unobserved_first_frame_timeout_stale_frame_or_version_zero",
+    "blank_transparent_flat_or_malformed_bgra_png",
+    "capture_age_over_30_seconds_or_time_order_invalid",
+    "existing_id_missing_receipt_changed_sha_or_partial_output",
+    "wrapper_exit_nonzero_child_exit_null_or_timeout",
+    "legacy_receipt_substitution_or_unverified_pixel_mapping",
+    "attempted_click_focus_keyboard_reload_restart_or_vm_target"
+  ],
+  "unresolvedRisks": [
+    "A before/after GetForegroundWindow equality alone cannot exclude transient focus theft; require event-hook interval proof.",
+    "IFrameGrabber frame version is not by itself a source timestamp; event/monotonic timing contract remains to be implemented.",
+    "WGC frame origin may not match DWM outer or client origin; no Retry click coordinates may be derived without calibrated mapping.",
+    "Disposable WGC pilot reported a real PNG but its wrapper exit1 and child exit was not observed; this is partial evidence only."
+  ],
+  "validation": {
+    "kind": "schema-design-review",
+    "codeImplemented": false,
+    "liveCaptureAttempted": false,
+    "liveGameInputAttempted": false,
+    "guiTestsRun": false
+  }
+}
