@@ -43,6 +43,12 @@ Use a newly created, disposable text file in a verified private investigation fi
 
 **Safe repro order:** offline unit test of the pure JavaScript literal-string replacement semantics → isolated `Changes.edit` fixture test with explicit expected SHA and approved Workbridge normal gate → package and regression tests → separate WB-001 maintenance window. No live edit/replace test now.
 
+## Verified isolated in-memory Node synthetic (not a Workbridge tool invocation)
+
+**Reviewed source:** `investigations/windows-desktop-automation/prototypes/replaceall-literal-dollar.test.mjs`, SHA-256 `1ccd8229c158b34562cf48330a36a2ad17601fcfdb1c17818b647a09b5045e77`. Only imports `node:test`, `node:assert/strict`, `node:crypto`; no filesystem, network, process spawn, project source/dist import, GUI or Windows access. Pure JavaScript reproduces vulnerable `replaceAll(oldText,newText)` versus corrected `replaceAll(oldText,()=>newText)`, with independently constructed expected text and SHA-256.
+
+**Exact bounded Workbridge command receipt:** job `wd_literal_replace_test_20261106b`, `node.exe --test investigations/windows-desktop-automation/prototypes/replaceall-literal-dollar.test.mjs`, exit **0**, stderr **0**, **11/11 tests PASS**, **0 fail**, Node runner duration 96.0138ms, Workbridge wall 396ms. Separate tests cover four expanding replacement tokens, two no-capture controls, CRLF repeated markers, mixed PowerShell text, regex-looking literal oldText, UTF-16LE BOM, and a narrow final SHA control. This proves **the JavaScript language semantics and callback remedy** only; no actual `Changes.edit` call, production file, or installed service was mutated.
+
 ## Deployment / recovery gate
 
 - Preserve already-corrupted source as evidence before any recovery; compare original backup SHA, change receipt, affected file, expected ending and exact tail. A successful `edit_file` operation is **not** proof its resulting text equals the intended literal replacement. Use fresh guarded edits/undo only under an explicitly authorized maintenance scope.
