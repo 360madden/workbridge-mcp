@@ -41,6 +41,22 @@ fallback. Existing apps should retain foreground.
 The self-test validates BGRA->PNG pixel channels, dimensions, signature and
 invalid buffers. It starts **no GUI** and makes **no capture**.
 
+## Offline dependency lock (P3.4)
+
+`RestorePackagesWithLockFile=true` and the committed `packages.lock.json` pin
+NuGet's transitive dependency graph and package content hashes. For a bounded,
+cache-only restore from this directory, run:
+
+`dotnet restore .\WgcNoFocusPilot.csproj --locked-mode --packages .packages --source .packages --disable-parallel`
+
+A changed or missing locked dependency must fail; do not remove `--locked-mode`
+to make verification pass. `dotnet restore` updates only restore metadata (`obj`)
+and does not compile or run a GUI. The November 5 G0 manifest's 13 preexisting
+compiled output files were rehashed unchanged after locking. The manifest's
+*source-project* hash refers to the preceding `.csproj`; future binary
+attestation needs a new source/build provenance receipt, not relabeling of
+those historical binaries as rebuilt from the locked project.
+
 ## GUI capture — NOT AUTHORIZED YET
 
 Only after an explicit coordinator/user checkpoint, launch a disposable
