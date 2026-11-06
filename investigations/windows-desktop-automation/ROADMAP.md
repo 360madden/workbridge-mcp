@@ -111,3 +111,13 @@ Detailed evidence: `reports/2026-11-05-investigation-sitrep-04.md`.
 - [ ] Coordinate a quiet Windows desktop interval before any **real** WinApp/Sbroenne UIA snapshot or owned-modal fixture launch. Keep the incumbent working backend and RIFT/VMware user sessions undisturbed.
 
 Latest coordinator evidence: `reports/2026-11-05-investigation-sitrep-05.md`.
+
+## Sixth-wave source/offline checkpoint (2026-11-05 Eastern / 2026-11-06 UTC)
+
+- [x] Sbroenne V5 strict exact-HWND, approved fixture hash, watchdog start/session/SID/image, fixed seven-key env, pre-dispatch synced journal, private child Job supervisor: **default UIA-disabled C# compile OS0, Node syntax 2/2 OS0, pure Node tests 6/6 OS0**. Source+evidence commit `c1baeb9`; independent peer receipt `f0ddd32`. V5 EXE was NOT run and no real UIA has been invoked. Enabled screenshot/input/desktop access remains HOLD.
+- [x] Provider-neutral before/dispatch-once/wait/independently-verify outcome and latency design peer reviewed and committed `d7c97df`. Five terminal/pending/unknown outcomes, nine non-additive phases; **18 pure synthetic reducer tests proposed**, not yet executed.
+- [x] Host VMware vs OneDrive guest Windows session/latency delta documented `386ee5c`. Guest UIA is not host UIA and historical vmrun command availability does not establish interactive OneDrive desktop. One-lab read-only metadata-only trial remains gated.
+- [x] Admission-only orphan no-guard handoff threat documented `1060ece`; no live recovery authority, process/stamp+census incomplete. Retain unknown and HOLD all live release.
+- [ ] Build and peer-review minimal pure outcome reducer and WinApp/Sbroenne structural parity normalizer offline (no UIA).
+- [ ] Source review passive owned-modal native oracle before controlled test on disposable window.
+- [ ] **Quiet user-coordinated Windows foreground interval required** for the first actual WinApp/Sbroenne comparable read-only DesktopProbe snapshots, with fresh owner watchdog/lease and postcondition receipts. No production backend change before measured M5/M6 decision and WB-001.
