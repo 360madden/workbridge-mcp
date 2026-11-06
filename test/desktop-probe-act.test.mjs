@@ -45,13 +45,31 @@ async function addEvent(root, stage, counter) {
 
 function fakeUi(
   root,
-  { failAction = false, badFocus = false, lostForeground = false, silentClick = false } = {},
+  {
+    failAction = false,
+    badFocus = false,
+    lostForeground = false,
+    silentClick = false,
+    geometryDriftAfterFocus = false,
+    lateResizeBeforeAction = false,
+  } = {},
 ) {
   const calls = [];
+  let focused = false;
+  let listCalls = 0;
   const runner = async (args) => {
     calls.push(args);
     if (args[0] === '--version') return '0.7.1';
-    if (args[1] === 'list-windows') return JSON.stringify([{ ...win, isForeground: !lostForeground }]);
+    if (args[1] === 'list-windows') {
+      listCalls++;
+      return JSON.stringify([
+        {
+          ...win,
+          width: lateResizeBeforeAction && listCalls >= 4 ? win.width - 1 : win.width,
+          isForeground: !lostForeground,
+        },
+      ]);
+    }
     if (args[1] === 'inspect') {
       const depthIndex = args.indexOf('--depth');
       if (depthIndex < 0 || args[depthIndex + 1] !== '2') {
@@ -77,7 +95,7 @@ function fakeUi(
                     isEnabled: true,
                     isOffscreen: false,
                     isInvokable: true,
-                    x: 550,
+                    x: geometryDriftAfterFocus && focused ? 580 : 550,
                     y: 500,
                     width: 170,
                     height: 58,
@@ -89,7 +107,10 @@ function fakeUi(
         ],
       });
     }
-    if (args[1] === 'focus') return JSON.stringify({ hwnd: win.hwnd, elementId: 'btn-probe-test' });
+    if (args[1] === 'focus') {
+      focused = true;
+      return JSON.stringify({ hwnd: win.hwnd, elementId: 'btn-probe-test' });
+    }
     if (args[1] === 'get-focused') {
       return JSON.stringify({
         hasFocus: true,
@@ -501,6 +522,44 @@ test('GUI-004b wrong foreground refuses both keyboard and mouse input', async ()
       await assert.rejects(
         () => invokeProbeOnce(request('gui004b_foreground_' + method, '0', method), { runner, root }),
         (e) => e.code === 'ACTION_RECOVERY_REQUIRED',
+      );
+      assert.equal(calls.filter((x) => ['send-keys', 'click'].includes(x[1])).length, 0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test('GUI-004c rejects focus-induced button movement before any keyboard or pointer action', async () => {
+  for (const method of ['keyboard', 'mouse']) {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'wb-ui-geometry-drift-'));
+    try {
+      await addEvent(root, 'shown', 0);
+      const { runner, calls } = fakeUi(root, { geometryDriftAfterFocus: true });
+      const id = 'gui004c_drift_' + method;
+      await assert.rejects(() => invokeProbeOnce(request(id, '0', method), { runner, root }), {
+        code: 'ACTION_RECOVERY_REQUIRED',
+      });
+      assert.equal(calls.filter((x) => ['send-keys', 'click'].includes(x[1])).length, 0);
+      assert.equal(
+        JSON.parse(await readFile(path.join(root, 'ui-action-' + id + '.intent.json'))).method,
+        method,
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test('GUI-004c rejects a late window-size change just before input dispatch', async () => {
+  for (const method of ['keyboard', 'mouse']) {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'wb-ui-late-resize-'));
+    try {
+      await addEvent(root, 'shown', 0);
+      const { runner, calls } = fakeUi(root, { lateResizeBeforeAction: true });
+      await assert.rejects(
+        () => invokeProbeOnce(request('gui004c_resize_' + method, '0', method), { runner, root }),
+        { code: 'ACTION_RECOVERY_REQUIRED' },
       );
       assert.equal(calls.filter((x) => ['send-keys', 'click'].includes(x[1])).length, 0);
     } finally {

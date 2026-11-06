@@ -1,5 +1,13 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## Workbridge-first LuaPad acceleration — November 6, 2026 (source-only)
+
+- Joey's Workbridge-first M1–M5 plan was saved and committed as `b129f3f`: `docs/2026-11-06-workbridge-first-luapad-automation-plan.md`. Physical LuaPad Run/Output remains **live unverified**.
+- **GUI-004c geometry subgate:** bounded DesktopProbe keyboard/mouse pilot now compares the original and post-focus root/button rectangles and target dimensions, and rechecks window size immediately before dispatch. Synthetic focus-induced button drift and late resize refuse both input methods with durable, non-replayable intent.
+- Focused `desktop-probe-act` + shared admission tests **26/26 PASS**; Prettier **PASS**; `git diff --check` **PASS**. This is source/test verification, **not** an additional live GUI fixture pass, a Workbridge MCP deployment or a RIFT input success.
+- **Still pending for GUI-004c/M1:** independently observed unlocked Default desktop, process lifetime/session, cancellation and competing-input races, after-action proof, then disposable live retest. Preserve current owner 0.16.4-dev and use WB-001 for deployment.
+
+
 ## LuaPadModern physical /lp reopen preflight — November 5, 2026, 21:13 EST
 
 - Source-only guarded helper `scripts/physical-rift-luapad-open.mjs` and synthetic test `test/physical-rift-luapad-open.test.mjs` prepared: strict target/capture/closed-editor gates, shared admission/GUI lock, one-shot journal, no-replay and quarantine; **4/4 synthetic tests + syntax PASS**, physical read-only identity preflight PASS. The fresh 21:09 EST screenshot showed LuaPad already OPEN, so live `/lp` input was deliberately **NOT SENT**. Next: Joey clicks the custom-drawn LuaPad Close control, then a fresh capture and one guarded `/lp` run can prove reopen. See `investigations/windows-desktop-automation/reports/2026-11-05-luapad-reopen-preflight.md`. Existing RIFT `/reloadui` singleton/receipt remain untouched.

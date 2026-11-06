@@ -128,10 +128,28 @@ export function assertProbePointerReady(preflight) {
   ) {
     fail('TARGET_NOT_VISIBLE', 'Probe button is outside its full, unminimized window');
   }
-  return { target, button };
+  return {
+    target,
+    button,
+    windowRect: { x: root.x, y: root.y, width: root.width, height: root.height },
+  };
 }
 
-async function assertFreshTarget(target, runner, requireForeground = false) {
+// Focus/activation may move or resize the fixture. The geometry used to
+// authorize a later click must match both snapshots, not merely be on-screen.
+function assertStableProbeGeometry(expected, observed) {
+  const sameRect = (a, b) => ['x', 'y', 'width', 'height'].every((key) => a[key] === b[key]);
+  if (
+    observed.target.width !== expected.target.width ||
+    observed.target.height !== expected.target.height ||
+    !sameRect(expected.windowRect, observed.windowRect) ||
+    !sameRect(expected.button, observed.button)
+  ) {
+    fail('TARGET_GEOMETRY_CHANGED', 'Probe geometry moved after preflight; no input sent');
+  }
+}
+
+async function assertFreshTarget(target, runner, requireForeground = false, expectedGeometry = null) {
   const current = JSON.parse(await runner(['ui', 'list-windows', '-a', String(target.pid), '--json']));
   const found = Array.isArray(current)
     ? current.find(
@@ -150,10 +168,17 @@ async function assertFreshTarget(target, runner, requireForeground = false) {
   if (Number(found.width) < 300 || Number(found.height) < 200) {
     fail('TARGET_NOT_VISIBLE', 'Window was minimized or resized before input');
   }
+  if (
+    expectedGeometry &&
+    (Number(found.width) !== expectedGeometry.target.width ||
+      Number(found.height) !== expectedGeometry.target.height)
+  ) {
+    fail('TARGET_GEOMETRY_CHANGED', 'Probe window resized immediately before input');
+  }
   return found;
 }
 
-async function confirmFocusedButton(requestTarget, target, runner) {
+async function confirmFocusedButton(requestTarget, target, runner, expectedGeometry) {
   const focus = JSON.parse(
     await runner(['ui', 'focus', BUTTON_SELECTOR, '-w', String(target.hwnd), '--json']),
   );
@@ -172,7 +197,8 @@ async function confirmFocusedButton(requestTarget, target, runner) {
   }
   const fresh = await executeReadOnly(requestTarget, runner);
   const geometry = assertProbePointerReady(fresh);
-  await assertFreshTarget(target, runner, true);
+  assertStableProbeGeometry(expectedGeometry, geometry);
+  await assertFreshTarget(target, runner, true, geometry);
   return geometry.button;
 }
 
@@ -318,7 +344,7 @@ async function invokeProbeOnceOwned(
     }
     const preflight = await executeReadOnly(request.target, runner);
     const target = assertProbeActionReady(preflight);
-    if (request.method !== 'uia') assertProbePointerReady(preflight);
+    const pointerGeometry = request.method === 'uia' ? null : assertProbePointerReady(preflight);
     const before = await readProbeCount(root, target.pid);
     if (before.counter !== request.expectedCount) {
       fail('EXPECTED_STATE_MISMATCH', 'Probe counter differs from the expected value');
@@ -363,7 +389,7 @@ async function invokeProbeOnceOwned(
           ]),
         );
       } else {
-        button = await confirmFocusedButton(request.target, target, runner);
+        button = await confirmFocusedButton(request.target, target, runner, pointerGeometry);
         if (request.method === 'keyboard') {
           result = JSON.parse(
             await runner([
