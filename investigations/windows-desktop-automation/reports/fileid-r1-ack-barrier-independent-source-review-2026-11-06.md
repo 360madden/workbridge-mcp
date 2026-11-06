@@ -29,6 +29,18 @@
 4. **Temporary artifacts:** This matrix creates a small number of GUID-owned files/directories, retains them for evidence, and performs a few owned test-file releases. These synthetic fixture edits are authorized only for the single bounded trial; do not recursively clean unknown existing directories.
 5. Successful R1 evidence would demonstrate a *file identity and release invariant*, not desktop action delivery, UIA reliability, process-tree ownership, or unattended production safety.
 
+## Independently observed first R1 negative-matrix result — RED, no rerun
+
+The reviewer independently retrieved previously saved Workbridge job `wda_fileid_r1_native_build_20261105a`: OS exit0, 379-byte complete stdout, 0 warnings, 0 errors, ~3s `net10.0` build. A separate read-only `file_info(hash:true)` confirmed the **exact ignored R1 EXE** `temp/fileid-r1-bin/FileIdLeaseR0.exe` is **162,304 bytes**, SHA-256 `59d169957ec57154348e8d20f2704090b096b06bcef0c20bb138f96d249ec6ca`.
+
+First author-controlled private test `wda_fileid_r1_negative_matrix_20261105a`: Workbridge **failed, actual OS exit1**, 529-byte complete stderr, stdout0, no truncation, `2026-11-06T00:14:35.220Z` to `00:14:43.863Z`. Its retained JSON reports **three completed PASS cases only**: `hardlink_count_two_refused`, `share_read_denies_delete_until_holder_exits`, `rename_race_during_held_delete_handle_refused` (actual competing rename error `EBUSY`). Then `R1_SYNTHETIC_FAILED:OWNED_CHILD_DEADLINE`. **B02 missing ACK was NOT verified; R01 junction not reached.** It reports `tempFixturesRetainedForReview:true`, `productionPathsTouched:false`. There was **no rerun** by reviewer.
+
+### Confirmed root cause hypothesis (current .NET source)
+
+Native `Program.cs` lines 315–320 calls `Console.In.ReadLineAsync()` before constructing the 500ms `Task.Delay` winner. That call is **not asynchronous** for .NET `Console.In`'s synchronized `SyncTextReader`: the current .NET runtime source states synchronized async read methods run synchronously, and implements `ReadLineAsync()` as `Task.FromResult(ReadLine())`. With B02 intentionally not sending ACK or closing stdin, the call blocks the native thread indefinitely, so `Task.WhenAny` is never reached. Node's separate 5.5s owned-child deadline correctly flags failure. Primary official source: [SyncTextReader implementation](https://source.dot.net/System.Console/System/IO/SyncTextReader.cs.html) lines 90–104 and [Console class documentation](https://learn.microsoft.com/en-us/dotnet/api/system.console).
+
+**Narrow proposed source-only fix, NOT executed:** `var ackTask = Task.Run(() => Console.In.ReadLine());` then retain current bounded `Task.WhenAny(ackTask, Task.Delay(testBarrierTimeoutMs))` and exact ACK handling. A background read may stay pending during timeout but the helper process must immediately return nonzero and **never call SetDisposition**. Before authorizing another single matrix test, freeze/pin patched source, run compile and independent safety review; preserve failed R1 job and fixtures. One-shot replay remains **HOLD** for the same failed request. Live Workbridge guard/archive remains **HOLD**.
+
 ## Acceptance for author/coordinator's ONE run
 
 Build only the reviewed `net10.0` source to the separate ignored R1 directory, zero errors/warnings, independently pin EXE SHA. Then one Workbridge-bounded `r1-synthetic-run.mjs ABS_R1_EXE EXACT_SHA` invocation **without `--benchmark`**. Require unique truthful H01, S01, B01, B02, R01 pass-or-explicit-skip receipts, native temp-root hash parity, no unexpected launch/timeout, verified original/alias state, and actual OS exit0 with untruncated output. Any uncertainty => HOLD and retain existing evidence. No live Workbridge path may be passed or accessed.
