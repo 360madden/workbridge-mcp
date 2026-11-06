@@ -1,0 +1,5 @@
+# Isolated restore/build products are never committed.
+.packages/
+bin/
+obj/
+pilot.png
