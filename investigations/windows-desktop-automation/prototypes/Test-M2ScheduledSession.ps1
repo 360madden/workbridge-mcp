@@ -23,6 +23,8 @@ $processBirthTicks = $null
 $exeHash = $null
 $firstSequence = $null
 $secondSequence = $null
+$firstDesktopStatus = $null
+$secondDesktopStatus = $null
 $taskRemoved = $false
 $processStopped = $false
 
@@ -73,6 +75,15 @@ try {
     Require ($null -ne $first) 'HEARTBEAT_TIMEOUT'
     Require ($first.sessionId -eq $ExpectedSessionId -and !$first.elevated -and
         $first.pid -gt 0 -and $first.schema -eq 1) 'HEARTBEAT_SESSION_OR_TOKEN_MISMATCH'
+    # These are two child-owned instantaneous observations, NOT an input authorization.
+    Require ($null -ne $first.desktop -and $first.desktop.sampleStatus -ceq 'DEFAULT_INPUT_DESKTOP_SAMPLE' -and
+        $first.desktop.userInteractive -eq $true -and $first.desktop.windowStation -ceq 'WinSta0' -and
+        $first.desktop.threadDesktop -ceq 'Default' -and $first.desktop.inputDesktop -ceq 'Default' -and
+        $first.desktop.activeConsoleSessionId -eq $ExpectedSessionId -and
+        $first.desktop.safeForInput -eq $false -and $first.desktop.sessionLocked -ceq 'UNKNOWN' -and
+        $first.desktop.sessionConnected -ceq 'UNKNOWN' -and
+        $first.desktop.intervalContinuity -ceq 'UNKNOWN') 'FIRST_DESKTOP_SAMPLE_MISMATCH'
+    $firstDesktopStatus = [string]$first.desktop.sampleStatus
     $processId = [int]$first.pid
     $proc = [Diagnostics.Process]::GetProcessById($processId)
     Require (-not $proc.HasExited -and $proc.ProcessName -ceq 'HeartbeatProbe' -and
@@ -86,6 +97,15 @@ try {
     $second = ReadHeartbeat $heartbeatPath
     Require ($first.instance -ceq $second.instance -and $second.pid -eq $processId -and
         [long]$second.sequence -gt $firstSequence -and $second.sessionId -eq $ExpectedSessionId) 'HEARTBEAT_NOT_CONTINUOUS'
+    Require ($null -ne $second.desktop -and $second.desktop.sampleStatus -ceq 'DEFAULT_INPUT_DESKTOP_SAMPLE' -and
+        $second.desktop.userInteractive -eq $true -and $second.desktop.windowStation -ceq 'WinSta0' -and
+        $second.desktop.threadDesktop -ceq 'Default' -and $second.desktop.inputDesktop -ceq 'Default' -and
+        $second.desktop.activeConsoleSessionId -eq $ExpectedSessionId -and
+        $second.desktop.safeForInput -eq $false -and $second.desktop.sessionLocked -ceq 'UNKNOWN' -and
+        $second.desktop.sessionConnected -ceq 'UNKNOWN' -and
+        $second.desktop.intervalContinuity -ceq 'UNKNOWN') 'SECOND_DESKTOP_SAMPLE_MISMATCH'
+    Require ([DateTimeOffset]$second.desktop.observedAtUtc -gt [DateTimeOffset]$first.desktop.observedAtUtc) 'DESKTOP_SAMPLE_TIME_NOT_ADVANCING'
+    $secondDesktopStatus = [string]$second.desktop.sampleStatus
     $secondSequence = [long]$second.sequence
     $verified = $true
 } catch {
@@ -128,6 +148,11 @@ $reason = if ($failure -and $failure -match '^[A-Z][A-Z_]{2,65}$') { $failure } 
     initialSequence=$firstSequence
     finalSequence=$secondSequence
     heartbeatStopped=$processStopped
+    firstDesktopStatus=$firstDesktopStatus
+    secondDesktopStatus=$secondDesktopStatus
+    desktopSamplesAuthorizeInput=$false
+    sessionLockVerified=$false
+    intervalVerified=$false
     errorCode=$reason
     remainingTaskMayRequireReview=(-not $taskRemoved)
 } | ConvertTo-Json -Compress -Depth 3

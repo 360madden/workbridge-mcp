@@ -1,5 +1,13 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## M2 scheduled child-owned desktop observations — November 6, 2026 (headless, read-only)
+
+- Added additive `desktop` telemetry to the existing .NET 10 `HeartbeatProbe` using read-only Win32 station/thread/input desktop names and active-console Session ID. The producer reports `sessionLocked=UNKNOWN`, `sessionConnected=UNKNOWN`, `intervalContinuity=UNKNOWN`, and `safeForInput=false` **unconditionally**. Existing heartbeat fields/manager behavior are unchanged.
+- **Validation:** Release publish PASS; pure classifier self-test **8/8 PASS**. Disposable `sessprobe20261106c` Task Scheduler launch **PASS**, exit 0: child PID **69248** in Session **1**, Limited/Interactive principal without triggers; heartbeat **1→2**, both independently time-advancing child-generated samples `WinSta0` / thread `Default` / input `Default` / active console **1**, both `DEFAULT_INPUT_DESKTOP_SAMPLE` and `safeForInput=false`. Published child executable SHA-256: `e0f6f1e413ab9c3d7c74c722c4ac3095643834e9ba62ea0e7cd0957274ddd3e5`.
+- **Independent cleanup census:** one separate read-only job found disposable task absent, PID **69248** absent, saved heartbeat sequence **4**, and all five preexisting helper tasks still registered. Disposable registration/evidence is retained under ignored `.local`/`.tools`; no GUI, input, screenshot, focus, RIFT/VM access, restart or Workbridge service update.
+- **Strict interpretation:** two child-owned desktop samples prove only what the child observed at two instants. They do **not** prove continuous unlocked/connected state, trusted foreground/modal/occlusion witness, or Run/Output. M2 **live GUI pilot remains HOLD** pending independent full-interval identity and readiness proof.
+
+
 ## M2 actual Task Scheduler session launch — November 6, 2026 (headless disposable acceptance)
 
 - Reused existing `scripts/helpers/HeartbeatProbe` (`.NET 10`, `WinExe`, no GUI) and `scripts/Manage-HelperTask.ps1`; added `investigations/windows-desktop-automation/prototypes/Test-M2ScheduledSession.ps1`. It uses a unique on-demand Limited/Interactive task with **zero triggers**, checks native process PID/session/start/executable hash and two advancing heartbeat observations, then removes its own task in `finally`. No screen input, focus, screenshot, RIFT/VM access, desktop-service update or reboot.

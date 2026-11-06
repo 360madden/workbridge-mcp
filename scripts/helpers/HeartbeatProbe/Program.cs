@@ -2,6 +2,16 @@ using System.Diagnostics;
 using System.Security.Principal;
 using System.Text.Json;
 
+if (args.Length == 1 && args[0] == "--desktop-facts-self-test")
+{
+    int cases = DesktopFacts.SelfTest();
+    Console.WriteLine(JsonSerializer.Serialize(new {
+        schemaVersion = 1, selfTest = cases == 8 ? "PASS" : "FAIL",
+        cases, safeForInput = false
+    }));
+    return cases == 8 ? 0 : 2;
+}
+
 if (args.Length != 1 || !Path.IsPathFullyQualified(args[0]) || !Directory.Exists(args[0])) return 2;
 var directory = Path.GetFullPath(args[0]);
 try
@@ -20,7 +30,8 @@ try
         var json = JsonSerializer.Serialize(new {
             schema = 1, marker = "WORKBRIDGE_PERSISTENT_HELPER_OK", instance,
             pid = Environment.ProcessId, sessionId = process.SessionId, startedUtc,
-            sequence = ++sequence, updatedUtc = DateTimeOffset.UtcNow, elevated
+            sequence = ++sequence, updatedUtc = DateTimeOffset.UtcNow, elevated,
+            desktop = DesktopFacts.Sample(process.SessionId)
         });
         var temporary = Path.Combine(directory, "heartbeat.tmp");
         File.WriteAllText(temporary, json);
