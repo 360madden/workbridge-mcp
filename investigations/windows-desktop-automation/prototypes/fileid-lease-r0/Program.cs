@@ -111,7 +111,8 @@ internal static class Program
                     GetHex(options, "--volume", 16),
                     GetHex(options, "--file-id", 32),
                     GetHex(options, "--sha256", 64),
-                    ParseGuid(GetRequired(options, "--lease-id")));
+                    ParseGuid(GetRequired(options, "--lease-id")),
+                    GetBarrierTimeoutMs(options));
             }
             return 0;
         }
@@ -133,9 +134,10 @@ internal static class Program
         {
             var key = args[i];
             var flag = key is "--existing-root" or "--abort-after-fsync";
+            var releaseKey = key is "--volume" or "--file-id" or "--sha256" or "--lease-id" or "--test-barrier-timeout-ms";
             var allowed = key == "--fixture-id" ||
                 (verb == "create" && flag) ||
-                (verb == "release" && key is "--volume" or "--file-id" or "--sha256" or "--lease-id");
+                (verb == "release" && releaseKey);
             if (!allowed || options.ContainsKey(key)) throw new Rejected("INVALID_ARGUMENTS");
             if (flag)
             {
@@ -148,7 +150,7 @@ internal static class Program
             }
         }
         if (verb == "create" && options.Count > 3) throw new Rejected("INVALID_ARGUMENTS");
-        if (verb == "release" && options.Count != 5) throw new Rejected("INVALID_ARGUMENTS");
+        if (verb == "release" && options.Count is not (5 or 6)) throw new Rejected("INVALID_ARGUMENTS");
         return options;
     }
 
@@ -172,6 +174,15 @@ internal static class Program
         if (value.Length != length || !value.All(Uri.IsHexDigit))
             throw new Rejected("INVALID_IDENTITY_TOKEN");
         return value.ToLowerInvariant();
+    }
+
+    private static int GetBarrierTimeoutMs(Dictionary<string, string?> options)
+    {
+        if (!options.TryGetValue("--test-barrier-timeout-ms", out var text)) return 0;
+        // A deterministic synthetic-only barrier; never a production polling loop.
+        if (!int.TryParse(text, out var milliseconds) || milliseconds < 1 || milliseconds > 1500)
+            throw new Rejected("INVALID_SYNTHETIC_BARRIER");
+        return milliseconds;
     }
 
     private static string GetFixtureFolder(string fixtureId)
@@ -251,7 +262,8 @@ internal static class Program
 
     private static void Release(
         string fixtureId, string folder, string file,
-        string expectedVolume, string expectedFileId, string expectedHash, string expectedLeaseId)
+        string expectedVolume, string expectedFileId, string expectedHash, string expectedLeaseId,
+        int testBarrierTimeoutMs)
     {
         EnsureOrdinaryDirectories(folder);
         using var handle = CreateFile(file, GenericRead | DeleteAccess, FileShareRead,
@@ -294,6 +306,24 @@ internal static class Program
                 !afterId.Identifier.SequenceEqual(originalId.Identifier) ||
                 after.EndOfFile != bytes.Length || after.NumberOfLinks != 1 || after.DeletePending != 0)
                 throw new Rejected("SOURCE_CHANGED", 3);
+            // R1 exact ordered barrier: stdout PINNED proves THIS DELETE handle
+            // is open and identity/hash-pinned. Contender attempts rename, THEN
+            // writes ACK on stdin; until that ACK the original handle stays open.
+            // Timeout/invalid ACK disposes handle WITHOUT issuing disposition.
+            if (testBarrierTimeoutMs > 0)
+            {
+                Emit(new { ok = true, stage = "pinned", fixtureId });
+                Console.Out.Flush();
+                // Console.In is synchronized: its ReadLineAsync executes synchronously.
+                // Run the blocking pipe read on a background ThreadPool worker so
+                // the deadline can refuse safely before any file disposition.
+                var ackTask = Task.Run(() => Console.In.ReadLine());
+                var winner = Task.WhenAny(ackTask, Task.Delay(testBarrierTimeoutMs)).GetAwaiter().GetResult();
+                if (!ReferenceEquals(winner, ackTask))
+                    throw new Rejected("BARRIER_TIMEOUT_RETAINED");
+                if (ackTask.GetAwaiter().GetResult() != "ACK")
+                    throw new Rejected("BARRIER_ACK_INVALID_RETAINED");
+            }
             // Held-handle operation: no path unlink, no checked-pathname removal.
             if (Marshal.SizeOf<FileDispositionInfo>() != 1)
                 throw new Rejected("INVALID_NATIVE_LAYOUT");
