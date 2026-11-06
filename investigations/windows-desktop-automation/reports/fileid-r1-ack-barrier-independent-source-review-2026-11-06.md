@@ -41,6 +41,22 @@ Native `Program.cs` lines 315–320 calls `Console.In.ReadLineAsync()` before co
 
 **Narrow proposed source-only fix, NOT executed:** `var ackTask = Task.Run(() => Console.In.ReadLine());` then retain current bounded `Task.WhenAny(ackTask, Task.Delay(testBarrierTimeoutMs))` and exact ACK handling. A background read may stay pending during timeout but the helper process must immediately return nonzero and **never call SetDisposition**. Before authorizing another single matrix test, freeze/pin patched source, run compile and independent safety review; preserve failed R1 job and fixtures. One-shot replay remains **HOLD** for the same failed request. Live Workbridge guard/archive remains **HOLD**.
 
+## Independently verified corrected R1 e02 synthetic — GREEN within scope (2026-11-06)
+
+The reviewer retrieved saved Workbridge **status and complete 800-byte stdout** for author-controlled job `wda_fileid_r1_negative_matrix_fixed_20261105_e02`: **OS exit 0**, status passed, `2026-11-06T00:26:24.106Z` to `00:26:28.258Z` (4.152 seconds), stdout 800 bytes, stderr 0, no truncation; **this was not rerun**. The JSON summary asserts `ok:true`, `syntheticOnly:true`, `r1CasesPassed:5`, `skipped:0`, `productionPathsTouched:false`, and `tempFixturesRetainedForReview:true`.
+
+All five **harness-reported** cases passed, with independently inspected source assertions as follows:
+
+1. `hardlink_count_two_refused` — hardlink-count-two fixture refused.
+2. `share_read_denies_delete_until_holder_exits` — separate test holder's FILE_SHARE_READ prevented DELETE-open until held handle closed; harness checks holder exit0 and no signal.
+3. `rename_race_during_held_delete_handle_refused` — pre-ACK competing rename rejected with actual `EBUSY`, `stage:pinned` verified before ACK, native release afterward exit0, no renamed leaf.
+4. `missing_ack_retains_lock` — no ACK given; harness explicitly asserts native **exit4**, second native result `ok:false` and `code:BARRIER_TIMEOUT_RETAINED`, original path still exists, retained original SHA-256 unchanged.
+5. `directory_junction_guard` — junction alias rejected as `UNSAFE_DIRECTORY_COMPONENT` exit4, original persisted. No test was skipped.
+
+A fresh, read-only Workbridge `file_info(hash:true)` independently matched the frozen source **Program.cs** SHA-256 `9443b975ac41e7af7c859f406aaa333a023b3183d91efa2b89adfe110147f84d`, Node **r1-synthetic-run.mjs** SHA-256 `466411c10ca5eddffd6cbe1964168df9b265cd0e19409355b51a65e398c26c42`, and isolated ignored **FileIdLeaseR0.exe** **162,304 bytes** SHA-256 `6545423797b3c17c3059649d39a9310ce665654831e07e90a21c8a49c50e791b`.
+
+**Evidence boundary:** The 800-byte receipt is a *single aggregate Node harness summary*, **not** per-native-child stdout traces, ETW proof, OS-wide descendant census, or independent live filesystem verification. Source inspection establishes what the harness asserts; it does not replace that native trace. First R1 e01 failure remains recorded above. This is **GO** to archive this synthetic milestone, **HOLD** real desktop-turn lock archival/release, GUI automation, and the optional 40× timing benchmark.
+
 ## Acceptance for author/coordinator's ONE run
 
 Build only the reviewed `net10.0` source to the separate ignored R1 directory, zero errors/warnings, independently pin EXE SHA. Then one Workbridge-bounded `r1-synthetic-run.mjs ABS_R1_EXE EXACT_SHA` invocation **without `--benchmark`**. Require unique truthful H01, S01, B01, B02, R01 pass-or-explicit-skip receipts, native temp-root hash parity, no unexpected launch/timeout, verified original/alias state, and actual OS exit0 with untruncated output. Any uncertainty => HOLD and retain existing evidence. No live Workbridge path may be passed or accessed.
