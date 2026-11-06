@@ -178,32 +178,56 @@ const DOTNET='C:\\Program Files\\dotnet\\dotnet.exe';
 const DLL=path.join(ROOT,'.tools','rift-retry-sender-artifacts','bin',
   'RiftRetrySender','release','RiftRetrySender.dll');
 const EXPECTED_DLL_SHA256='1ac2699148ec089ef69631d4b590f492646ba288f97959fddc3b6ac29376604f';
+const SENDER_DIR=path.dirname(DLL);
+const LOCKED_ARTIFACTS=Object.freeze([
+  Object.freeze({path:path.join(SENDER_DIR,"RiftRetrySender.dll"),sha256:"1ac2699148ec089ef69631d4b590f492646ba288f97959fddc3b6ac29376604f"}),
+  Object.freeze({path:path.join(SENDER_DIR,"RiftRetrySender.deps.json"),sha256:"eb37e1d66f89c5df7c99eb0d3f946863ce27eeed93feb29bf89a37e6a3b9b5ed"}),
+  Object.freeze({path:path.join(SENDER_DIR,"RiftRetrySender.runtimeconfig.json"),sha256:"96bc2946dff8790400d652ec7f8de7bb043e954980d59470c112788b68a1fbd3"}),
+  Object.freeze({path:path.join(SENDER_DIR,"FlaUI.Core.dll"),sha256:"b95db065bbac22bf16a3f8fd0b6faed751b9b41d8d355ae6a3c13624991f44a0"}),
+  Object.freeze({path:path.join(SENDER_DIR,"System.Management.dll"),sha256:"527ff1125d7b4a3ebe76c7c28a0eb524678abcf00108fe0166c9e8c22ef4da9a"}),
+  Object.freeze({path:path.join(SENDER_DIR,"runtimes","win","lib","net10.0","System.Management.dll"),sha256:"b54deff63d4c23cc4bbea00cea659727872f7ceb8ade74475577d45aa92e6216"}),
+]);
 const SOURCE=fileURLToPath(new URL('./Program.cs',import.meta.url));
 const CSPROJ=fileURLToPath(new URL('./RiftRetrySender.csproj',import.meta.url));
 
-// Fixed Windows PowerShell 5.1 launcher. Hash the actual DLL through a held
-// FileShare.Read handle, retain that handle until the C# --contract-check child exits.
-// This closes the primary DLL read/hash -> .NET load replacement race. No live CLI.
-// Transitive FlaUI.Core/deps/runtimeconfig are not hash-pinned or handle-held here.
+// Fixed Windows PowerShell 5.1 launcher. Hash an explicit six-artifact allowlist
+// through held FileShare.Read handles; retain all until --contract-check exits.
+// Machine-wide .NET runtime and unlisted binaries remain outside this narrow gate.
+// No live input CLI or arbitrary executable/artifact paths are exposed.
 const POWERSHELL='C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-const LOCKED_CONTRACT_PS=String.raw`$ErrorActionPreference='Stop'
+export const LOCKED_CONTRACT_PS=String.raw`$ErrorActionPreference='Stop'
 $dll=$env:RRE_RETRY_DLL_PATH
 $dotnet=$env:RRE_RETRY_DOTNET_PATH
 $witness=$env:RRE_RETRY_VALIDATED_PATH
-$expected=$env:RRE_RETRY_DLL_SHA256
-$held=$null
+$manifest=ConvertFrom-Json $env:RRE_RETRY_LOCK_MANIFEST_JSON
+$held=New-Object 'System.Collections.Generic.List[System.IO.FileStream]'
+$hashes=@()
 $hasher=$null
 $child=$null
 try {
   if([string]::IsNullOrWhiteSpace($dll) -or [string]::IsNullOrWhiteSpace($dotnet) -or
      [string]::IsNullOrWhiteSpace($witness) -or $dll.Contains('"') -or
      $witness.Contains('"') -or $dotnet.Contains('"')) { throw 'LOCKED_CONTRACT_PATH_INVALID' }
-  # Windows FileShare.Read denies replacement/rename/write for the entire child lifetime.
-  $held=[System.IO.File]::Open($dll,[System.IO.FileMode]::Open,
-    [System.IO.FileAccess]::Read,[System.IO.FileShare]::Read)
+  # Every fixed artifact is checked through its own held Windows FileShare.Read
+  # handle; write/rename/delete remains denied until the child exits.
+  if(@($manifest).Count -ne 6 -or $manifest[0].path -cne $dll){
+    throw 'LOCKED_MANIFEST_INVALID'
+  }
   $hasher=[System.Security.Cryptography.SHA256]::Create()
-  $digest=([System.BitConverter]::ToString($hasher.ComputeHash($held))).Replace('-','').ToLowerInvariant()
-  if($digest -cne $expected) { throw 'LOCKED_SENDER_DLL_HASH_CHANGED' }
+  foreach($part in $manifest){
+    $p=[string]$part.path
+    $expectedHash=[string]$part.sha256
+    if([string]::IsNullOrWhiteSpace($p) -or $p.Contains('"') -or
+       $expectedHash -notmatch "^[a-f0-9]{64}$"){
+      throw 'LOCKED_MANIFEST_INVALID'
+    }
+    $stream=[System.IO.File]::Open($p,[System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::Read,[System.IO.FileShare]::Read)
+    $held.Add($stream)
+    $digest=([System.BitConverter]::ToString($hasher.ComputeHash($stream))).Replace('-','').ToLowerInvariant()
+    if($digest -cne $expectedHash){throw 'LOCKED_ARTIFACT_HASH_CHANGED'}
+    $hashes+=([pscustomobject]@{path=$p;sha256=$digest})
+  }
   $psi=New-Object System.Diagnostics.ProcessStartInfo
   $psi.FileName=$dotnet
   $psi.Arguments='"'+$dll+'" --contract-check "'+$witness+'"'
@@ -225,11 +249,22 @@ try {
   $childErr=$errTask.Result
   if($child.ExitCode -ne 0){throw 'LOCKED_CONTRACT_CHILD_REJECTED'}
   if($childErr.Length -ne 0 -or $childOut.Length -gt 8192){throw 'LOCKED_CONTRACT_OUTPUT_INVALID'}
-  $receipt=[pscustomobject]@{guard='win32-filestream-shareread-v1';dllSha256=$digest;
+  $receipt=[pscustomobject]@{guard='win32-filestream-shareread-allowlist-v2';
+    dllSha256=$hashes[0].sha256;heldArtifacts=$hashes;
     childExit=$child.ExitCode;childStdout=$childOut}
-  [System.Console]::Out.Write(($receipt|ConvertTo-Json -Compress))
+  [System.Console]::Out.Write(($receipt|ConvertTo-Json -Depth 5 -Compress))
 } catch {
-  [System.Console]::Error.WriteLine('LOCKED_CONTRACT_REJECTED')
+  $reason='LOCKED_CONTRACT_REJECTED'
+  if($_.Exception.Message -eq 'LOCKED_ARTIFACT_HASH_CHANGED'){
+    $reason='LOCKED_ARTIFACT_HASH_CHANGED'
+  }elseif($_.Exception.Message -eq 'LOCKED_MANIFEST_INVALID'){
+    $reason='LOCKED_MANIFEST_INVALID'
+  }elseif($_.Exception -is [System.IO.FileNotFoundException] -or
+           $_.Exception.InnerException -is [System.IO.FileNotFoundException] -or
+           $_.Exception.InnerException -is [System.IO.DirectoryNotFoundException]){
+    $reason='LOCKED_ARTIFACT_UNAVAILABLE'
+  }
+  [System.Console]::Error.WriteLine($reason)
   if($null -ne $child){
     try{if(-not $child.HasExited){$child.Kill();[void]$child.WaitForExit(2000)}}catch{}
   }
@@ -237,7 +272,7 @@ try {
 } finally {
   if($null -ne $child){$child.Dispose()}
   if($null -ne $hasher){$hasher.Dispose()}
-  if($null -ne $held){$held.Dispose()}
+  for($i=$held.Count-1;$i -ge 0;$i--){$held[$i].Dispose()}
 }`;
 
 export async function sendFixedContractCheck(validatedPath){
@@ -249,16 +284,21 @@ export async function sendFixedContractCheck(validatedPath){
     boundedFile(DLL,10000,16*1024*1024),lstat(SOURCE),lstat(CSPROJ)]);
   if(dllStat.mtimeMs+1500<Math.max(srcStat.mtimeMs,projStat.mtimeMs))
     stop('STALE_SENDER_BUILD','Native offline sender must be rebuilt after C# changes');
-  const dllSha=sha(await readFile(DLL));
-  if(dllSha!==EXPECTED_DLL_SHA256)
-    stop('SENDER_DLL_HASH_CHANGED','Pinned offline C# sender binary hash differs');
+  // Fail early if any explicitly pinned primary/dependency artifact differs.
+  // The PowerShell child independently rehashes each SAME held handle.
+  for(const artifact of LOCKED_ARTIFACTS){
+    await boundedFile(artifact.path,2,16*1024*1024);
+    if(sha(await readFile(artifact.path))!==artifact.sha256)
+      stop('SENDER_ARTIFACT_HASH_CHANGED','Pinned sender/dependency artifact differs');
+  }
   let stdout;
   try{
     ({stdout}=await execFileAsync(POWERSHELL,['-NoProfile','-NonInteractive',
       '-EncodedCommand',Buffer.from(LOCKED_CONTRACT_PS,'utf16le').toString('base64')],{
         cwd:ROOT,timeout:21000,maxBuffer:16384,windowsHide:true,
         env:{...process.env,RRE_RETRY_DLL_PATH:DLL,RRE_RETRY_DOTNET_PATH:DOTNET,
-          RRE_RETRY_VALIDATED_PATH:validatedPath,RRE_RETRY_DLL_SHA256:EXPECTED_DLL_SHA256}
+          RRE_RETRY_VALIDATED_PATH:validatedPath,
+          RRE_RETRY_LOCK_MANIFEST_JSON:JSON.stringify(LOCKED_ARTIFACTS)}
       }));
   }catch{
     stop('CONTRACT_CHECK_REJECTED','Locked C# contract-check rejected evidence without input');
@@ -266,8 +306,13 @@ export async function sendFixedContractCheck(validatedPath){
   let guarded,output;
   try{
     guarded=JSON.parse(stdout.trim());
-    if(guarded.guard!=='win32-filestream-shareread-v1'||
+    if(guarded.guard!=='win32-filestream-shareread-allowlist-v2'||
        guarded.dllSha256!==EXPECTED_DLL_SHA256||guarded.childExit!==0||
+       !Array.isArray(guarded.heldArtifacts)||
+       guarded.heldArtifacts.length!==LOCKED_ARTIFACTS.length||
+       guarded.heldArtifacts.some((part,i)=>
+         part.path!==LOCKED_ARTIFACTS[i].path||
+         part.sha256!==LOCKED_ARTIFACTS[i].sha256)||
        typeof guarded.childStdout!=='string')throw Error();
     output=JSON.parse(guarded.childStdout.trim());
   }catch{stop('CONTRACT_RECEIPT_INVALID','Locked C# contract JSON unavailable or unverified');}
@@ -275,7 +320,9 @@ export async function sendFixedContractCheck(validatedPath){
      output?.nativeVerified!==false||output?.liveInputAllowed!==false||
      output?.inputInjected!==false)
     stop('CONTRACT_RECEIPT_INVALID','C# did not explicitly prove no native/input path');
-  return {output,dllSha256:guarded.dllSha256,senderLockGuard:guarded.guard};
+  return {output,dllSha256:guarded.dllSha256,senderLockGuard:guarded.guard,
+    senderArtifactCount:guarded.heldArtifacts.length,
+    senderManifestSha256:sha(Buffer.from(JSON.stringify(LOCKED_ARTIFACTS)))};
 }
 
 // Before creating a C#-readable envelope, recheck the actual Workbridge screenshot
@@ -321,6 +368,8 @@ export async function contractCheckOfflineOnce(envelopePath,opts={}){
           screenshotSha256:latest.screenshotSha256,
           senderDllSha256:response.dllSha256??null,
           senderLockGuard:response.senderLockGuard??null,
+          senderArtifactCount:response.senderArtifactCount??null,
+          senderManifestSha256:response.senderManifestSha256??null,
           nativeVerified:false,liveAuthorized:false,inputAttempted:false,
           point:latest.plan.virtualScreenPoint,
           completedUtc:new Date().toISOString()});

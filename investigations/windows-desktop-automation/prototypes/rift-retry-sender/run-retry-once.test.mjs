@@ -9,7 +9,7 @@ import {mkdtemp,writeFile,readFile,lstat,readdir,rm} from 'node:fs/promises';
 import path from 'node:path';
 import {
   LIVE_REFUSAL,parseRetryArgs,planDwmRetryOffline,
-  inspectRetryEvidence,journalOfflineRetryOnce,contractCheckOfflineOnce
+  inspectRetryEvidence,journalOfflineRetryOnce,contractCheckOfflineOnce,LOCKED_CONTRACT_PS
 } from './run-retry-once.mjs';
 
 const id='rre_retry_synthetic_20261105_a1';
@@ -221,7 +221,9 @@ test('P2.1 actual Node-to-C# synthetic JSON/PNG contract (NO Win32, NO input)',a
     assert.deepEqual(r.plan.virtualScreenPoint,{x:-406,y:465});
     const receipt=JSON.parse(await readFile(r.receiptPath,'utf8'));
     assert.match(receipt.senderDllSha256,/^[0-9a-f]{64}$/);
-    assert.equal(receipt.senderLockGuard,'win32-filestream-shareread-v1');
+    assert.equal(receipt.senderLockGuard,'win32-filestream-shareread-allowlist-v2');
+    assert.equal(receipt.senderArtifactCount,6);
+    assert.match(receipt.senderManifestSha256,/^[0-9a-f]{64}$/);
   }finally{await rm(a.root,{recursive:true,force:true});}
 });
 
@@ -252,6 +254,44 @@ try {
       {timeout:15000,windowsHide:true,maxBuffer:4096,
         env:{...process.env,RRE_TEST_SHARE_FILE:dll}});
     assert.deepEqual(JSON.parse(stdout.trim()),{writeDenied:true,renameDenied:true});
+  }finally{await rm(root,{recursive:true,force:true});}
+});
+
+
+test('six-file locked sender rejects tampered and missing synthetic artifacts before launch',{
+  skip:process.platform!=='win32'
+},async()=>{
+  const root=await mkdtemp(path.join(tmpdir(),'rift-retry-allowlist-fault-'));
+  const names=['sender.dll','sender.deps.json','sender.runtimeconfig.json',
+    'FlaUI.Core.dll','System.Management.dll','nested-System.Management.dll'];
+  const files=names.map(n=>path.join(root,n));
+  const contents=names.map((n,i)=>Buffer.from('synthetic artifact '+i+' '+n));
+  try{
+    for(let i=0;i<files.length;i++)await writeFile(files[i],contents[i]);
+    const manifest=files.map((p,i)=>({path:p,
+      sha256:createHash('sha256').update(contents[i]).digest('hex')}));
+    const launch=async(expectedCode)=>{
+      let failure=null;
+      try{
+        await execNativeAsync(
+          'C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+          ['-NoProfile','-NonInteractive','-EncodedCommand',
+            Buffer.from(LOCKED_CONTRACT_PS,'utf16le').toString('base64')],
+          {timeout:15000,windowsHide:true,maxBuffer:4096,
+            env:{...process.env,RRE_RETRY_DLL_PATH:files[0],
+              RRE_RETRY_DOTNET_PATH:'C:\\nonexistent\\dotnet.exe',
+              RRE_RETRY_VALIDATED_PATH:path.join(root,'not-used.validated.json'),
+              RRE_RETRY_LOCK_MANIFEST_JSON:JSON.stringify(manifest)}});
+      }catch(e){failure=e;}
+      const stderr=String(failure?.stderr??'');
+      assert.ok(failure&&stderr.includes(expectedCode),
+        'Expected '+expectedCode+', observed '+stderr.slice(0,150));
+    };
+    await writeFile(files[3],Buffer.from('tampered-after-manifest'));
+    await launch('LOCKED_ARTIFACT_HASH_CHANGED');
+    await writeFile(files[3],contents[3]);
+    await rm(files[4]);
+    await launch('LOCKED_ARTIFACT_UNAVAILABLE');
   }finally{await rm(root,{recursive:true,force:true});}
 });
 
