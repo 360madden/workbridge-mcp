@@ -40,3 +40,9 @@ Workbridge's **deployed** `dist/changes.js` and source `src/changes.ts` implemen
 - `reports/2026-11-05-investigation-sitrep-04.md`
 
 All these outcomes are deliberately limited to the exact executed evidence. This report does not convert an isolated protocol handshake into proof of real Windows GUI reliability.
+
+## Post-checkpoint verified follow-up (after the initial report)
+
+- The first private watchdog inspector e01 test remains a recorded **failure** at I01. The corrected, freshly peer-reviewed **new** e02 job passed 12/12 synthetic cases, OS exit0, 12/12 private fixtures cleaned, no live locks, GUI or VMware. Its readonly inspector is still not a production lock-release utility. Independent audit `d3322ad`; owned implementation and truthful e01/e02 evidence commit `f542678`.
+- An isolated in-memory JavaScript regression proved 11/11 cases: replacement-string substitution corrupts literal special tokens, while callback replacement preserves exact content. Commit `2e42969`. Workbridge deployed edit_file is still **unpatched**; direct write_file is not proven affected.
+- A separate exact-HWND WinApp/Sbroenne parity **source-only** pilot contract was committed `a3b3555`; the actual Windows UIA snapshot trial remains HOLD until user-coordinated quiet desktop admission.
