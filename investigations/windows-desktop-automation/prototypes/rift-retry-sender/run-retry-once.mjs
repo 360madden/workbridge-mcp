@@ -1,13 +1,16 @@
 #!/usr/bin/env node
-// OFFLINE ONLY: physical-RIFT RRECollector Retry evidence gate and no-input journal.
-// No native sender, focus, mouse, keyboard, screenshot, reload or restart is reachable.
+// OFFLINE ONLY: physical-RIFT Retry evidence gate and no-input C# contract check.
+// No native live sender, focus, mouse, keyboard, screenshot, reload or restart is reachable.
 import {createHash,randomUUID} from 'node:crypto';
+import {execFile} from 'node:child_process';
 import {lstat,realpath,readFile,open,unlink,readdir,mkdir} from 'node:fs/promises';
+import {promisify} from 'node:util';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {withDesktopAdmission} from '../../../../scripts/desktop-turn-admission.mjs';
 
+const execFileAsync=promisify(execFile);
 const ROOT=fileURLToPath(new URL('../../../../',import.meta.url));
 const EVIDENCE=path.join(ROOT,'.tools','desktop-evidence');
 const ID=/^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/;
@@ -34,12 +37,16 @@ export function parseRetryArgs(argv){
   for(const a of argv)if(a.startsWith('--')){const k=a.split('=')[0];if(opts.has(k))stop('INVALID_ARGUMENTS','Duplicate flag');opts.add(k);}
   let v;
   try{({values:v}=parseArgs({args:argv,strict:true,allowPositionals:false,
-    options:{'preflight-only':{type:'string'},'journal-offline-once':{type:'string'}}}));}
+    options:{'preflight-only':{type:'string'},'journal-offline-once':{type:'string'},
+      'contract-check-only':{type:'string'}}}));}
   catch{stop('INVALID_ARGUMENTS','Only offline preflight or journal modes supported');}
-  const n=Number(v['preflight-only']!==undefined)+Number(v['journal-offline-once']!==undefined);
+  const n=Number(v['preflight-only']!==undefined)+Number(v['journal-offline-once']!==undefined)+
+    Number(v['contract-check-only']!==undefined);
   if(n!==1)stop('MODE_REQUIRED','Exactly one offline mode required');
-  const mode=v['preflight-only']!==undefined?'preflight':'journal';
-  const envelopePath=mode==='preflight'?v['preflight-only']:v['journal-offline-once'];
+  const mode=v['preflight-only']!==undefined?'preflight':
+    v['journal-offline-once']!==undefined?'journal':'contract';
+  const envelopePath=mode==='preflight'?v['preflight-only']:
+    mode==='journal'?v['journal-offline-once']:v['contract-check-only'];
   if(!path.isAbsolute(envelopePath))stop('INVALID_ARGUMENTS','Absolute witness path required');
   return {mode,envelopePath};
 }
@@ -166,6 +173,102 @@ export async function inspectRetryEvidence(envelopePath,{evidenceRoot=EVIDENCE,n
     nativeLiveVerificationStillRequired:true,humanRetryRoiReviewStillRequired:true};
 }
 
+// Cross-language P2.1 contract path: only a C# validation process, never native GUI input.
+const DOTNET='C:\\Program Files\\dotnet\\dotnet.exe';
+const DLL=path.join(ROOT,'.tools','rift-retry-sender-artifacts','bin',
+  'RiftRetrySender','release','RiftRetrySender.dll');
+const EXPECTED_DLL_SHA256='1ac2699148ec089ef69631d4b590f492646ba288f97959fddc3b6ac29376604f';
+const SOURCE=fileURLToPath(new URL('./Program.cs',import.meta.url));
+const CSPROJ=fileURLToPath(new URL('./RiftRetrySender.csproj',import.meta.url));
+
+export async function sendFixedContractCheck(validatedPath){
+  if(!path.isAbsolute(validatedPath)||
+     !path.basename(validatedPath).endsWith('.validated.json'))
+    stop('WRONG_CONTRACT_TARGET','Only fixed validated evidence path supported');
+  await boundedFile(DOTNET,10000,128*1024*1024);
+  const [dllStat,srcStat,projStat]=await Promise.all([
+    boundedFile(DLL,10000,16*1024*1024),lstat(SOURCE),lstat(CSPROJ)]);
+  if(dllStat.mtimeMs+1500<Math.max(srcStat.mtimeMs,projStat.mtimeMs))
+    stop('STALE_SENDER_BUILD','Native offline sender must be rebuilt after C# changes');
+  const dllSha=sha(await readFile(DLL));
+  if(dllSha!==EXPECTED_DLL_SHA256)
+    stop('SENDER_DLL_HASH_CHANGED','Pinned offline C# sender binary hash differs');
+  let stdout;
+  try{
+    ({stdout}=await execFileAsync(DOTNET,[DLL,'--contract-check',validatedPath],
+      {cwd:ROOT,timeout:15000,maxBuffer:16384,windowsHide:true}));
+  }catch(e){
+    stop('CONTRACT_CHECK_REJECTED','C# contract-check rejected evidence or failed without input');
+  }
+  let output;
+  try{output=JSON.parse(stdout.trim());}
+  catch{stop('CONTRACT_RECEIPT_INVALID','C# contract JSON unavailable');}
+  if(output?.status!=='CONTRACT_ONLY_OK_NATIVE_NOT_CHECKED'||
+     output?.nativeVerified!==false||output?.liveInputAllowed!==false||
+     output?.inputInjected!==false)
+    stop('CONTRACT_RECEIPT_INVALID','C# did not explicitly prove no native/input path');
+  return {output,dllSha256:dllSha};
+}
+
+// Before creating a C#-readable envelope, recheck the actual Workbridge screenshot
+// and capture receipt under admission+GUI lease. The GUI is not touched.
+export async function contractCheckOfflineOnce(envelopePath,opts={}){
+  const root=path.resolve(opts.evidenceRoot??EVIDENCE);
+  const clock=()=>opts.nowUtc??new Date().toISOString();
+  const initial=await inspectRetryEvidence(envelopePath,
+    {evidenceRoot:root,nowUtc:clock()});
+  const id=initial.plan.captureRequestId;
+  return withDesktopAdmission(path.join(root,'desktop-input-turn.lock'),
+    {producer:'rift-retry-contract',requestId:id},async()=>{
+      await veto(root);
+      const turn=await createTurn(root,id,initial.plan.target);
+      try{
+        const latest=await inspectRetryEvidence(envelopePath,
+          {evidenceRoot:root,nowUtc:clock()});
+        if(JSON.stringify(latest.plan)!==JSON.stringify(initial.plan))
+          stop('EVIDENCE_CHANGED_UNDER_LEASE','Preflight changed before C# contract');
+        const source=await jsonFile(envelopePath);
+        const sealed={
+          ...source,nowUtc:clock(),
+          capture:{...source.capture,imageBytesVerified:true,
+            imageSha256Verified:true,imageDimensionsVerified:true},
+          desktop:{...source.desktop,windowFramePixelsVerified:true},
+          plan:latest.plan,
+        };
+        const validatedPath=path.join(root,'rift-retry-'+id+'.validated.json');
+        const receiptPath=path.join(root,'rift-retry-'+id+'.contract.receipt.json');
+        const sealedSha256=await exclusiveJson(validatedPath,sealed);
+        const sender=opts.sender??sendFixedContractCheck;
+        const response=await sender(validatedPath);
+        const out=response?.output;
+        if(out?.status!=='CONTRACT_ONLY_OK_NATIVE_NOT_CHECKED'||
+           out?.inputInjected!==false||out?.liveInputAllowed!==false||
+           out?.nativeVerified!==false||
+           Number(out?.ClickPoint?.X)!==latest.plan.virtualScreenPoint.x||
+           Number(out?.ClickPoint?.Y)!==latest.plan.virtualScreenPoint.y)
+          stop('CONTRACT_POINT_MISMATCH','C# contract did not reproduce exact DWM point/no-input proof');
+        await exclusiveJson(receiptPath,{
+          schemaVersion:1,kind:'workbridge.rift-retry-offline-contract-receipt',
+          requestId:id,validatedEnvelopeSha256:sealedSha256,
+          screenshotSha256:latest.screenshotSha256,
+          senderDllSha256:response.dllSha256??null,
+          nativeVerified:false,liveAuthorized:false,inputAttempted:false,
+          point:latest.plan.virtualScreenPoint,
+          completedUtc:new Date().toISOString()});
+        await releaseTurn(turn);
+        return {ok:true,status:'CROSS_LANGUAGE_CONTRACT_ONLY_OK',
+          inputAttempted:false,nativeVerified:false,liveAuthorized:false,
+          receiptPath,validatedEnvelopeSha256:sealedSha256,
+          plan:latest.plan};
+      }catch(e){
+        // C# --contract-check has no input path. Leave one-shot sealed evidence
+        // unmodified for manual inspection; release only our unmodified GUI lock.
+        await releaseTurn(turn);
+        throw e;
+      }
+    });
+}
+
 async function exclusiveJson(filename,obj){
   const bytes=Buffer.from(JSON.stringify(obj)+'\n');
   if(bytes.length>4096)stop('JOURNAL_TOO_LARGE','Journal record too large');
@@ -254,7 +357,8 @@ export async function journalOfflineRetryOnce(envelopePath,{evidenceRoot=EVIDENC
 async function main(){
   try{
     const {mode,envelopePath}=parseRetryArgs(process.argv.slice(2));
-    const result=mode==='preflight'?await inspectRetryEvidence(envelopePath):await journalOfflineRetryOnce(envelopePath);
+    const result=mode==='preflight'?await inspectRetryEvidence(envelopePath):
+      mode==='journal'?await journalOfflineRetryOnce(envelopePath):await contractCheckOfflineOnce(envelopePath);
     console.log(JSON.stringify(result));
   }catch(e){
     console.log(JSON.stringify({ok:false,code:e?.code??'OFFLINE_RETRY_FAILED',

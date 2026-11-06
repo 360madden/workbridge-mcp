@@ -6,7 +6,7 @@ import {mkdtemp,writeFile,readFile,lstat,readdir,rm} from 'node:fs/promises';
 import path from 'node:path';
 import {
   LIVE_REFUSAL,parseRetryArgs,planDwmRetryOffline,
-  inspectRetryEvidence,journalOfflineRetryOnce
+  inspectRetryEvidence,journalOfflineRetryOnce,contractCheckOfflineOnce
 } from './run-retry-once.mjs';
 
 const id='rre_retry_synthetic_20261105_a1';
@@ -59,6 +59,7 @@ test('hard live CLI gate rejects both aliases even when other CLI parameters pre
     assert.throws(()=>parseRetryArgs([flag]),e=>e.code===LIVE_REFUSAL);
   }
   assert.equal(parseRetryArgs(['--preflight-only',path.resolve('example.witness.json')]).mode,'preflight');
+  assert.equal(parseRetryArgs(['--contract-check-only',path.resolve('example.witness.json')]).mode,'contract');
   assert.throws(()=>parseRetryArgs(['--preflight-only','relative.json']),e=>e.code==='INVALID_ARGUMENTS');
   assert.throws(()=>parseRetryArgs(['--preflight-only',path.resolve('a'),'--preflight-only',path.resolve('b')]),
     e=>e.code==='INVALID_ARGUMENTS');
@@ -147,6 +148,76 @@ test('under both leases, tampered PNG is detected before intent; locks released 
     assert.ok(!names.some(n=>n.includes('intent')||n.includes('receipt.json')&&n.startsWith('rift-retry-')));
     assert.ok(!names.some(n=>n.startsWith('desktop-turn-admission.lock')||
       n==='desktop-input-turn.lock'||n.includes('quarantine')));
+  }finally{await rm(a.root,{recursive:true,force:true});}
+});
+
+test('P2.1 builds sealed C# contract envelope under both locks and accepts only no-input proof',async()=>{
+  const a=await syntheticEvidence();
+  try{
+    const r=await contractCheckOfflineOnce(a.witnessPath,{evidenceRoot:a.root,nowUtc:observed,
+      sender:async validatedPath=>{
+        const sealed=JSON.parse(await readFile(validatedPath,'utf8'));
+        assert.equal(sealed.capture.imageBytesVerified,true);
+        assert.equal(sealed.capture.imageSha256Verified,true);
+        assert.equal(sealed.capture.imageDimensionsVerified,true);
+        assert.equal(sealed.desktop.windowFramePixelsVerified,true);
+        assert.equal(sealed.nowUtc,observed);
+        assert.equal(sealed.plan.kind,'physical-rift-retry-DWM-OFFLINE-PLAN');
+        assert.deepEqual(sealed.plan.virtualScreenPoint,{x:-406,y:465});
+        return {dllSha256:'f'.repeat(64),output:{
+          status:'CONTRACT_ONLY_OK_NATIVE_NOT_CHECKED',
+          nativeVerified:false,liveInputAllowed:false,inputInjected:false,
+          ClickPoint:{X:-406,Y:465}}};
+      }});
+    assert.equal(r.status,'CROSS_LANGUAGE_CONTRACT_ONLY_OK');
+    const receipt=JSON.parse(await readFile(r.receiptPath,'utf8'));
+    assert.equal(receipt.nativeVerified,false);
+    assert.equal(receipt.inputAttempted,false);
+    await assert.rejects(contractCheckOfflineOnce(a.witnessPath,{
+      evidenceRoot:a.root,nowUtc:observed,sender:async()=>{throw Error('SHOULD_NOT_REPLAY');}
+    }),e=>e.code==='ACTION_RECOVERY_REQUIRED');
+    const names=await readdir(a.root);
+    assert.ok(!names.some(n=>n==='desktop-input-turn.lock'||n==='desktop-turn-admission.lock'));
+  }finally{await rm(a.root,{recursive:true,force:true});}
+});
+test('C# contract must reproduce point and unambiguous no-input flags, otherwise rejects',async()=>{
+  const a=await syntheticEvidence();
+  try{
+    await assert.rejects(contractCheckOfflineOnce(a.witnessPath,{evidenceRoot:a.root,nowUtc:observed,
+      sender:async()=>({output:{status:'CONTRACT_ONLY_OK_NATIVE_NOT_CHECKED',
+        nativeVerified:false,liveInputAllowed:false,inputInjected:false,
+        ClickPoint:{X:-414,Y:457}}})}),e=>e.code==='CONTRACT_POINT_MISMATCH');
+    const names=await readdir(a.root);
+    assert.ok(names.some(n=>n.endsWith('.validated.json')));
+    assert.ok(!names.some(n=>n==='desktop-input-turn.lock'||n==='desktop-turn-admission.lock'));
+  }finally{await rm(a.root,{recursive:true,force:true});}
+});
+
+test('P2.1 actual Node-to-C# synthetic JSON/PNG contract (NO Win32, NO input)',async()=>{
+  const a=await syntheticEvidence();
+  try{
+    const e=JSON.parse(await readFile(a.witnessPath,'utf8'));
+    const current=Date.now();
+    const startedFresh=new Date(current-60000).toISOString();
+    const capturedFresh=new Date(current-3000).toISOString();
+    const observedFresh=new Date(current-2000).toISOString();
+    e.target={...e.target,startedUtc:startedFresh};
+    e.processBefore={...e.processBefore,startedUtc:startedFresh};
+    e.processAfter={...e.processAfter,startedUtc:startedFresh};
+    e.capture.capturedUtc=capturedFresh;
+    e.coordinateMapping.observedUtc=observedFresh;
+    await writeFile(a.witnessPath,JSON.stringify(e));
+    const receiptPath=path.join(a.root,'capture-'+id+'.json');
+    const oldReceipt=JSON.parse(await readFile(receiptPath,'utf8'));
+    await writeFile(receiptPath,JSON.stringify({...oldReceipt,capturedUtc:capturedFresh}));
+    const r=await contractCheckOfflineOnce(a.witnessPath,{evidenceRoot:a.root});
+    assert.equal(r.ok,true);
+    assert.equal(r.status,'CROSS_LANGUAGE_CONTRACT_ONLY_OK');
+    assert.equal(r.nativeVerified,false);
+    assert.equal(r.inputAttempted,false);
+    assert.deepEqual(r.plan.virtualScreenPoint,{x:-406,y:465});
+    const receipt=JSON.parse(await readFile(r.receiptPath,'utf8'));
+    assert.match(receipt.senderDllSha256,/^[0-9a-f]{64}$/);
   }finally{await rm(a.root,{recursive:true,force:true});}
 });
 
