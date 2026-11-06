@@ -1,0 +1,201 @@
+{
+  "schema": "wgc_disposable_capture_pilot_evidence_v1",
+  "observed_at": {
+    "utc": "2026-11-06T01:12:30Z",
+    "local_eastern": "2026-11-05T20:12:30-05:00"
+  },
+  "project": "workbridge-mcp",
+  "directory_windows": "C:\\work\\workbridge-mcp\\investigations\\windows-desktop-automation\\prototypes\\wgc-no-focus-pilot",
+  "scope": {
+    "mode": "disposable_window_only",
+    "physical_rift_captured": false,
+    "vm_captured": false,
+    "game_input": false,
+    "game_focus": false,
+    "game_restart": false,
+    "service_change": false,
+    "gui_attempts": 1
+  },
+  "source": {
+    "commits": [
+      "03af169bbddf77939cb5775a707d572de1ea481d",
+      "03f034cec9c2b73e9963fecee706021e9ddcf358"
+    ],
+    "target_framework": "net10.0-windows10.0.19041.0",
+    "package": "Microsoft.Windows.SDK.BuildTools.WinApp.UIAutomation",
+    "package_version": "0.7.1",
+    "api": [
+      "IWindowCapture.StartFrameGrabber",
+      "IFrameGrabber.WaitForFirstFrameAsync",
+      "IFrameGrabber.TryGetLatest"
+    ],
+    "route": "v0.7.1 WgcWindowCapture direct WgcCapture.StartGrabber / CreateItemForWindow / Direct3D11CaptureFramePool.CreateFreeThreaded",
+    "printwindow_fallback_supported_in_this_route": false,
+    "output_target": "AppContext.BaseDirectory/pilot.png",
+    "output_create_mode": "CreateNew",
+    "no_arbitrary_hwnd": true,
+    "no_focus_input_apicalls": true,
+    "no_capture_gui_during_selftest": true
+  },
+  "validation_pre_runtime": [
+    {
+      "job": "wgc_pilot_dotnet_restore_20261105_01",
+      "status": "passed",
+      "exit_code": 0,
+      "scope": "directory_local_nuget_restore"
+    },
+    {
+      "job": "wgc_pilot_dotnet_build_20261105_01",
+      "status": "passed",
+      "exit_code": 0,
+      "warnings": 0,
+      "errors": 0
+    },
+    {
+      "job": "wgc_pilot_synthetic_selftest_20261105_01",
+      "status": "passed",
+      "exit_code": 0,
+      "category": "synthetic_bgra_to_png"
+    },
+    {
+      "job": "wgc_pilot_static_guard_20261105_01",
+      "status": "passed",
+      "exit_code": 0,
+      "tests": {
+        "passed": 4,
+        "total": 4
+      }
+    },
+    {
+      "job": "wgc_pilot_sta_rebuild_20261105_01",
+      "status": "passed",
+      "exit_code": 0,
+      "warnings": 0,
+      "errors": 0
+    },
+    {
+      "job": "wgc_pilot_sta_selftest_20261105_01",
+      "status": "passed",
+      "exit_code": 0,
+      "category": "synthetic_bgra_to_png"
+    },
+    {
+      "job": "wgc_pilot_sta_static_guard_20261105_01",
+      "status": "passed",
+      "exit_code": 0,
+      "tests": {
+        "passed": 6,
+        "total": 6
+      }
+    }
+  ],
+  "one_runtime_attempt": {
+    "job": "wgc_pilot_one_disposable_gui_attempt_20261105_01",
+    "wrapper_status": "failed",
+    "wrapper_exit_code": 1,
+    "child_exit_code_observed": null,
+    "child_exit_code_note": "Start-Process -PassThru process object ExitCode was blank when inspected; do not infer zero",
+    "wrapper_failure_classification": "null_exit_code_considered_nonzero",
+    "watchdog_milliseconds": 20000,
+    "child_pid": 55108,
+    "child_finished_before_watchdog": true,
+    "stdout_reported_status": "PASS",
+    "stderr_size_bytes": 0,
+    "synthetic_hwnd_hex": "0xB50352",
+    "foreground_hwnd_before_decimal": 1903292,
+    "foreground_hwnd_after_decimal": 1903292,
+    "foreground_unchanged": true,
+    "frame": {
+      "version": 1,
+      "width": 406,
+      "height": 253,
+      "backend": "WGC-only pinned release API",
+      "color_variation_check": true
+    },
+    "png": {
+      "path_windows": "C:\\work\\workbridge-mcp\\investigations\\windows-desktop-automation\\prototypes\\wgc-no-focus-pilot\\bin\\Release\\net10.0-windows10.0.19041.0\\pilot.png",
+      "bytes": 4255,
+      "sha256": "9414885183cf32274a353ccefb75c5a5e2028b97e87053cf90cec38a08b628f5",
+      "independently_verified": true,
+      "pixel_samples_argb": [
+        {
+          "x": 30,
+          "y": 50,
+          "a": 255,
+          "r": 20,
+          "g": 180,
+          "b": 90
+        },
+        {
+          "x": 220,
+          "y": 60,
+          "a": 255,
+          "r": 240,
+          "g": 120,
+          "b": 30
+        },
+        {
+          "x": 390,
+          "y": 200,
+          "a": 255,
+          "r": 30,
+          "g": 50,
+          "b": 110
+        },
+        {
+          "x": 100,
+          "y": 180,
+          "a": 255,
+          "r": 30,
+          "g": 50,
+          "b": 110
+        },
+        {
+          "x": 350,
+          "y": 110,
+          "a": 255,
+          "r": 240,
+          "g": 120,
+          "b": 30
+        }
+      ],
+      "distinct_sample_colors": 3
+    }
+  },
+  "read_only_reconciliation": [
+    {
+      "job": "wgc_pilot_png_offline_reader_20261105_01",
+      "status": "passed",
+      "source": "independent_reviewer",
+      "result": "Decoded PNG 406x253 Format32bppArgb; green FF14B45A at (20,70), orange FFF0781E at (220,70), navy FF1E326E at (10,200)"
+    },
+    {
+      "method": "workbridge_file_info_sha256",
+      "result": "matched 4255 bytes and png SHA"
+    },
+    {
+      "job": "wgc_pilot_readonly_png_reconcile_20261105_01",
+      "status": "passed",
+      "result": "PNG decoded 406x253, file hash and child stdout matched"
+    },
+    {
+      "job": "wgc_pilot_readonly_pixel_colors_20261105_01",
+      "status": "passed",
+      "result": "three distinct expected synthetic fixture colors"
+    }
+  ],
+  "acceptance": {
+    "exploratory_disposable_wgc_frame": "verified",
+    "png_color_validation": "verified",
+    "foreground_unchanged": "verified_in_capture_and_wrapper",
+    "wrapper_complete_success": "not_verified",
+    "full_g0_7": "not_claimed",
+    "physical_game_capture": "not_attempted",
+    "statement": "One WGC frame was captured and independently decoded, but wrapper exit1 due null child ExitCode makes whole job not clean-green."
+  },
+  "next_steps": [
+    "Do not re-run GUI attempt without new coordinator authorization.",
+    "If persisting wrapper, fix exit-code receipt using process Refresh/HasExited and separate unknown classification; synthetic wrapper tests only.",
+    "Treat actual RIFT/VM WGC capture as a separate authorization, design and validation target."
+  ]
+}
