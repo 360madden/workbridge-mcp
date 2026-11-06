@@ -6,6 +6,7 @@
 - The .NET watchdog gained `--synthetic-abandon-dual` and `--synthetic-abandon-admission`: abrupt process exit after creating real watchdog-shaped mock stamps, without child launch, GUI, focus or input.
 - **Verified:** .NET 10 Release publish PASS; Windows `WatchdogOrphanFixture.test.mjs` **7/7 PASS**. The new `--synthetic-abandon-with-child` observed a sleeping child in its Job (member count 2), then exited the watchdog abruptly; an independent Node kernel check confirmed child exit within four seconds, before its normal 30-second sleep. Copied orphan-lock evidence was hash/file-ID archived. Earlier positive/negative archival tests remain green. Original GUI outcome remains unknown; no replay.
 - **Live pilot remains HOLD:** independent historical descendant/Job settlement, Task Scheduler interactive-token and production manual recovery are not proven. No RIFT/VM interaction, service update, screenshot, restart or reload occurred.
+- **Read-only session inventory at 11:21 UTC:** Workbridge terminal child Session 1, `UserInteractive=true`; Explorer and `rift_x64` also Session 1; Task Scheduler service running and zero enabled DesktopProbe tasks. Lock/secure-desktop/WinSta0-Default state, Task Scheduler interactive-token ownership and foreground identity remain **unverified**. This is a readiness clue, not a live launch authorization.
 
 ## M2 C# → JavaScript contract handshake — November 6, 2026 (fifth source-only subgate)
 
