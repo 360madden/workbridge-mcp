@@ -46,6 +46,19 @@ Reuse: V2 private Job helper `55a35716...`, pinned single-file Sbroenne v1.3.28 
 
 **Independent GO:** default-disabled Host V5 compilation with `ENABLE_SBROENNE_UI_SNAPSHOT` **undefined**, JS syntax checks and 142-line isolated, pure, no-GUI unit suite. Default host Main **returns OS64 before any process/manifest/private-directory work**. **NO GO** for defining the feature symbol, launching any compiled snapshot helper, interacting with a GUI, altering the existing quarantine lease, or using V5 against RIFT/VM. There is no claim of Windows runtime, real modal behavior, leakage absence under an actual MCP response, or proven arbitrary-target safety.
 
+## Independently inspected offline retained receipts (2026-11-06 UTC)
+
+After source authorization, the reviewer retrieved Workbridge command_status/complete command_output for **four already-saved author-controlled jobs**, without executing or replaying them:
+
+| Saved job ID | Actual OS exit | Saved output | Assessment |
+| --- | --- | --- | --- |
+| `wda_m3p11_v5_default_disabled_compile_20261105_a01` | 0 | 0 bytes stdout/stderr | Default-disabled C# compile succeeds; no EXE execution evidenced. |
+| `wda_m3p11_v5_sampler_syntax_20261105_a01` | 0 | 0 bytes | Node V5 syntax check succeeds. |
+| `wda_m3p11_v5_tests_syntax_20261105_a01` | 0 | 0 bytes | Pure test source syntax check succeeds. |
+| `wda_m3p11_v5_pure_offline_unit_20261105_a01` | 0 | 662-byte complete stdout/0 stderr | Six named tests, **6/6 pass**, zero fails/skips; no child/GUI calls in test source. |
+
+Fresh `file_info(hash:true)` still matched all five frozen Host/Launcher/Node/Observer/test hashes in the revised-source table above. These checks confirm only **offline compile, syntax and pure in-memory validation**; they do not establish real UIA performance, lifecycle, privacy, GUI ownership, native Job behavior, or runtime launch safety. **GO** to commit this bounded offline milestone; **HOLD** enabled snapshot executable and live desktop/VM use.
+
 ## Unmeasured / operational holds
 
 No enabled V5 process has run; source cannot establish whether vendor `ui_snapshot` affects focus, whether exact HWND is interpreted as intended, if UIA hangs, if PowerShell survives the seven-key environment, or snapshot latency. An eventual pilot requires separately approved DesktopProbe watchdog live fixture, verified owner/lease and nonreparse ancestry, manifest hash, watchdog deadline, native Job, a single read-only call, before/after foreground parity, secure projected receipt, and no existing quarantined GUI turn. This review authorizes **none** of those actions; no use against physical RIFT or VMware guest.
