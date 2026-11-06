@@ -1,6 +1,6 @@
 # M2 read-only DesktopProbe surface snapshot
 
-Status: **SOURCE-ONLY / BUILD-AND-SELF-TEST GATE. No live observer or RIFT input executed.**
+Status: **SOURCE-ONLY / BUILD-AND-CONTRACT-TEST GATE. No live observer or RIFT input executed.**
 
 This standalone .NET 10 Windows console program reuses the geometry, per-monitor DPI,
 target birth/session pinning and owned-HWND enumeration patterns already proven useful
@@ -11,6 +11,8 @@ WinEvent hook, process launch, service deployment or filesystem output.
 ## Supported modes
 
 - `--self-test`: purely synthetic argument/geometry checks; **zero Win32 calls**.
+- `--contract-fixture`: emits one synthetic receipt through the **same JSON serializer**
+  as the native path, without process lookup, hooks or Windows desktop reads.
 - `--snapshot --pid <pid> --hwnd <decimal-hwnd> --session-id <id> --start-utc-ticks <ticks>`:
   one bounded, read-only sample of the **existing** disposable GUI-004 WinForms
   `DesktopProbe` process and the exact `Workbridge GUI-004 Native Input Probe` title.
@@ -31,8 +33,8 @@ minimized/visible/cloaked/enabled flags, foreground HWND, center-point hit-test 
 and the count of visible *owned* top-level windows. The adjacent
 `native-surface-snapshot.mjs` validates this exact JSON shape and classifies
 confirmed bad states without ever returning VERIFIED; its offline adversarial
-fixtures live in `native-surface-snapshot.test.mjs`. It omits arbitrary window
-titles, keystrokes, clipboard text and desktop pixels.
+fixtures live in `native-surface-snapshot.test.mjs`. The producer omits arbitrary
+window titles, keystrokes, clipboard text and desktop pixels.
 
 - Visible owned windows may be dialogs; the count is **not** an authoritative modal count.
 - An unobscured center point does **not** prove an entire window is unobscured.
@@ -56,11 +58,17 @@ dotnet build investigations/windows-desktop-automation/prototypes/m2-surface-pro
 dotnet run --project investigations/windows-desktop-automation/prototypes/m2-surface-probe/M2SurfaceProbe.csproj -c Release --no-build -- --self-test
 ```
 
-The offline JavaScript consumer test runs with:
+The offline JavaScript and **real C# serializer → JavaScript schema integration**
+tests run after building the assembly:
 
 ```powershell
-node --test investigations/windows-desktop-automation/prototypes/m2-surface-probe/native-surface-snapshot.test.mjs
+node --test investigations/windows-desktop-automation/prototypes/m2-surface-probe/native-surface-snapshot.test.mjs investigations/windows-desktop-automation/prototypes/m2-surface-probe/native-contract-pipeline.test.mjs
 ```
+
+The integration test caught and fixed an extra `PixelRect.Valid` field in the
+first actual C# JSON output. `[JsonIgnore]` now excludes it, preserving the
+strict four-field rectangle schema. Tests cover `--contract-fixture`,
+`--self-test`, and an invalid `--click` command that exits before native calls.
 
 These checks do not start `DesktopProbe`, RIFT, VMware or the native observer.
 The next milestone is a target-specific, read-only disposable-fixture snapshot

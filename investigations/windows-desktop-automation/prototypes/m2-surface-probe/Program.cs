@@ -5,12 +5,14 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Workbridge.M2SurfaceProbe;
 
 internal readonly record struct PinnedTarget(int Pid, long Hwnd, int SessionId, long StartUtcTicks);
 internal readonly record struct PixelRect(int X, int Y, int Width, int Height)
 {
+    [JsonIgnore]
     public bool Valid =>
         Width > 0 && Height > 0 &&
         (long)X + Width <= int.MaxValue && (long)X + Width >= int.MinValue &&
@@ -30,35 +32,70 @@ internal static class Program
     {
         if (args.Length == 1 && args[0] == "--self-test")
             return SelfTest();
+        if (args.Length == 1 && args[0] == "--contract-fixture")
+            return ContractFixture();
         if (!TryParse(args, out var target))
             return Unknown("INVALID_OR_UNAPPROVED_ARGUMENTS", 2);
 
         try
         {
             var observed = Native.Sample(target);
-            Console.WriteLine(JsonSerializer.Serialize(new
-            {
-                schemaVersion = 1,
-                kind = "desktopprobe-native-surface-snapshot",
-                status = "OBSERVED_NOT_VERIFIED",
-                target = new
-                {
-                    pid = target.Pid,
-                    hwnd = target.Hwnd,
-                    sessionId = target.SessionId,
-                    processStartedAt = new DateTime(target.StartUtcTicks, DateTimeKind.Utc).ToString("O", CultureInfo.InvariantCulture)
-                },
-                sample = observed,
-                // A point-in-time Win32 read cannot prove no transient modal/occlusion.
-                modalCoverage = "unknown",
-                occlusion = "unknown",
-                actionAuthorized = false,
-                inputInjected = false
-            }, JsonOptions));
+            EmitSnapshot(target, observed);
             return 0;
         }
         catch (ProbeUnknown error) { return Unknown(error.Code, 3); }
         catch { return Unknown("NATIVE_OBSERVATION_FAILED", 3); }
+    }
+
+    private static void EmitSnapshot(PinnedTarget target, object observed)
+    {
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            kind = "desktopprobe-native-surface-snapshot",
+            status = "OBSERVED_NOT_VERIFIED",
+            target = new
+            {
+                pid = target.Pid,
+                hwnd = target.Hwnd,
+                sessionId = target.SessionId,
+                processStartedAt = new DateTime(target.StartUtcTicks, DateTimeKind.Utc).ToString("O", CultureInfo.InvariantCulture)
+            },
+            sample = observed,
+            // A point-in-time Win32 read cannot prove no transient modal/occlusion.
+            modalCoverage = "unknown",
+            occlusion = "unknown",
+            actionAuthorized = false,
+            inputInjected = false
+        }, JsonOptions));
+    }
+
+    private static int ContractFixture()
+    {
+        // Purely synthetic. Shares the native JSON emitter but never calls Native.Sample.
+        var start = new DateTime(2026, 11, 6, 10, 0, 0, DateTimeKind.Utc);
+        var target = new PinnedTarget(100, 123456, 2, start.Ticks);
+        EmitSnapshot(target, new
+        {
+            observedAtUtc = new DateTime(2026, 11, 6, 10, 1, 0, DateTimeKind.Utc)
+                .ToString("O", CultureInfo.InvariantCulture),
+            observerTick = "146001230",
+            observerFrequency = "10000000",
+            outerRect = new PixelRect(-300, 100, 720, 460),
+            clientRect = new PixelRect(-290, 140, 700, 410),
+            windowDpi = 144,
+            monitorDpi = 144,
+            monitorHandle = "9876",
+            isWindowVisible = true,
+            isMinimized = false,
+            isEnabled = true,
+            cloaked = false,
+            foregroundHwnd = "123456",
+            isForeground = true,
+            centerHitRootHwnd = "123456",
+            visibleOwnedTopLevelCount = 0
+        });
+        return 0;
     }
 
     private static int Unknown(string code, int exitCode)

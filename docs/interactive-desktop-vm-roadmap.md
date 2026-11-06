@@ -1,5 +1,11 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## M2 C# → JavaScript contract handshake — November 6, 2026 (fifth source-only subgate)
+
+- The disposable-only native observer now has a `--contract-fixture` synthetic command that runs the **same JSON envelope serializer** as `--snapshot` without any Win32 calls or window launch. `native-contract-pipeline.test.mjs` executes the actual compiled .NET binary and validates its output through the real strict JavaScript schema and conservative classifier.
+- The first cross-language test **caught a real bug**: the C# `PixelRect.Valid` helper property appeared as an unauthorized extra JSON field. `[JsonIgnore]` removed it; the native-shaped receipt now parses exactly and remains `UNKNOWN` / non-action-authorizing.
+- **Verified offline:** .NET 10 Release build zero warnings/errors; all **10/10** M2 snapshot + native-serializer tests passed, including valid JSON, synthetic self-test, rejected unsupported `--click`, changed target, forged coverage, and adverse surface states. No existing `DesktopProbe` window was detected by a read-only inventory; none was launched, no `--snapshot` ran and no RIFT/VM input, capture, service deployment or restart occurred. M2 live acceptance remains pending.
+
 ## M2 read-only native surface producer — November 6, 2026 (fourth source-only subgate)
 
 - A restricted .NET 10 `m2-surface-probe` candidate now pins GUI-004 `DesktopProbe` PID/HWND/process birth/session/title, reads client/outer geometry, monitor/window DPI, visible owned HWND count, center hit root, foreground/minimized/visible/cloaked state, and reports no input. Its `--snapshot` path was **not run**. It installs no WinEvent hooks and cannot address physical RIFT.
