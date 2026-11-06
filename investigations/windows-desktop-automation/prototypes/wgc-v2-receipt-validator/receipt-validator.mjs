@@ -27,6 +27,7 @@ function parsePng(png) {
   let offset = 8;
   let first = true;
   let seenIdat = false;
+  let idatSequenceClosed = false;
   let seenIend = false;
   let width = 0;
   let height = 0;
@@ -37,6 +38,7 @@ function parsePng(png) {
     const next = offset + length + 12;
     if (next > png.length) fail('PNG_TRUNCATED');
     const type = png.toString('ascii', offset + 4, offset + 8);
+    if (seenIdat && type !== 'IDAT') idatSequenceClosed = true;
     if (crc32(png.subarray(offset + 4, offset + 8 + length)) !== png.readUInt32BE(offset + 8 + length))
       fail('PNG_CRC');
     if (first) {
@@ -52,13 +54,16 @@ function parsePng(png) {
         fail('PNG_UNSUPPORTED_FORMAT');
       first = false;
     } else if (type === 'IDAT') {
-      if (seenIend) fail('PNG_ORDER');
+      if (seenIend || idatSequenceClosed) fail('PNG_ORDER');
       seenIdat = true;
       idats.push(png.subarray(offset + 8, offset + 8 + length));
     } else if (type === 'IEND') {
       if (length !== 0 || !seenIdat || next !== png.length) fail('PNG_ORDER');
       seenIend = true;
     } else if (type === 'IHDR') fail('PNG_ORDER');
+    else if (type === 'PLTE') {
+      if (seenIdat || seenIend || length < 3 || length > 768 || length % 3 !== 0) fail('PNG_ORDER');
+    } else if (/^[A-Z]/.test(type)) fail('PNG_UNSUPPORTED_CRITICAL_CHUNK');
     offset = next;
   }
   if (!seenIdat || !seenIend) fail('PNG_TRUNCATED');
@@ -95,9 +100,13 @@ function utc(value, code) {
   if (!Number.isFinite(ms) || new Date(ms).toISOString().slice(0, 19) !== value.slice(0, 19)) fail(code);
   return ms;
 }
+// Stopwatch.GetTimestamp() is a positive signed Int64, serialized exactly as decimal text.
+const MAX_SIGNED_INT64 = 9_223_372_036_854_775_807n;
 function tick(value, code) {
-  if (typeof value !== 'string' || !/^\d{1,20}$/.test(value)) fail(code);
-  return BigInt(value);
+  if (typeof value !== 'string' || !/^[1-9]\d{0,18}$/.test(value)) fail(code);
+  const parsed = BigInt(value);
+  if (parsed > MAX_SIGNED_INT64) fail(code);
+  return parsed;
 }
 function same(value, expected, code) { if (value !== expected) fail(code); }
 

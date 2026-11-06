@@ -35,6 +35,15 @@ function fakePng(raw = Buffer.from([0, 20, 180, 90, 255, 240, 120, 30, 255]), fo
   return Buffer.concat([magic, chunk('IHDR', header), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 const image = fakePng();
+function pngWithDataChunks(dataChunks) {
+  // IHDR occupies exactly 25 bytes after the PNG signature in this synthetic fixture.
+  return Buffer.concat([image.subarray(0, 33), ...dataChunks, chunk('IEND', Buffer.alloc(0))]);
+}
+function replacePng(receipt, context, replacement) {
+  context.pngBytes = replacement;
+  receipt.artifact.sizeBytes = replacement.length;
+  receipt.artifact.sha256 = sha(replacement);
+}
 function fixture() {
   const requestId = 'synthetic_wgc_receipt_20261105_01';
   const target = {
@@ -126,6 +135,19 @@ test('positive synthetic v2 receipt is accepted as STRUCTURE ONLY', () => {
   assert.equal(checked.pngHeight, 1);
 });
 
+test('positive signed Int64 minimum monotonic ticks accepted (1 then 2)', () => {
+  const { receipt, context } = fixture();
+  receipt.timing.grabberCreatedMonotonicTicks = '1';
+  receipt.timing.firstFrameObservedMonotonicTicks = '2';
+  assert.equal(validateWgcReceipt(receipt, context).ok, true);
+});
+test('positive signed Int64 maximum monotonic tick accepted', () => {
+  const { receipt, context } = fixture();
+  receipt.timing.grabberCreatedMonotonicTicks = '9223372036854775806';
+  receipt.timing.firstFrameObservedMonotonicTicks = '9223372036854775807';
+  assert.equal(validateWgcReceipt(receipt, context).ok, true);
+});
+
 test('Windows .NET 7-digit fractional UTC timestamps accepted without pixel proof', () => {
   const { receipt, context } = fixture();
   for (const [owner, key] of [[receipt.timing, 'captureBeginUtc'], [receipt.timing, 'firstFrameObservedUtc'],
@@ -158,6 +180,12 @@ reject('stale frame > 30 seconds rejected', (r,c) => { c.nowUtc = '2026-11-06T01
 reject('future frame rejected', (r,c) => { c.nowUtc = '2026-11-06T01:29:00Z'; }, 'FRAME_STALE_OR_ORDER');
 reject('frame version 0 rejected', r => { r.timing.frameVersion = 0; }, 'FRAME_VERSION');
 reject('monotonic frame not new rejected', r => { r.timing.firstFrameObservedMonotonicTicks = '100000'; }, 'FRAME_NOT_NEW');
+reject('zero grabber monotonic tick rejected', r => { r.timing.grabberCreatedMonotonicTicks = '0'; }, 'GRAB_TICK');
+reject('negative grabber monotonic tick rejected', r => { r.timing.grabberCreatedMonotonicTicks = '-1'; }, 'GRAB_TICK');
+reject('leading-zero grabber tick rejected as noncanonical decimal', r => { r.timing.grabberCreatedMonotonicTicks = '01'; }, 'GRAB_TICK');
+reject('signed Int64 max plus one grabber tick rejected', r => { r.timing.grabberCreatedMonotonicTicks = '9223372036854775808'; }, 'GRAB_TICK');
+reject('zero first-frame monotonic tick rejected', r => { r.timing.firstFrameObservedMonotonicTicks = '0'; }, 'FRAME_TICK');
+reject('signed Int64 max plus one first-frame tick rejected', r => { r.timing.firstFrameObservedMonotonicTicks = '9223372036854775808'; }, 'FRAME_TICK');
 reject('first frame timeout rejected', r => { r.timing.maxFirstFrameWaitMs = 200; }, 'FRAME_TIMEOUT');
 reject('missing foreground hook rejected', r => { r.foreground.eventHookInstalled = false; }, 'FOREGROUND_HOOK_MISSING');
 reject('foreground hook gap rejected', r => { r.foreground.eventHookCoverageComplete = false; }, 'FOREGROUND_HOOK_GAP');
@@ -171,6 +199,19 @@ reject('color variation missing rejected', r => { r.frame.colorVariation = false
 reject('changed PNG SHA rejected', r => { r.artifact.sha256 = '0'.repeat(64); }, 'ARTIFACT_HASH');
 reject('truncated PNG rejected', (r,c) => { c.pngBytes = image.subarray(0, image.length-3); r.artifact.sizeBytes = c.pngBytes.length; r.artifact.sha256 = sha(c.pngBytes); }, 'PNG_TRUNCATED');
 reject('PNG CRC corruption rejected', (r,c) => { c.pngBytes = Buffer.from(image); c.pngBytes[29] ^= 1; r.artifact.sha256 = sha(c.pngBytes); }, 'PNG_CRC');
+reject('CRC-valid unknown critical PNG chunk rejected', (r,c) => {
+  const deflated = deflateSync(Buffer.from([0, 20, 180, 90, 255, 240, 120, 30, 255]));
+  replacePng(r, c, pngWithDataChunks([chunk('FOOO', Buffer.alloc(0)), chunk('IDAT', deflated)]));
+}, 'PNG_UNSUPPORTED_CRITICAL_CHUNK');
+reject('CRC-valid IDAT chunks separated by ancillary PNG chunk rejected', (r,c) => {
+  const deflated = deflateSync(Buffer.from([0, 20, 180, 90, 255, 240, 120, 30, 255]));
+  const midpoint = Math.floor(deflated.length / 2);
+  replacePng(r, c, pngWithDataChunks([
+    chunk('IDAT', deflated.subarray(0, midpoint)),
+    chunk('tEXt', Buffer.from('key\0value')),
+    chunk('IDAT', deflated.subarray(midpoint))
+  ]));
+}, 'PNG_ORDER');
 reject('CRC-valid but raw IDAT scanline truncated rejected', (r,c) => {
   c.pngBytes = fakePng(Buffer.from([0]));
   r.artifact.sizeBytes = c.pngBytes.length; r.artifact.sha256 = sha(c.pngBytes);
