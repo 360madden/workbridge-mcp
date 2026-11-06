@@ -1,5 +1,11 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## M2 read-only native surface producer — November 6, 2026 (fourth source-only subgate)
+
+- A restricted .NET 10 `m2-surface-probe` candidate now pins GUI-004 `DesktopProbe` PID/HWND/process birth/session/title, reads client/outer geometry, monitor/window DPI, visible owned HWND count, center hit root, foreground/minimized/visible/cloaked state, and reports no input. Its `--snapshot` path was **not run**. It installs no WinEvent hooks and cannot address physical RIFT.
+- `native-surface-snapshot.mjs` strictly validates producer JSON against a separately pinned target, classifies definite bad surface states and keeps all snapshots `UNKNOWN` without independent origin/interval evidence. It rejects fabricated `modalCoverage: complete` or `occlusion: clear`.
+- **Offline verification:** `dotnet build -c Release` zero errors/warnings; `--self-test` PASS without native calls; seven adversarial JavaScript tests PASS. No desktop/VM interaction, screenshot, service update, native observer run or LuaPad Run/Output acceptance occurred. Full M2 remains pending.
+
 ## M2 post-capture surface witnesses — November 6, 2026 (third source-only subgate)
 
 - New `src/desktop-action-surface-proof.ts` requires three bounded, exact-target Win32/UIA-style surface observations (before action, after action, after screenshot), plus a fresh independent post-screenshot desktop/session observation before a PNG receipt can become `VERIFIED`. A missing/incomplete observer is `UNKNOWN`; a confirmed focus loss, minimize/hide, cloak, owned modal, occlusion, screen/client-geometry or DPI drift is `REJECTED`. Neither state permits retry.
