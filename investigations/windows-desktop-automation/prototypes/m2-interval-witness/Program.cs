@@ -40,8 +40,9 @@ internal static class Program
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
 
-    [DllImport("user32.dll", EntryPoint = "SendMessageW")]
-    private static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", EntryPoint = "PostMessageW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 
     private static bool Healthy(JsonElement observation, int expectedSession)
     {
@@ -130,6 +131,7 @@ internal static class Program
         int sampleCount = 0;
         int healthySamples = 0;
         bool syntheticPosted = false;
+        bool syntheticPostSucceeded = false;
         var startedAt = DateTimeOffset.UtcNow;
         var stopwatch = Stopwatch.StartNew();
         try
@@ -160,8 +162,10 @@ internal static class Program
                 if (synthetic && !syntheticPosted && stopwatch.ElapsedMilliseconds >= 250)
                 {
                     syntheticPosted = true;
-                    // Delivers only to our own hidden HWND. Does NOT lock Windows.
-                    SendMessage(window.Handle, WmWtsSessionChange, new IntPtr(7), new IntPtr(session));
+                    // Queue a real message-pump delivery to our own hidden HWND only.
+                    // This does NOT lock Windows or notify any other process.
+                    syntheticPostSucceeded = PostMessage(window.Handle, WmWtsSessionChange,
+                        new IntPtr(7), new IntPtr(session));
                 }
                 hiddenAndNotForeground &= !IsWindowVisible(window.Handle)
                     && GetForegroundWindow() != window.Handle;
@@ -186,6 +190,9 @@ internal static class Program
             registered = true; // registration was successful for the observed window
             string status = ledger.Classify(registered, unregistered, pumpTicks > 0,
                 hiddenAndNotForeground, sampleCount == healthySamples, sampleCount);
+            if (synthetic && (!syntheticPosted || !syntheticPostSucceeded ||
+                ledger.TotalEvents == 0))
+                status = "SYNTHETIC_DELIVERY_MISSING";
             return (status == "NO_TRANSITION_OBSERVED" ? 0 : 2, new
             {
                 schemaVersion = 1, status,
@@ -200,6 +207,8 @@ internal static class Program
                 longestSampleGapMs = ledger.LongestSampleGapMs,
                 sampleTimingInvalid = ledger.SampleTimingInvalid,
                 initial, final, syntheticSelfMessage = synthetic,
+                syntheticNotificationPosted = syntheticPosted,
+                syntheticPostSucceeded,
                 safeForInput = false, intervalVerified = false, coverageVerified = false
             });
         }

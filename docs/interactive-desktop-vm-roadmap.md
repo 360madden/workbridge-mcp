@@ -1,5 +1,11 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## M2 queued synthetic WTS notification — November 6, 2026 (read-only)
+
+- Corrected the hidden-listener synthetic test from synchronous `SendMessageW` to asynchronous `PostMessageW` directed **only at its own hidden HWND**. The previous test invoked the handler directly and did not by itself prove event-queue dispatch. The new receipt records whether posting was attempted/succeeded, requires the handler to observe at least one event, and reports `SYNTHETIC_DELIVERY_MISSING` if delivery was not established. It does **not** lock Windows, touch RIFT, use GUI input, or prove genuine OS-generated WTS event delivery.
+- **Queued-event validation PASS:** .NET 10 Release publish, **12/12** pure tests; a three-second `--synthetic-lock` invocation posted event code **7** to its own HWND, observed exactly **one** Session **1** event, and produced `TRANSITION_OBSERVED` with intentional exit **2**. Registration/unregistration true, window hidden, **40** samples, longest gap **94 ms**, `safeForInput=false`, `intervalVerified=false`.
+- **Scheduled-session regression PASS:** disposable helper `queued20261106a` (PID **46096**, EXE SHA-256 `31d6316546f88607eeabe33ed125ef7f0dfd8527a7d3b864e8fd2031d95e0811`), Session **1**, exit **0**, `NO_TRANSITION_OBSERVED`, **40/40** healthy samples, longest gap **94 ms**, zero session events. An independent census verified task and PID absent and all **five** established helper tasks intact. No restart, focus, screenshot, input, VM interaction or owner deployment. M2 live GUI remains **HOLD** for a genuine OS-transition acceptance.
+
 ## M2 hidden listener timing-gap rejection — November 6, 2026 (read-only)
 
 - The disposable .NET 10 hidden session listener now records monotonic sample timing (`Stopwatch`), reports `timedSampleCount`, `longestSampleGapMs` and `sampleTimingInvalid`, and returns `EVIDENCE_INCOMPLETE` on a greater-than-500-ms sample gap, backward/negative timing, or sample-count mismatch. These checks detect some observer stalls; they do **not** establish continuous delivery of OS notifications or authorize desktop input. `safeForInput=false`, `intervalVerified=false`, and `coverageVerified=false` remain unconditional.
