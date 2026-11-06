@@ -4,7 +4,7 @@
 
 - `Archive-WatchdogOrphanFixture.ps1` reads or archives only unique OS-temp synthetic lock fixtures. It pins SHA-256 and NTFS file IDs; dual case moves GUI guard first, admission last. Live `.tools/desktop-evidence` is structurally excluded.
 - The .NET watchdog gained `--synthetic-abandon-dual` and `--synthetic-abandon-admission`: abrupt process exit after creating real watchdog-shaped mock stamps, without child launch, GUI, focus or input.
-- **Verified:** .NET 10 Release publish PASS; Windows `WatchdogOrphanFixture.test.mjs` **6/6 PASS**, including both actual-watchdog-stamp archival paths, hash drift, unexpected sidecars, live/reused owner PID, extra guard and forbidden roots. Original GUI outcome remains unknown; no replay.
+- **Verified:** .NET 10 Release publish PASS; Windows `WatchdogOrphanFixture.test.mjs` **7/7 PASS**. The new `--synthetic-abandon-with-child` observed a sleeping child in its Job (member count 2), then exited the watchdog abruptly; an independent Node kernel check confirmed child exit within four seconds, before its normal 30-second sleep. Copied orphan-lock evidence was hash/file-ID archived. Earlier positive/negative archival tests remain green. Original GUI outcome remains unknown; no replay.
 - **Live pilot remains HOLD:** independent historical descendant/Job settlement, Task Scheduler interactive-token and production manual recovery are not proven. No RIFT/VM interaction, service update, screenshot, restart or reload occurred.
 
 ## M2 C# → JavaScript contract handshake — November 6, 2026 (fifth source-only subgate)

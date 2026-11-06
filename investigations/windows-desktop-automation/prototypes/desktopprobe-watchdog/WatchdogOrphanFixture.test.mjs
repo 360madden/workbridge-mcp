@@ -168,3 +168,63 @@ for (const kind of ['dual', 'admission-only']) {
     if (g) assert.equal(sha(readFileSync(path.join(out.archive, 'relocated', 'desktop-input-turn.lock'))), sha(guard));
   });
 }
+
+// Independent kernel liveness check of a real synthetic child after its Job owner
+// exits abruptly. The child otherwise sleeps 30s; we require disappearance
+// within 4 seconds, so natural completion cannot masquerade as containment.
+test('abrupt watchdog death closes Job and kills sleeping synthetic child', { timeout: 75_000 }, async () => {
+  const watchdog = path.join(repo, 'investigations', 'windows-desktop-automation',
+    'temp', 'desktopprobe-watchdog-publish', 'DesktopProbeWatchdog.exe');
+  assert.equal(existsSync(watchdog), true);
+  const runId = 'wdjob' + randomBytes(6).toString('hex');
+  const result = spawnSync(watchdog, ['--synthetic-abandon-with-child', runId], {
+    cwd: repo, windowsHide: true, shell: false, timeout: 12_000, encoding: 'utf8',
+  });
+  assert.equal(result.error ?? null, null, 'synthetic watchdog abort timed out');
+  assert.equal(result.status, 73, 'unexpected watchdog exit: ' + result.stdout + ' ' + result.stderr);
+  const produced = path.join(repo, 'investigations', 'windows-desktop-automation',
+    'temp', 'desktopprobe-watchdog-abandon-' + runId);
+  const receipt = load(path.join(produced, 'abandon-child-receipt.json'));
+  const marker = readFileSync(path.join(produced, 'started-' + runId + '.marker'));
+  const admission = readFileSync(path.join(produced, 'desktop-turn-admission.mock.lock'));
+  const guard = readFileSync(path.join(produced, 'desktop-input-turn.mock.lock'));
+  const a = JSON.parse(admission.toString('utf8'));
+  const g = JSON.parse(guard.toString('utf8'));
+  assert.equal(receipt.schemaVersion, 1);
+  assert.equal(receipt.runId, runId);
+  assert.equal(receipt.activeJobProcessesBeforeAbandon, 2);
+  assert.equal(receipt.markerSha256, sha(marker));
+  assert.equal(receipt.ownerPid, a.owner.pid);
+  assert.equal(receipt.ownerPid, g.owner.pid);
+  assert.equal(receipt.childPid > 0 && receipt.childPid !== receipt.ownerPid, true);
+  assert.match(receipt.childStartedAtUtcTicks, /^[1-9][0-9]{10,}$/);
+
+  let childAbsent = false;
+  for (let i = 0; i < 40; i++) {
+    try {
+      process.kill(receipt.childPid, 0);
+    } catch (err) {
+      if (err?.code === 'ESRCH') { childAbsent = true; break; }
+      throw err; // EPERM/other uncertainty is not proof of exit.
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  assert.equal(childAbsent, true, 'Job kill-on-close failed to settle the synthetic child within 4s');
+
+  // Reuse the existing exact-hash archival contract after independent process
+  // disappearance. This still operates on a COPY in a separate OS-temp fixture.
+  const root = path.join(os.tmpdir(), 'wb-watchdog-orphan-fixture-' + randomBytes(9).toString('hex'));
+  mkdirSync(root);
+  const f = {
+    root, kind: 'dual', runId, ownerPid: a.owner.pid, leaseId: g.leaseId, admission, guard,
+    admissionPath: path.join(root, 'desktop-turn-admission.lock'),
+    guardPath: path.join(root, 'desktop-input-turn.lock'),
+  };
+  writeFileSync(f.admissionPath, admission, { flag: 'wx' });
+  writeFileSync(f.guardPath, guard, { flag: 'wx' });
+  assert.equal(okRun(invoke(f), 'Job settled read-only preflight').mode, 'read-only');
+  const out = okRun(invoke(f, { execute: true }), 'Job settled synthetic archival');
+  assert.equal(out.mode, 'archived');
+  assert.equal(existsSync(f.admissionPath), false);
+  assert.equal(existsSync(f.guardPath), false);
+});

@@ -59,7 +59,7 @@ Synthetic tests do **not** prove TaskScheduler ownership, real WinForms UI start
 ## Pending gates
 
 1. Independent final review of native lease P/Invoke, real manifest and identity checks.
-2. **PARTIAL / STILL BLOCKED:** `Archive-WatchdogOrphanFixture.ps1` plus `WatchdogOrphanFixture.test.mjs` have **6/6 PASS** for dual/admission-only OS-temp archival, including actual .NET watchdog-written stamps after abrupt synthetic exit. Hash/file-ID pins, backup and admission-last move are tested; negative inputs refuse. The script cannot operate on live shared locks. Independent descendant/Job settlement and a separately reviewed, authorized production recovery remain missing.
+2. **PARTIAL / STILL BLOCKED:** `Archive-WatchdogOrphanFixture.ps1` plus `WatchdogOrphanFixture.test.mjs` have **7/7 PASS**. New watchdog fault injection proved Job membership 1→2, abrupt owner exit and independent child disappearance within four seconds before synthetic copied-lock archival. Dual/admission-only archiving and hostile-input checks remain green. This proves one synthetic child-kill case, not historical descendant settlement for a real GUI. The archiver cannot touch live shared locks; reviewed production recovery remains missing.
 3. Operator approval for first GUI pilot, published disposable DesktopProbe hashes, TaskScheduler interactive token, watchdog process-tree ownership, separate sampler lock validation, and target foreground/freshness preflight.
 4. If >5-second sampling is needed, add a safe atomic fresh-manifest publisher or a new independently revalidated fresh-snapshot contract; do not treat an aged manifest as current.
 

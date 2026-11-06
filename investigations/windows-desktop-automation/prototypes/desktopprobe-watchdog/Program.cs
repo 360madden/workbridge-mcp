@@ -52,6 +52,7 @@ internal static class Program
                 ["--synthetic-uncertain", var runId] => RunSynthetic(runId, true),
                 ["--synthetic-abandon-dual", var runId] => RunSyntheticAbandon(runId, true),
                 ["--synthetic-abandon-admission", var runId] => RunSyntheticAbandon(runId, false),
+                ["--synthetic-abandon-with-child", var runId] => RunSyntheticAbandonWithChild(runId),
                 ["--desktopprobe", var runId, var exeSha, var dllSha] => RunDesktopProbe(runId, exeSha, dllSha),
                 _ => throw new ArgumentException("INVALID_ARGUMENTS"),
             };
@@ -89,6 +90,69 @@ internal static class Program
             _ = DesktopAdmissionLease.Acquire(guiPath, runId, Environment.ProcessId, true);
         }
         Environment.Exit(includeGuiGuard ? 71 : 72);
+        return 3;
+    }
+
+    // Research-only: abort with a real sleeping synthetic child inside the
+    // watchdog Job. Kernel Job kill-on-close must remove it on owner exit.
+    // This never constructs a DesktopProbe window or sends input.
+    private static int RunSyntheticAbandonWithChild(string runId)
+    {
+        AssertSafeId(runId);
+        var self = Environment.ProcessPath ?? throw new InvalidOperationException("SELF_PATH_MISSING");
+        if (!PathEquals(self, Path.Combine(ExpectedPublish, "DesktopProbeWatchdog.exe")))
+            throw new InvalidOperationException("SELF_PATH_MISMATCH");
+        var evidence = Path.Combine(Temp, "desktopprobe-watchdog-abandon-" + runId);
+        Directory.CreateDirectory(evidence);
+        var guiPath = Path.Combine(evidence, "desktop-input-turn.mock.lock");
+        _ = DesktopTurnLease.Acquire(guiPath, runId, Environment.ProcessId,
+            Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture),
+            Process.GetCurrentProcess().SessionId, true);
+        DesktopJobLifetime.Attach();
+        if (DesktopJobLifetime.ActiveProcesses() != 1)
+            throw new InvalidOperationException("SYNTHETIC_JOB_OWNER_COUNT");
+
+        var marker = Path.Combine(evidence, "started-" + runId + ".marker");
+        var startInfo = new ProcessStartInfo(self)
+        {
+            UseShellExecute = false,
+            WorkingDirectory = ExpectedPublish,
+            CreateNoWindow = true,
+        };
+        startInfo.ArgumentList.Add("--synthetic-child");
+        startInfo.ArgumentList.Add(marker);
+        using var child = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("SYNTHETIC_CHILD_START_FAILED");
+        int childPid = child.Id;
+        long childStartTicks = child.StartTime.ToUniversalTime().Ticks;
+        if (!IsProcessInJob(child.Handle, IntPtr.Zero, out bool assigned) || !assigned)
+            throw new InvalidOperationException("SYNTHETIC_CHILD_JOB_UNPROVED");
+        if (child.SessionId != Process.GetCurrentProcess().SessionId)
+            throw new InvalidOperationException("SYNTHETIC_CHILD_SESSION_MISMATCH");
+        var ready = Stopwatch.StartNew();
+        while (!File.Exists(marker) && !child.HasExited && ready.ElapsedMilliseconds < 1_500)
+            Thread.Sleep(10);
+        if (!File.Exists(marker) || child.HasExited || DesktopJobLifetime.ActiveProcesses() != 2)
+            throw new InvalidOperationException("SYNTHETIC_CHILD_ACTIVE_PROOF_MISSING");
+        var receiptPath = Path.Combine(evidence, "abandon-child-receipt.json");
+        var receipt = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1, runId, childPid,
+            childStartedAtUtcTicks = childStartTicks.ToString(CultureInfo.InvariantCulture),
+            ownerPid = Environment.ProcessId, sessionId = Process.GetCurrentProcess().SessionId,
+            activeJobProcessesBeforeAbandon = DesktopJobLifetime.ActiveProcesses(),
+            markerSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(marker))).ToLowerInvariant(),
+            createdUtc = DateTimeOffset.UtcNow,
+        }) + "\n";
+        using (var file = new FileStream(receiptPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
+        {
+            var bytes = Encoding.UTF8.GetBytes(receipt);
+            file.Write(bytes);
+            file.Flush(true);
+        }
+        // Deliberate abrupt exit: the only Job owner handle is non-inherited.
+        // No Complete()/Dispose() of GUI lease, admission or child.
+        Environment.Exit(73);
         return 3;
     }
 
