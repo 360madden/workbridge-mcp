@@ -98,3 +98,16 @@ Evidence: `reports/2026-11-04-investigation-sitrep-03.md`. Production deployment
 - [ ] No production backend switch or broad GUI input before M5/M6 and WB-001.
 
 Detailed evidence: `reports/2026-11-05-investigation-sitrep-04.md`.
+
+## Fifth-wave research checkpoint (Thursday evening, 2026-11-05, Eastern)
+
+- [x] Verify seven-key restricted Unicode child environment with one synthetic 20-key mask and clean native Job settlement, OS exit0. Evidence `benchmarks/sbroenne-v31-restricted-env-oracle-2026-11-05.md` and commits `5dc47ad`, `8e8d78e`.
+- [x] Launch exactly one pinned Sbroenne v1.3.28 **protocol-only** catalog via restricted environment; OS exit0, 1.328 s, one advertised `ui_snapshot`, no calls, Job0; no GUI/UIA proof. Evidence `benchmarks/sbroenne-v4-restricted-singlefile-protocol-2026-11-05.md`, commit `604c305`.
+- [x] Build standalone .NET10 native FileId lease and prove 4/4 private synthetic cases, including exact FileId substitution refusal and lock preserved after aborted owner; no production locks touched. Evidence `prototypes/fileid-lease-r0/R0-EVIDENCE-2026-11-05.md`, commit `378b2ea`.
+- [x] Independently source-confirm deployed Workbridge `edit_file` text-template substitution defect; **not proven** in `write_file`. Document regression and WB-001 proposed fix; production source/server unchanged. Report `reports/2026-11-06-edit-file-dollar-replacement-audit.md`, commit `8ce2d8e`.
+- [x] Record aborted WinApp A/B with zero completed pairs; no direct-inspect performance claim.
+- [ ] Resolve crash-orphan inspector canonical FileId mismatch. First actual private matrix **failed I01** with exit1 and was not automatically rerun; second source-only corrected 12-case version requires fresh parser/Temp preflight and independent peer review before any distinct attempt. Live orphan archival remains **HOLD**.
+- [ ] R1 native release/rename/hardlink/share/reparse and performance tests, peer-reviewed private synthetic only, no deployed changes.
+- [ ] Coordinate a quiet Windows desktop interval before any **real** WinApp/Sbroenne UIA snapshot or owned-modal fixture launch. Keep the incumbent working backend and RIFT/VMware user sessions undisturbed.
+
+Latest coordinator evidence: `reports/2026-11-05-investigation-sitrep-05.md`.
