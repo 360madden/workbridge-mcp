@@ -31,6 +31,44 @@ internal static class DesktopFacts
     [DllImport("kernel32.dll")]
     private static extern uint WTSGetActiveConsoleSessionId();
 
+    // Query WTSConnectState (class 8), an independent read-only session signal.
+    // The buffer is a 4-byte WTS_CONNECTSTATE_CLASS and must be freed by WTSFreeMemory.
+    [DllImport("wtsapi32.dll", EntryPoint = "WTSQuerySessionInformationW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool WTSQuerySessionInformation(
+        IntPtr server, uint sessionId, int infoClass, out IntPtr buffer, out uint returnedBytes);
+
+    [DllImport("wtsapi32.dll")]
+    private static extern void WTSFreeMemory(IntPtr buffer);
+
+    internal static string ClassifyConnectionState(int? state) => state switch
+    {
+        0 => "ACTIVE",
+        4 => "DISCONNECTED",
+        _ => "UNKNOWN",
+    };
+
+    private static (int? rawState, int? win32Error, bool validResponse) ReadConnectionState(int processSessionId)
+    {
+        IntPtr buffer = IntPtr.Zero;
+        try
+        {
+            bool queried = WTSQuerySessionInformation(
+                IntPtr.Zero, checked((uint)processSessionId), 8, out buffer, out uint returnedBytes);
+            if (!queried)
+                return (null, Marshal.GetLastWin32Error(), false);
+            if (buffer == IntPtr.Zero || returnedBytes != sizeof(int))
+                return (null, null, false);
+            int value = Marshal.ReadInt32(buffer);
+            return (value, null, true);
+        }
+        finally
+        {
+            if (buffer != IntPtr.Zero)
+                WTSFreeMemory(buffer);
+        }
+    }
+
     private static string? ReadName(IntPtr handle)
     {
         if (handle == IntPtr.Zero)
@@ -95,6 +133,7 @@ internal static class DesktopFacts
         uint consoleId = WTSGetActiveConsoleSessionId();
         int? activeConsoleSessionId = consoleId == uint.MaxValue ? null : checked((int)consoleId);
         bool userInteractive = Environment.UserInteractive;
+        var connection = ReadConnectionState(processSessionId);
         return new
         {
             observedAtUtc = DateTimeOffset.UtcNow,
@@ -108,7 +147,10 @@ internal static class DesktopFacts
                 userInteractive, windowStation, threadDesktop, inputDesktop,
                 processSessionId, activeConsoleSessionId),
             sessionLocked = "UNKNOWN",
-            sessionConnected = "UNKNOWN",
+            sessionConnected = ClassifyConnectionState(connection.rawState),
+            wtsConnectState = connection.rawState,
+            wtsQueryWin32Error = connection.win32Error,
+            wtsResponseValid = connection.validResponse,
             intervalContinuity = "UNKNOWN",
             safeForInput = false,
         };
@@ -132,6 +174,14 @@ internal static class DesktopFacts
             if (Classify(item.user, item.station, item.thread, item.input,
                     item.session, item.console) != item.expected)
                 return -1;
-        return cases.Length;
+        var connectionCases = new (int? raw, string expected)[]
+        {
+            (0, "ACTIVE"), (4, "DISCONNECTED"),
+            (1, "UNKNOWN"), (null, "UNKNOWN"),
+        };
+        foreach (var item in connectionCases)
+            if (ClassifyConnectionState(item.raw) != item.expected)
+                return -1;
+        return cases.Length + connectionCases.Length;
     }
 }

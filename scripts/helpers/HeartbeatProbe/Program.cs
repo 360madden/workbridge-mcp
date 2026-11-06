@@ -6,10 +6,10 @@ if (args.Length == 1 && args[0] == "--desktop-facts-self-test")
 {
     int cases = DesktopFacts.SelfTest();
     Console.WriteLine(JsonSerializer.Serialize(new {
-        schemaVersion = 1, selfTest = cases == 8 ? "PASS" : "FAIL",
+        schemaVersion = 1, selfTest = cases == 12 ? "PASS" : "FAIL",
         cases, safeForInput = false
     }));
-    return cases == 8 ? 0 : 2;
+    return cases == 12 ? 0 : 2;
 }
 
 if (args.Length != 1 || !Path.IsPathFullyQualified(args[0]) || !Directory.Exists(args[0])) return 2;
