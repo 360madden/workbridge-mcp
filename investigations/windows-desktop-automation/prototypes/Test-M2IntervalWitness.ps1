@@ -75,7 +75,9 @@ try {
         $report.hiddenAndNotForeground -eq $true -and
         $report.pumpTicks -gt 0 -and $sampleCount -ge 2 -and
         $report.healthySamples -eq $sampleCount -and $eventCount -eq 0 -and
-        $report.eventOverflow -eq $false -and
+        $report.eventOverflow -eq $false -and $report.timedSampleCount -eq $sampleCount -and
+        $report.sampleTimingInvalid -eq $false -and
+        $report.longestSampleGapMs -ge 0 -and $report.longestSampleGapMs -le 500 -and
         $report.syntheticSelfMessage -eq $false -and $report.safeForInput -eq $false -and
         $report.intervalVerified -eq $false -and $report.coverageVerified -eq $false -and
         $report.durationMs -ge ($DurationSeconds * 1000)) 'WITNESS_RECEIPT_REJECTED'
@@ -117,6 +119,8 @@ $reason = if ($failure -and $failure -match '^[A-Z][A-Z_]{2,65}$') { $failure } 
     childPid=$processId
     witnessStatus=$receiptStatus
     sampleCount=$sampleCount
+    longestSampleGapMs=$report.longestSampleGapMs
+    sampleTimingInvalid=$report.sampleTimingInvalid
     eventCount=$eventCount
     temporaryTaskRegistrationCreated=(Test-Path -LiteralPath $config)
     taskAbsentAfterRun=$taskRemoved

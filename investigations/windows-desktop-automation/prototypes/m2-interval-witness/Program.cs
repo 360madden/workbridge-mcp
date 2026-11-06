@@ -70,10 +70,10 @@ internal static class Program
             int cases = SessionEventLedger.SelfTest();
             Console.WriteLine(JsonSerializer.Serialize(new
             {
-                schemaVersion = 1, selfTest = cases == 9 ? "PASS" : "FAIL", cases,
+                schemaVersion = 1, selfTest = cases == 12 ? "PASS" : "FAIL", cases,
                 safeForInput = false
             }));
-            return cases == 9 ? 0 : 2;
+            return cases == 12 ? 0 : 2;
         }
 
         if (args.Length != 3 || (args[0] != "--observe" && args[0] != "--synthetic-lock") ||
@@ -151,6 +151,7 @@ internal static class Program
             }
             var initial = JsonSerializer.SerializeToElement(DesktopFacts.Sample(session));
             sampleCount++;
+            ledger.RecordTimedSample(stopwatch.ElapsedMilliseconds);
             if (Healthy(initial, session)) healthySamples++;
 
             timer.Tick += (_, _) =>
@@ -166,6 +167,7 @@ internal static class Program
                     && GetForegroundWindow() != window.Handle;
                 var sampled = JsonSerializer.SerializeToElement(DesktopFacts.Sample(session));
                 sampleCount++;
+                ledger.RecordTimedSample(stopwatch.ElapsedMilliseconds);
                 if (Healthy(sampled, session)) healthySamples++;
                 if (stopwatch.Elapsed >= TimeSpan.FromSeconds(durationSeconds))
                 {
@@ -178,6 +180,7 @@ internal static class Program
             timer.Stop();
             var final = JsonSerializer.SerializeToElement(DesktopFacts.Sample(session));
             sampleCount++;
+            ledger.RecordTimedSample(stopwatch.ElapsedMilliseconds);
             if (Healthy(final, session)) healthySamples++;
             unregistered = WTSUnRegisterSessionNotification(window.Handle);
             registered = true; // registration was successful for the observed window
@@ -193,6 +196,9 @@ internal static class Program
                 hiddenAndNotForeground, pumpTicks,
                 sampleCount, healthySamples, eventCount = ledger.TotalEvents,
                 eventOverflow = ledger.Overflow, events = ledger.Events,
+                timedSampleCount = ledger.TimedSamples,
+                longestSampleGapMs = ledger.LongestSampleGapMs,
+                sampleTimingInvalid = ledger.SampleTimingInvalid,
                 initial, final, syntheticSelfMessage = synthetic,
                 safeForInput = false, intervalVerified = false, coverageVerified = false
             });
