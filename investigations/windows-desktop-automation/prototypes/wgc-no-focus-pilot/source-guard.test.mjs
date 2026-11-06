@@ -4,11 +4,10 @@ import { test } from 'node:test';
 
 const source = readFileSync(new URL('./Program.cs', import.meta.url), 'utf8');
 const project = readFileSync(new URL('./WgcNoFocusPilot.csproj', import.meta.url), 'utf8');
-// This pilot intentionally has no block comments; remove one-line comments so
-// documentation about forbidden APIs is not mistaken for a call.
+// Only line comments are present. Ignore comments when detecting forbidden calls.
 const executableSource = source.replace(/\/\/[^\r\n]*/g, '');
 
-test('direct Microsoft WinApp 0.7.1 WGC-only API is pinned', () => {
+test('official Microsoft WinApp 0.7.1 direct WGC API is pinned', () => {
   assert.match(project, /Microsoft\.Windows\.SDK\.BuildTools\.WinApp\.UIAutomation" Version="0\.7\.1"/);
   assert.match(project, /net10\.0-windows10\.0\.19041\.0/);
   assert.match(executableSource, /capture\.StartFrameGrabber\(window\.Handle/);
@@ -21,8 +20,7 @@ test('all external target HWND/PID capture is unavailable', () => {
   assert.match(executableSource, /"--capture-disposable"/);
   assert.match(executableSource, /new DisposableTestWindow\(/);
   assert.doesNotMatch(executableSource, /args\[[^\]]+\].*(?:--hwnd|--pid)/);
-  assert.doesNotMatch(executableSource, /GetWindowThreadProcessId\s*\(/);
-  assert.doesNotMatch(executableSource, /FindWindow\s*\(/);
+  assert.doesNotMatch(executableSource, /GetWindowThreadProcessId\s*\(|FindWindow\s*\(/);
 });
 
 test('no explicit focus, input, picker, PrintWindow or GDI fallback API calls', () => {
@@ -35,7 +33,7 @@ test('no explicit focus, input, picker, PrintWindow or GDI fallback API calls', 
     assert.doesNotMatch(
       executableSource,
       new RegExp('\\b' + api + '\\s*\\(', 'i'),
-      `unexpected explicit ${api} call`,
+      'unexpected explicit ' + api + ' call',
     );
   }
   const nativeImports = Array.from(
@@ -52,4 +50,21 @@ test('no GUI/capture code path in --self-test branch', () => {
   const segment = executableSource.substring(selfStart, disposableStart);
   assert.match(segment, /SelfTest\.Run\(\)/);
   assert.doesNotMatch(segment, /Application\.|new DisposableTestWindow|StartFrameGrabber/);
+});
+
+test('synthetic fixture remains on one STA with bounded message pump', () => {
+  assert.match(executableSource, /\[STAThread\][\s\S]*?private static int Main\(/);
+  assert.match(executableSource, /private static int CaptureDisposable\(\)/);
+  assert.doesNotMatch(executableSource, /async Task<int> CaptureDisposable/);
+  assert.match(executableSource, /WaitForFirstFrameAsync\(/);
+  assert.match(executableSource, /Stopwatch.StartNew\(\)/);
+  assert.match(executableSource, /deadline\.Elapsed < TimeSpan\.FromSeconds\(8\)/);
+  assert.match(executableSource, /Application\.DoEvents\(\)/);
+  assert.match(executableSource, /Thread\.Sleep\(20\)/);
+});
+
+test('output is prototype-only, never caller-selected or overwritten', () => {
+  assert.match(executableSource, /Path\.Combine\(AppContext\.BaseDirectory, "pilot\.png"\)/);
+  assert.match(executableSource, /FileMode\.CreateNew/);
+  assert.doesNotMatch(executableSource, /args\[1\]/);
 });

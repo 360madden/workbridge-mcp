@@ -34,7 +34,7 @@ fallback. Existing apps should retain foreground.
 
 ## Source build/synthetic tests (Windows PowerShell in this directory)
 
-1. `dotnet restore .\WgcNoFocusPilot.csproj`
+1. `dotnet restore .\WgcNoFocusPilot.csproj --packages .packages`
 2. `dotnet build .\WgcNoFocusPilot.csproj --no-restore -c Release`
 3. `dotnet run --no-build --project .\WgcNoFocusPilot.csproj -c Release -- --self-test`
 
@@ -45,15 +45,18 @@ invalid buffers. It starts **no GUI** and makes **no capture**.
 
 Only after an explicit coordinator/user checkpoint, launch a disposable
 synthetic local top-level window:
-`dotnet run --no-build --project .\WgcNoFocusPilot.csproj -c Release -- --capture-disposable pilot.png`
+`dotnet run --no-build --no-restore --project .\WgcNoFocusPilot.csproj -c Release -- --capture-disposable`
 
 Expected: foreground HWND unchanged, WGC-only release API, one color-varying
-frame, PNG with SHA-256, and no overwrite. A failed/unsupported capture
-stops without trying another backend. The synthetic fixture may briefly appear
-at the top left; it uses ShowWithoutActivation and WS_EX_NOACTIVATE to avoid
-stealing focus. **Never run this command against the physical game.**
+frame, PNG with SHA-256, and no overwrite. The output is a fixed
+`bin/Release/net10.0-windows10.0.19041.0/pilot.png` inside this prototype;
+there is no caller-supplied output path. All GUI lifetime and the bounded
+message-pumping wait stay on the originating STA thread. A failed/unsupported
+capture stops without another backend. The synthetic fixture may briefly
+appear at the top left; it uses ShowWithoutActivation and WS_EX_NOACTIVATE
+to avoid stealing focus. **Never run this command against the physical game.**
 
 ## Reversibility
 
-Only this directory's own `bin/obj` and optional `pilot.png` are affected.
+Only this directory's own `.packages/bin/obj` and optional `bin/.../pilot.png` are affected.
 Cleanup requires validated exact paths and separate authorization.

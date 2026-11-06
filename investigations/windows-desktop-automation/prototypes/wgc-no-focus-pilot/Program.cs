@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -12,7 +13,7 @@ internal static class Program
     // Only self-test or a window created by this disposable process is accepted.
     // No arbitrary HWND input, no keyboard/mouse injection, no focus-changing API.
     [STAThread]
-    private static async Task<int> Main(string[] args)
+    private static int Main(string[] args)
     {
         if (args.Length == 1 && args[0] == "--self-test")
         {
@@ -29,28 +30,29 @@ internal static class Program
             }
         }
 
-        if (args.Length == 2 && args[0] == "--capture-disposable")
+        if (args.Length == 1 && args[0] == "--capture-disposable")
         {
             // This branch launches a synthetic GUI. Do not execute without the
             // coordinator's *separate* disposable-window-only authorization.
-            return await CaptureDisposableAsync(args[1]);
+            return CaptureDisposable();
         }
 
         Console.Error.WriteLine(
-            "Usage: WgcNoFocusPilot --self-test | --capture-disposable OUTPUT.png");
+            "Usage: WgcNoFocusPilot --self-test | --capture-disposable");
         Console.Error.WriteLine(
             "The capture command is RESERVED for separately authorized disposable-window testing.");
         return 2;
     }
 
-    private static async Task<int> CaptureDisposableAsync(string outputPath)
+    private static int CaptureDisposable()
     {
         try
         {
-            if (Path.GetExtension(outputPath) != ".png")
-                throw new ArgumentException("Output must be a .png file.");
+            // Always inside this compiled prototype's own output directory:
+            // no caller-supplied or guessed path, and CreateNew forbids overwrite.
+            string outputPath = Path.Combine(AppContext.BaseDirectory, "pilot.png");
             if (File.Exists(outputPath))
-                throw new IOException("Output already exists; refusing to overwrite.");
+                throw new IOException("Disposable test PNG already exists; refusing to overwrite.");
 
             Application.SetHighDpiMode(HighDpiMode.SystemAware);
             using var window = new DisposableTestWindow();
@@ -81,10 +83,23 @@ internal static class Program
             if (foregroundWhileCapturing != foregroundBefore)
                 throw new InvalidOperationException("Foreground changed during capture startup.");
 
+            // Keep this method, the Form and its Dispose on the originating
+            // STA thread. Pump fixture paint/messages while the free-threaded
+            // WGC frame callback completes; never await across an STA boundary.
             using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-            var firstFrame = await frameGrabber.WaitForFirstFrameAsync(
+            Task<bool> firstFrameTask = frameGrabber.WaitForFirstFrameAsync(
                 TimeSpan.FromSeconds(7), cancel.Token);
-            if (!firstFrame)
+            var deadline = Stopwatch.StartNew();
+            while (!firstFrameTask.IsCompleted && deadline.Elapsed < TimeSpan.FromSeconds(8))
+            {
+                Application.DoEvents();
+                if (NativeForeground.GetForegroundWindow() != foregroundBefore)
+                    throw new InvalidOperationException("Foreground changed while pumping fixture.");
+                Thread.Sleep(20);
+            }
+            if (!firstFrameTask.IsCompleted)
+                throw new TimeoutException("No WGC frame before bounded pump deadline.");
+            if (!firstFrameTask.GetAwaiter().GetResult())
                 throw new TimeoutException("No WGC frame before timeout.");
             var pixels = frameGrabber.TryGetLatest()
                 ?? throw new InvalidOperationException("First WGC frame unavailable.");
@@ -99,7 +114,7 @@ internal static class Program
             var sha256 = Convert.ToHexString(SHA256.HashData(png));
             // No overwrite; scoped test artifact only.
             using (var output = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write))
-                await output.WriteAsync(png);
+                output.Write(png);
             Console.WriteLine(
                 $"PASS WGC-only synthetic HWND 0x{window.Handle:X}, {pixels.Width}x{pixels.Height}, " +
                 $"frame={pixels.Version}, png-bytes={png.Length}, sha256={sha256}, foreground-unchanged=yes");
