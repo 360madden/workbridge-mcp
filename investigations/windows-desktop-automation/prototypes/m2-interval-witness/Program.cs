@@ -71,13 +71,14 @@ internal static class Program
             int cases = SessionEventLedger.SelfTest();
             Console.WriteLine(JsonSerializer.Serialize(new
             {
-                schemaVersion = 1, selfTest = cases == 12 ? "PASS" : "FAIL", cases,
+                schemaVersion = 1, selfTest = cases == 15 ? "PASS" : "FAIL", cases,
                 safeForInput = false
             }));
-            return cases == 12 ? 0 : 2;
+            return cases == 15 ? 0 : 2;
         }
 
-        if (args.Length != 3 || (args[0] != "--observe" && args[0] != "--synthetic-lock") ||
+        if (args.Length != 3 || args[0] is not ("--observe" or "--synthetic-lock"
+                or "--synthetic-disconnect" or "--synthetic-mismatch") ||
             !Path.IsPathFullyQualified(args[1]) || !Directory.Exists(args[1]) ||
             !int.TryParse(args[2], out int durationSeconds) || durationSeconds is < 2 or > 10 ||
             !OperatingSystem.IsWindows())
@@ -89,12 +90,12 @@ internal static class Program
         if (File.Exists(receipt))
             return 2;
 
-        bool synthetic = args[0] == "--synthetic-lock";
+        bool synthetic = args[0] != "--observe";
         int result = 2;
         object report;
         try
         {
-            (result, report) = RunWitness(durationSeconds, synthetic);
+            (result, report) = RunWitness(durationSeconds, args[0]);
         }
         catch
         {
@@ -117,9 +118,12 @@ internal static class Program
         return result;
     }
 
-    private static (int exitCode, object receipt) RunWitness(int durationSeconds, bool synthetic)
+    private static (int exitCode, object receipt) RunWitness(int durationSeconds, string mode)
     {
+        bool synthetic = mode != "--observe";
         int session = Process.GetCurrentProcess().SessionId;
+        int syntheticCode = mode == "--synthetic-disconnect" ? 4 : 7;
+        int syntheticSession = mode == "--synthetic-mismatch" ? checked(session + 1) : session;
         var ledger = new SessionEventLedger(session);
         using var context = new ApplicationContext();
         using var timer = new System.Windows.Forms.Timer { Interval = 75 };
@@ -165,7 +169,7 @@ internal static class Program
                     // Queue a real message-pump delivery to our own hidden HWND only.
                     // This does NOT lock Windows or notify any other process.
                     syntheticPostSucceeded = PostMessage(window.Handle, WmWtsSessionChange,
-                        new IntPtr(7), new IntPtr(session));
+                        new IntPtr(syntheticCode), new IntPtr(syntheticSession));
                 }
                 hiddenAndNotForeground &= !IsWindowVisible(window.Handle)
                     && GetForegroundWindow() != window.Handle;
@@ -190,8 +194,9 @@ internal static class Program
             registered = true; // registration was successful for the observed window
             string status = ledger.Classify(registered, unregistered, pumpTicks > 0,
                 hiddenAndNotForeground, sampleCount == healthySamples, sampleCount);
+            // An unrelated WTS notification cannot substitute for our queued test message.
             if (synthetic && (!syntheticPosted || !syntheticPostSucceeded ||
-                ledger.TotalEvents == 0))
+                !ledger.Contains(syntheticCode, syntheticSession)))
                 status = "SYNTHETIC_DELIVERY_MISSING";
             return (status == "NO_TRANSITION_OBSERVED" ? 0 : 2, new
             {
@@ -207,6 +212,8 @@ internal static class Program
                 longestSampleGapMs = ledger.LongestSampleGapMs,
                 sampleTimingInvalid = ledger.SampleTimingInvalid,
                 initial, final, syntheticSelfMessage = synthetic,
+                syntheticEventCode = synthetic ? syntheticCode : (int?)null,
+                syntheticEventSessionId = synthetic ? syntheticSession : (int?)null,
                 syntheticNotificationPosted = syntheticPosted,
                 syntheticPostSucceeded,
                 safeForInput = false, intervalVerified = false, coverageVerified = false

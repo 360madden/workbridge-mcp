@@ -16,6 +16,8 @@ internal sealed class SessionEventLedger
     internal int TotalEvents { get; private set; }
     internal bool Overflow { get; private set; }
     internal IReadOnlyList<SessionChangeEvent> Events => events;
+    internal bool Contains(int code, int sessionId) =>
+        events.Exists(item => item.Code == code && item.SessionId == sessionId);
 
     internal SessionEventLedger(int expectedSessionId)
     {
@@ -78,6 +80,9 @@ internal sealed class SessionEventLedger
         Check(normal.Classify(true, true, true, true, false, 3) == "EVIDENCE_INCOMPLETE");
         normal.Record(7, 1, DateTimeOffset.UtcNow);
         Check(normal.Classify(true, true, true, true, true, 3) == "TRANSITION_OBSERVED");
+        Check(normal.Contains(7, 1));
+        Check(!normal.Contains(7, 999));
+        Check(!normal.Contains(4, 1));
         var weird = new SessionEventLedger(1);
         weird.RecordTimedSample(0);
         weird.RecordTimedSample(75);

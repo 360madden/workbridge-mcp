@@ -1,17 +1,19 @@
-# Passive M2 Lab 2 readiness only. Does not start controllers, access guest credentials,
+# Passive M2 Lab 1/2 readiness only. Does not start controllers, access guest credentials,
 # send VMware guest commands, lock Windows, focus windows, or touch RIFT.
+# Historical Lab2 filename retained for existing callers; -Lab selects either lab.
 [CmdletBinding()]
-param()
+param([ValidateSet('lab1','lab2')][string]$Lab = 'lab2')
 $ErrorActionPreference = 'Stop'
 
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
-$configPath = [IO.Path]::GetFullPath((Join-Path $repo '..\RiftReader2\artifacts\control-fleet-live\lab2\host.json'))
-$expectedVmx = 'C:\rift modding\VMs\RIFT-Lab-2\RIFT-Lab.vmx'
+$configPath = [IO.Path]::GetFullPath((Join-Path $repo ('..\RiftReader2\artifacts\control-fleet-live\' + $Lab + '\host.json')))
+$labNumber = if ($Lab -ceq 'lab1') { '1' } else { '2' }
+$expectedVmx = 'C:\rift modding\VMs\RIFT-Lab-' + $labNumber + '\RIFT-Lab.vmx'
 $expectedVmrun = 'C:\Program Files\VMware\VMware Workstation\vmrun.exe'
-$taskName = 'Workbridge Helper rr2-controller-lab2'
+$taskName = 'Workbridge Helper rr2-controller-' + $Lab
 $report = [ordered]@{
     schemaVersion = 1
-    lab = 'lab2'
+    lab = $Lab
     readOnly = $true
     vmxIdentityMatches = $false
     vmxRunning = $false
