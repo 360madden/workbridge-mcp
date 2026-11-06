@@ -1,0 +1,174 @@
+{
+  "schema": "workbridge.wgc-source-provenance-audit",
+  "schemaVersion": 1,
+  "observedAtUtc": "2026-11-06T01:36:08Z",
+  "status": "READ_ONLY_DISPOSABLE_BUILD_INVENTORY_NOT_EXECUTION_PIN",
+  "scope": {
+    "machine": "Joey Windows physical host",
+    "project": "workbridge-mcp",
+    "mode": "read-only file inventory",
+    "physicalRiftCapture": false,
+    "gameInput": false,
+    "guiChange": false,
+    "buildOrRestorePerformed": false,
+    "serviceChange": false
+  },
+  "source": {
+    "projectFile": {
+      "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/WgcNoFocusPilot.csproj",
+      "sha256": "aa9bbb636ee06cd56e8979a4cbb44e2744c263b65d5a5af4eda9ef97bb5e4ac4"
+    },
+    "programFile": {
+      "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/Program.cs",
+      "sha256": "2df6d1174dd3eb490e9a10d148327f552595eb54e4284feb64a938174893d82d"
+    },
+    "targetFramework": "net10.0-windows10.0.19041.0",
+    "vendorPackage": {
+      "id": "Microsoft.Windows.SDK.BuildTools.WinApp.UIAutomation",
+      "version": "0.7.1",
+      "nupkgPath": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/.packages/microsoft.windows.sdk.buildtools.winapp.uiautomation/0.7.1/microsoft.windows.sdk.buildtools.winapp.uiautomation.0.7.1.nupkg",
+      "nupkgSizeBytes": 700506,
+      "nupkgSha256": "eb5c2dfe260e0e058123049281001a698741379f9df1550c7ac653ce1af0e66f",
+      "metadataContentSha512Base64": "3o0Ihk4A5znYHr8g68RqJylSO2LFOKdCF6Si2rcuwyMBlTk5D3Jcd9TbKB6mazr3m6d8G6wDEotrpHze+Z3L3g==",
+      "nupkgWholeFileSha512Base64": "S6R4Je9Pxu8M0vPRsAL3swizq2HTYBL8CDydh2V6BkBRYK3qVAKrd5n49DLGFnygYeBARuvThl3HBtT5ecG1qQ==",
+      "metadataSource": "https://api.nuget.org/v3/index.json",
+      "hashDifferenceExplanation": "NuGet metadata contentHash excludes package signature whereas legacy .nupkg.sha512 covers the signed file; values are not expected to match",
+      "officialReference": "https://github.com/NuGet/Home/wiki/Nupkg-Metadata-File"
+    },
+    "directPackageVersions": {
+      "Microsoft.Extensions.DependencyInjection": "10.0.0",
+      "Microsoft.Extensions.Logging": "10.0.0"
+    }
+  },
+  "resolvedByDepsJson": {
+    "Microsoft.Extensions.DependencyInjection": "10.0.0",
+    "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.5",
+    "Microsoft.Extensions.Logging": "10.0.0",
+    "Microsoft.Extensions.Logging.Abstractions": "10.0.5",
+    "Microsoft.Extensions.Options": "10.0.0",
+    "Microsoft.Extensions.Primitives": "10.0.0",
+    "Microsoft.Windows.SDK.BuildTools.WinApp.UIAutomation": "0.7.1",
+    "runtimepack.Microsoft.Windows.SDK.NET.Ref": "10.0.19041.57"
+  },
+  "outputs": {
+    "directory": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0",
+    "artifactCount": 13,
+    "artifacts": [
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/WgcNoFocusPilot.exe",
+        "sizeBytes": 162304,
+        "sha256": "b914f36d39013c2066adcbe4936e9ac6871d9a82c906a25d129a639137e61e8c",
+        "method": "Workbridge_file_info_hash_true"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/WgcNoFocusPilot.dll",
+        "sizeBytes": 14848,
+        "sha256": "155005c52a84318883aee6dc3a3351463a061f5e524beaf0a0c6a381c12a7dce",
+        "method": "Workbridge_file_info_hash_true"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/WgcNoFocusPilot.deps.json",
+        "sizeBytes": 6702,
+        "sha256": "075e07d13d8980fedf92f562ceff0203a667c739f3554839f56ad01ef4479507",
+        "method": "Workbridge_file_info_hash_true"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/WgcNoFocusPilot.runtimeconfig.json",
+        "sizeBytes": 519,
+        "sha256": "96bc2946dff8790400d652ec7f8de7bb043e954980d59470c112788b68a1fbd3",
+        "method": "Workbridge_file_info_hash_true"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll",
+        "sizeBytes": 66320,
+        "sha256": "842fc19802a761e49c65b0e90b2c68bc6868b989145da5ac6ca30b766e2658f2",
+        "method": "Workbridge_file_info_hash_true"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/Microsoft.Extensions.DependencyInjection.dll",
+        "sizeBytes": 96008,
+        "sha256": "d646a5cca5e8116ae46b43715297083fa8a38db636eab60e66eeef350d74cd5d",
+        "method": "Workbridge_file_info_hash_true"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/Microsoft.Extensions.Logging.Abstractions.dll",
+        "sizeBytes": 67384,
+        "sha256": "03e916b9c5f91717b67c790325d4e5dd2debe81d8e403928806ba1d430ea7147",
+        "method": "Workbridge_file_info_hash_true"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/Microsoft.Extensions.Logging.dll",
+        "sizeBytes": 52016,
+        "sha256": "2c034725abd90afe30a1426e6477cb0693bc79170e1dfdb3cef7146e296a1f71",
+        "method": "Workbridge_file_info_hash_true"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/Microsoft.Extensions.Options.dll",
+        "sizeBytes": 65848,
+        "sha256": "58048d710cf2a88d3dea7c933d0b1408464d5aa4245ef736d3d47e6df6ba4db3",
+        "method": "Workbridge_file_info_hash_true"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/Microsoft.Extensions.Primitives.dll",
+        "sizeBytes": 45328,
+        "sha256": "6aaf929343fd02415d6cb5d903816c2f1c831b194bfe7a15789879093d0fa6b7",
+        "method": "Workbridge_file_info_hash_true"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/Microsoft.Windows.SDK.BuildTools.WinApp.UIAutomation.dll",
+        "sizeBytes": 984448,
+        "sha256": "7b062661e7c37f1f56bb74202aee6a1689c5dbcb0de973d2aeb48817ef37fa37",
+        "method": "Workbridge_file_info_hash_true"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/Microsoft.Windows.SDK.NET.dll",
+        "sizeBytes": 24877600,
+        "sha256": "0ec371d93798852e36461c8adddbeadce0f963a04752f0b64e54fe19c1c834a7",
+        "method": "PowerShell_Get-FileHash_job_p33_sdknet_large_dll_hash_readonly_20261105_a"
+      },
+      {
+        "path": "workbridge-mcp/investigations/windows-desktop-automation/prototypes/wgc-no-focus-pilot/bin/Release/net10.0-windows10.0.19041.0/WinRT.Runtime.dll",
+        "sizeBytes": 528944,
+        "sha256": "bcf3a14e8712a90837fc5c0d8c8a24696af2bd7f74e9767597ec81ededfb23db",
+        "method": "Workbridge_file_info_hash_true"
+      }
+    ],
+    "includesExeDllDepsRuntimeconfig": true,
+    "dependencyDllCount": 9,
+    "appDllCount": 1,
+    "hashCoverage": "13/13 listed files SHA256 observed; 12 file_info, 1 bounded Get-FileHash"
+  },
+  "proof": {
+    "sdkNetLargeDllHashJob": "p33_sdknet_large_dll_hash_readonly_20261105_a",
+    "sdkNetLargeDllHashJobStatus": "passed_exit0",
+    "sdkNetLargeDllHashResult": "0EC371D93798852E36461C8ADDDBEADCE0F963A04752F0B64E54FE19C1C834A7",
+    "sdkNetFileInfoHash": false,
+    "sdkNetFileInfoHashNote": "file_info(hash:true) returned INVALID_ARGUMENT at 24,877,600 B; separate bounded PowerShell Get-FileHash confirmed hash"
+  },
+  "installedRuntimeInventory": {
+    "sourceJob": "p33_dotnet_runtime_inventory_readonly_20261105_a",
+    "jobStatus": "passed_exit0",
+    "classification": "INSTALLED_ONLY_NOT_ACTUAL_LOADED_ASSEMBLY_PROOF",
+    "Microsoft.NETCore.App": "10.0.10",
+    "Microsoft.WindowsDesktop.App": "10.0.10",
+    "Microsoft.AspNetCore.App": "10.0.10",
+    "legacyMicrosoft.NETCore.App": "3.1.32"
+  },
+  "unresolved": [
+    "These are observed disk hashes, not same-open-handle pinning through a future capture process.",
+    "No packages.lock.json or restore-locked mode detected in pilot root; dependency resolution may change on future restore.",
+    "Runtimeconfig requests Microsoft.NETCore.App and Microsoft.WindowsDesktop.App 10.0.0; installed 10.0.10 was observed, but runtime actually loaded by the pilot was not independently attested.",
+    "OS Windows Graphics Capture, D3D11, DXGI and display driver binaries and load identities are outside this local artifact inventory.",
+    "The vendor package has generic screenshot fallback paths; only direct v0.7.1 StartFrameGrabber was source-reviewed as WGC-only. Runtime backend provenance still needs independent proof.",
+    "NuGet metadata/deps hashes are package content hashes; SHA-256 file inventory is separate and not a full signed-package trust validation.",
+    "No WGC physical-RIFT frame, foreground-event coverage, exact target/ROI qualification, or live Retry authorization."
+  ],
+  "recommendedOfflineAcceptance": [
+    "Reject unknown/added/missing/changed manifest files; pin each artifact over the same open handle through the capture attempt.",
+    "Require reproducible locked restore with committed packages.lock.json; assert resolved versions and package IDs.",
+    "Record actual CLR runtime/WindowsDesktop patch and loaded assembly path/version/hash without altering global environment.",
+    "Assert direct WGC-only backend/no fallback; negative-test any changed source/package/backend route.",
+    "Keep live Retry and physical-RIFT capture disabled pending separately authorized qualification."
+  ],
+  "gate": "G0_ARTIFACT_INVENTORY_ONLY_NOT_FULLY_ACCEPTED"
+}
