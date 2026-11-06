@@ -1,11 +1,12 @@
 # Physical RIFT Retry Sender — P2 C# offline-only
 
-Status: **Built and 25/25 pure synthetic tests passed on 2026-11-05**. No game input performed. P3 live activation **not approved**.
+Status: **Built and pure synthetic tests passed on 2026-11-05**. No game input performed. P3 live activation **not approved**.
 
 ## Exact responsibility and boundaries
 
-- The .NET 10 console executable accepts only `--self-test` or `--dry-run <absolute-witness-envelope.json>`. All other CLI requests, including `--execute-once` / `--live`, hard-reject with `LIVE_DISABLED_PENDING_P3` (exit 2) before touching Windows.
+- The .NET 10 console executable accepts only `--self-test`, `--contract-check <absolute-witness-envelope.json>` or `--dry-run <absolute-witness-envelope.json>`. All other CLI requests, including `--execute-once` / `--live`, hard-reject with `LIVE_DISABLED_PENDING_P3` (exit 2) before touching Windows.
 - `--self-test` performs no Win32 or FlaUI calls and uses synthetic PNG-header bytes, **not** a complete PNG image.
+- `--contract-check` validates the envelope and actual PNG SHA/IHDR with **no NativeProbe/Win32/FlaUI calls**. Its success status `CONTRACT_ONLY_OK_NATIVE_NOT_CHECKED` explicitly includes `nativeVerified:false`; it is for deterministic cross-language offline fixtures, not live target verification.
 - `--dry-run` is **read-only**: verifies envelope metadata, independently hashes supplied PNG bytes, reads PNG IHDR dimensions, and rechecks native RIFT HWND / PID / process start UTC / Windows session / class / title / owner / foreground / visibility / WindowFromPoint root / DPI / outer bounds / DWM extended bounds / client rect and origin / physical virtual-screen containment. It **never moves or clicks the mouse, never focuses, launches, or reloads the game**.
 - C# checks requested `imageBytesVerified` etc. **as caller assertions**. It does not directly call Workbridge's screenshot/capture receipt service. Only the Node wrapper's independent receipt validator can provide that provenance, and only an actual human viewing the exact SHA-bound screenshot can attest that the selected ROI represents the Retry button. A forged JSON envelope can misrepresent visual/receipt history; this prototype must not be represented as independently proving those facts.
 - The private `UnreachableFlaUiTransport.FutureSingleClick` is source for future review. It contains an internal permanently-false gate and has **no caller or public CLI path**. The adapted transport uses existing local FlaUI.Core `Mouse.Position` then `Mouse.LeftClick` after immediate native hit-test. P2 never invokes it.

@@ -441,9 +441,11 @@ internal static class Program
         // The default and every unknown/unapproved flag reject before reading files.
         if (args.Length == 1 && args[0] == "--self-test")
             return SyntheticTests.Run();
-        if (args.Length != 2 || args[0] != "--dry-run")
+        bool contractOnly = args.Length == 2 && args[0] == "--contract-check";
+        bool nativeDryRun = args.Length == 2 && args[0] == "--dry-run";
+        if (!contractOnly && !nativeDryRun)
             return Reject("LIVE_DISABLED_PENDING_P3",
-                "P2 only supports --self-test or --dry-run <witness-envelope.json>; no live RIFT input");
+                "P2 supports --self-test, --contract-check or --dry-run; live RIFT input is disabled");
 
         try
         {
@@ -464,6 +466,21 @@ internal static class Program
                 return Reject("PNG_SIZE", "PNG must be between 33 bytes and 32 MiB");
             byte[] png = File.ReadAllBytes(pngPath);
             var validated = Witness.Validate(json.RootElement, png, DateTimeOffset.UtcNow);
+            if (contractOnly)
+            {
+                // Cross-language offline contract test: no NativeProbe/Win32.
+                Console.WriteLine(JsonSerializer.Serialize(new
+                {
+                    status = "CONTRACT_ONLY_OK_NATIVE_NOT_CHECKED",
+                    nativeVerified = false, inputInjected = false,
+                    liveInputAllowed = false,
+                    target = new { validated.Pid, validated.Hwnd, validated.StartedUtc, validated.SessionId },
+                    capture = new { validated.CaptureRequestId, validated.CaptureSha256 },
+                    coordinateMapping = "dwm-extended-frame-physical",
+                    validated.DwmFrame, validated.ScreenshotRoi, validated.ClickPoint
+                }));
+                return 0;
+            }
             var native = NativeProbe.Capture(validated);
             NativeProbe.RequireExact(native, validated);
             Console.WriteLine(JsonSerializer.Serialize(new

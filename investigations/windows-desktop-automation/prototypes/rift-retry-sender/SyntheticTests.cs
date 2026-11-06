@@ -144,6 +144,14 @@ internal static class SyntheticTests
         });
         Rejected("reject old outer-window planner", "INVALID_PLAN",
             x => x["plan"]!["kind"] = "physical-rift-retry-OFFLINE-PLAN");
+        Rejected("reject missing persisted Node plan", "MISSING_FIELD",
+            x => x.AsObject().Remove("plan"));
+        Rejected("reject missing persisted nowUtc", "MISSING_FIELD",
+            x => x.AsObject().Remove("nowUtc"));
+        Rejected("reject missing capture verified flag", "MISSING_FIELD",
+            x => x["capture"]!.AsObject().Remove("imageBytesVerified"));
+        Rejected("reject missing screenshot frame pixel proof", "MISSING_FIELD",
+            x => x["desktop"]!.AsObject().Remove("windowFramePixelsVerified"));
         Rejected("reject arbitrary click coordinate", "PLAN_POINT_MISMATCH",
             x => x["plan"]!["virtualScreenPoint"]!["x"] = -377);
         Rejected("reject swapped PID", "PID_CHANGED",
