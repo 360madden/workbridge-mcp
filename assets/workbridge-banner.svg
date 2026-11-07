@@ -19,9 +19,9 @@
   <path d="M718 222H1190" stroke="#7092e9" stroke-width="7" stroke-linecap="round"/>
   <g fill="#0c2747" stroke="#57d6f6" stroke-width="4"><circle cx="732" cy="220" r="10"/><circle cx="949" cy="62" r="12"/><circle cx="1172" cy="220" r="10"/></g>
   <g fill="#a4efff"><circle cx="826" cy="119" r="5"/><circle cx="1072" cy="125" r="5"/></g>
-  <rect x="59" y="53" width="139" height="33" rx="16.5" fill="url(#pill)" stroke="#54d1e3" stroke-opacity=".6"/>
+  <rect x="59" y="53" width="201" height="33" rx="16.5" fill="url(#pill)" stroke="#54d1e3" stroke-opacity=".6"/>
   <circle cx="78" cy="69" r="5" fill="#55f2c5"/>
-  <text x="93" y="75" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#bfeffc">LOCAL-FIRST MCP</text>
+  <text x="96" y="75" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" letter-spacing=".3" fill="#bfeffc">LOCAL-FIRST MCP</text>
   <text x="56" y="163" font-family="Segoe UI, Arial, sans-serif" font-size="69" font-weight="800" letter-spacing="-2" fill="#f4f8ff">WORKBRIDGE</text>
   <text x="61" y="210" font-family="Segoe UI, Arial, sans-serif" font-size="33" font-weight="700" fill="#8cbdff">MCP</text>
   <text x="145" y="210" font-family="Segoe UI, Arial, sans-serif" font-size="22" fill="#d1dcef">•  Your AI-to-Windows development bridge</text>
