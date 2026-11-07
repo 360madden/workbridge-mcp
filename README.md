@@ -1,4 +1,123 @@
-# Workbridge MCP
+# 🌉 Workbridge MCP
+
+### Your Windows development workspace. Connected to AI.
+
+**A local-first Model Context Protocol bridge for inspecting, editing, testing, and coordinating real projects from ChatGPT and compatible MCP clients.**
+
+[![Version](https://img.shields.io/badge/version-0.16.4--dev-2563eb?style=for-the-badge&logo=typescript&logoColor=white)](docs/workbridge-36-capacity-20261101.md)
+[![Platform](https://img.shields.io/badge/platform-Windows%2011-0078d4?style=for-the-badge&logo=windows11&logoColor=white)](#-quick-start)
+[![MCP](https://img.shields.io/badge/protocol-MCP-8b5cf6?style=for-the-badge)](https://modelcontextprotocol.io/)
+[![Private by default](https://img.shields.io/badge/access-local--first-16a34a?style=for-the-badge&logo=shield&logoColor=white)](#-safety--recovery)
+
+[![Build & Test](https://img.shields.io/badge/build%20%26%20test-npm%20test-059669?style=flat-square&logo=npm)](#-quick-start)
+[![TypeScript](https://img.shields.io/badge/TypeScript-server-3178c6?style=flat-square&logo=typescript&logoColor=white)](#-architecture)
+[![PowerShell](https://img.shields.io/badge/PowerShell-operations-5391fe?style=flat-square&logo=powershell&logoColor=white)](#-quick-start)
+[![Git](https://img.shields.io/badge/Git-aware-f05032?style=flat-square&logo=git&logoColor=white)](#-capability-map)
+[![License](https://img.shields.io/badge/license-see%20repository-lightgrey?style=flat-square)](#-documentation)
+
+**🔎 Discover** · **📖 Understand** · **🛠️ Change** · **🧪 Validate** · **↩️ Recover**
+
+---
+
+## 🚀 At a glance
+
+| 🧭 Deployment | ⚡ Concurrent capacity | 🧰 Interface | 🛡️ Operational model |
+| :---: | :---: | :---: | :---: |
+| **0.16.4-dev** | **36 command jobs** | **64 MCP tools** | **Local Windows host** |
+| Active adopted baseline | **36 coordinated-worker assignments** | Git, files, search, workflows, snapshots | Guarded edits and durable recovery |
+
+> [!IMPORTANT]
+> **36 execution slots are not 36 AI reasoning agents.** Workbridge coordinates host-side jobs and worker assignments; your ChatGPT/Codex plan independently determines reasoning-agent availability. The figures above describe the [adopted 2026-11-01 baseline](docs/workbridge-36-capacity-20261101.md), not a guarantee for every installation. Check `workspace_info` for live limits.
+
+### 🗺️ Explore this README
+
+[**⚡ Quick start**](#-quick-start) · [**🏗️ Architecture**](#-architecture) · [**🧩 Capability map**](#-capability-map) · [**🛡️ Safety**](#-safety--recovery) · [**📚 Documentation**](#-documentation) · [**🪟 Windows setup**](#windows-setup)
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TB
+    A["💬 ChatGPT / MCP client"] --> B["🔐 OpenAI Secure MCP Tunnel"]
+    B --> C["🌉 Workbridge MCP server"]
+    D["💻 Local CLI"] --> E["🔒 Authenticated loopback"]
+    E --> C
+    C --> F["📂 Allowed Windows roots"]
+    C --> G["⚙️ Bounded command jobs"]
+    C --> H["🧩 Git, patches & workflows"]
+    F --> I["🗃️ Repositories & files"]
+    G --> J["🧪 Builds & tests"]
+    H --> K["↩️ Review & recovery"]
+```
+
+**One TypeScript server, two supported entry points:** browser access via the official Secure MCP Tunnel, and a separately authenticated local CLI via loopback. No public inbound listener, Docker, or database is required for the core bridge. Root allowlists and host permissions still govern access.
+
+## 🧩 Capability map
+
+| Area | What you can do | Helpful detail |
+| :--- | :--- | :--- |
+| 🔎 **Project discovery** | Find repositories, worktrees, and project manifests | Bounded scans and configured roots |
+| 📄 **Code intelligence** | Read multiple files, search source, assemble task context | Line numbers, paging, hashes |
+| 🧬 **Git awareness** | Inspect branches, commits, status, history, and diffs | No automatic remote push |
+| ✍️ **Safe editing** | Apply guarded single-file edits and multi-file patches | SHA-256 preconditions, durable IDs |
+| ⚙️ **Execution** | Run configured checks or explicit developer commands | 36 bounded command-job slots |
+| 🧑‍💻 **Coordination** | Track worker assignments and exclusive file ownership | 36 assignment capacity; not AI-agent spawning |
+| ✅ **Validation** | Resume named checks and review results | Input-consistency guards |
+| 🧊 **Snapshots** | Inspect saved binary/gzip evidence | Bounded reads and typed decoding |
+| ↩️ **Recovery** | Review, retry, or undo eligible operations | Refuses unsafe overwrite of newer edits |
+
+### 📊 Capacity snapshot
+
+```mermaid
+xychart-beta
+    title "Adopted host-side capacities"
+    x-axis ["Command jobs", "Worker assignments"]
+    y-axis "Slots" 0 --> 36
+    bar [36, 36]
+```
+
+<sub>Capacity is a configured maximum, not a claim that all slots are currently busy. Live settings are authoritative.</sub>
+
+## ⚡ Quick start
+
+**Prerequisites:** Windows, Node.js 24+, npm, Git for Windows, PowerShell 5.1+ (PowerShell 7 recommended), and an authorized OpenAI Secure MCP Tunnel for browser access.
+
+```powershell
+# Run in Windows PowerShell from your Workbridge checkout
+Set-Location C:\work\workbridge-mcp
+npm ci
+npm test
+.\scripts\Install-TunnelClient.ps1
+```
+
+Next, [configure the tunnel](#configure-and-run), [connect ChatGPT](#connect-browser-chatgpt--manual-ui-step), and inspect the [Windows autostart option](#automatic-windows-startup). Tunnel creation, workspace association, and runtime-key authorization are separate account steps.
+
+## 🛡️ Safety & recovery
+
+- 🔒 **Local-first access:** configured filesystem roots, protected runtime state, and authenticated local CLI.
+- 🧷 **Hash-guarded changes:** edits check the expected file version; conflicting writes fail instead of silently overwriting newer content.
+- 🧾 **Durable operation IDs:** inspect uncertain outcomes before retrying; multi-file patches and validation workflows retain review/recovery state.
+- 🧯 **Staged service updates:** use the [WB-001 release and rollback procedure](docs/updates.md) rather than replacing the live owner in place.
+- ⚠️ **Important boundary:** developer commands run as the Windows user; a restricted working directory is **not** an operating-system sandbox.
+
+## 📚 Documentation
+
+| Start here | Topic |
+| :--- | :--- |
+| [📘 Coding workflow](docs/coding-workflow.md) | Edits, jobs, Git, checks, and recovery |
+| [🧭 36-slot rollout](docs/workbridge-36-capacity-20261101.md) | Adopted baseline and acceptance evidence |
+| [🧩 Task context](docs/task-context.md) | Scoped instructions, searches, and source excerpts |
+| [🛠️ Resumable workflows](docs/resumable-workflows.md) | Checks, review, and retry behavior |
+| [🗺️ Workspace roots](docs/workspace-roots.md) | Root configuration and path rules |
+| [🧪 Update process](docs/updates.md) | Staged deployment and rollback |
+| [📡 Snapshots](docs/snapshots.md) | Saved evidence inspection |
+| [🗂️ Historical relocation](docs/workbridge-historical-fixture-relocation-20261101.md) | Archived experimental folders |
+
+---
+
+## 📖 Engineering notes & deployment history
+
+The sections below retain the detailed setup, operational instructions, and historical evidence for developers and maintainers.
+
 
 **Active, officially adopted architecture (2026-11-01): Workbridge 0.16.4-dev, 36 command-job slots, 36 coordinated-worker assignments, and 64 MCP tools.** The sealed `cap36-quiescence-20261101-03` release passed all nine WB-001 gates (1,037 tests passed, 0 failed, 3 skipped), and the hosted connector independently verified the healthy 36-slot deployment. The old 0.16.3-dev/six-slot runtime is retired as the operational baseline, while its Git history and release evidence are preserved. Workbridge slots are not ChatGPT reasoning-agent quotas. See [36-slot rollout and baseline adoption](docs/workbridge-36-capacity-20261101.md).
 
