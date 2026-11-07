@@ -1,3 +1,5 @@
+![Workbridge MCP banner](assets/workbridge-banner.svg)
+
 # 🌉 Workbridge MCP
 
 ### Your Windows development workspace. Connected to AI.
@@ -9,7 +11,7 @@
 [![MCP](https://img.shields.io/badge/protocol-MCP-8b5cf6?style=for-the-badge)](https://modelcontextprotocol.io/)
 [![Private by default](https://img.shields.io/badge/access-local--first-16a34a?style=for-the-badge&logo=shield&logoColor=white)](#-safety--recovery)
 
-[![Build & Test](https://img.shields.io/badge/build%20%26%20test-npm%20test-059669?style=flat-square&logo=npm)](#-quick-start)
+[![Build and Test](https://github.com/360madden/workbridge-mcp/actions/workflows/build-test.yml/badge.svg?branch=main)](https://github.com/360madden/workbridge-mcp/actions/workflows/build-test.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-server-3178c6?style=flat-square&logo=typescript&logoColor=white)](#-architecture)
 [![PowerShell](https://img.shields.io/badge/PowerShell-operations-5391fe?style=flat-square&logo=powershell&logoColor=white)](#-quick-start)
 [![Git](https://img.shields.io/badge/Git-aware-f05032?style=flat-square&logo=git&logoColor=white)](#-capability-map)
