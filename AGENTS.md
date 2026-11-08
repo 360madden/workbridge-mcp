@@ -1,4 +1,7 @@
 # Workbridge coding-agent instructions
+## Mandatory machine identity preflight (every new agent/chat session)
+
+Before inspecting or changing a local project, running commands, controlling a desktop, or dispatching workers, verify the actual Windows hostname on the selected Workbridge connector. Run `hostname.exe` through that connector (not through the ChatGPT sandbox), and check the completed job's stdout and exit code. The expected hostname for the LEGION connector is `LEGION`; for AMD_DESKTOP it is `AMD-DESKTOP`. Connector names, cached context, `C:\work` paths and earlier chats are not identity evidence. If the hostname does not match, the command fails, or the target is ambiguous, STOP local operations and report the mismatch. Do not silently switch to another connector. Reverify after a server restart, connector change, or when changing target machines. State the verified machine in the first operational status update. This preflight is required even if another chat already verified the machine.
 
 This repository is used for long-running AI-assisted development on Joey's Windows host. Before working on Workbridge, desktop/VM control or Rift integration, read `docs/autonomous-investigation-policy.md` and the relevant active roadmap (currently `docs/interactive-desktop-vm-roadmap.md`).
 
