@@ -76,7 +76,10 @@ async function main() {
     const settingsFile = path.join(state, 'settings.json');
     if ((await lstat(settingsFile)).size > 16 * 1024) throw new Error('Settings too large');
     settings = z
-      .object({ snapshotCacheGiB: capacity.optional(), expectedHostname: z.string().min(1).max(255).optional() })
+      .object({
+        snapshotCacheGiB: capacity.optional(),
+        expectedHostname: z.string().min(1).max(255).optional(),
+      })
       .strict()
       .parse(JSON.parse((await readFile(settingsFile, 'utf8')).replace(/^\uFEFF/, '')));
   } catch (error) {
@@ -87,7 +90,10 @@ async function main() {
       );
   }
   if (settings.expectedHostname && os.hostname().toUpperCase() !== settings.expectedHostname.toUpperCase()) {
-    throw new BridgeError('MACHINE_IDENTITY_MISMATCH', `Workbridge expected host ${settings.expectedHostname} but is running on ${os.hostname()}. Refusing startup.`);
+    throw new BridgeError(
+      'MACHINE_IDENTITY_MISMATCH',
+      `Workbridge expected host ${settings.expectedHostname} but is running on ${os.hostname()}. Refusing startup.`,
+    );
   }
   const roots = await readRoots(state);
   const workspace = await Workspace.create(undefined, roots.additionalRoots);

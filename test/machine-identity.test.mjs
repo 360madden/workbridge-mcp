@@ -1,1 +1,26 @@
-import assert from 'node:assert/strict';import { spawnSync } from 'node:child_process';import { mkdtempSync,writeFileSync,rmSync } from 'node:fs';import { tmpdir,hostname } from 'node:os';import path from 'node:path';import { test } from 'node:test';const server=path.resolve('dist/server.js');test('configured wrong hostname rejects server startup',()=>{const state=mkdtempSync(path.join(tmpdir(),'wb-machine-'));try{writeFileSync(path.join(state,'settings.json'),JSON.stringify({expectedHostname:'NOT-THIS-MACHINE'}));const result=spawnSync(process.execPath,[server],{env:{...process.env,WORKBRIDGE_STATE_DIR:state},encoding:'utf8',timeout:5000});assert.equal(result.status,1);assert.match(result.stderr,/MACHINE_IDENTITY_MISMATCH/);assert.match(result.stderr,/Refusing startup/);}finally{rmSync(state,{recursive:true,force:true});}});
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir, hostname } from 'node:os';
+import path from 'node:path';
+import { test } from 'node:test';
+const server = path.resolve('dist/server.js');
+test('configured wrong hostname rejects server startup', () => {
+  const state = mkdtempSync(path.join(tmpdir(), 'wb-machine-'));
+  try {
+    writeFileSync(
+      path.join(state, 'settings.json'),
+      JSON.stringify({ expectedHostname: 'NOT-THIS-MACHINE' }),
+    );
+    const result = spawnSync(process.execPath, [server], {
+      env: { ...process.env, WORKBRIDGE_STATE_DIR: state },
+      encoding: 'utf8',
+      timeout: 5000,
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /MACHINE_IDENTITY_MISMATCH/);
+    assert.match(result.stderr, /Refusing startup/);
+  } finally {
+    rmSync(state, { recursive: true, force: true });
+  }
+});
