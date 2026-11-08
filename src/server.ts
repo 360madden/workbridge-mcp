@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { mkdir, readFile, lstat } from 'node:fs/promises';
 import { Workspace, limits, excludedDirectories, errorDetails, BridgeError } from './workspace.js';
@@ -70,20 +71,23 @@ async function main() {
   );
   await mkdir(state, { recursive: true });
   const capacity = z.number().positive().max(1024);
-  let settings: { snapshotCacheGiB?: number } = {};
+  let settings: { snapshotCacheGiB?: number; expectedHostname?: string } = {};
   try {
     const settingsFile = path.join(state, 'settings.json');
     if ((await lstat(settingsFile)).size > 16 * 1024) throw new Error('Settings too large');
     settings = z
-      .object({ snapshotCacheGiB: capacity.optional() })
+      .object({ snapshotCacheGiB: capacity.optional(), expectedHostname: z.string().min(1).max(255).optional() })
       .strict()
       .parse(JSON.parse((await readFile(settingsFile, 'utf8')).replace(/^\uFEFF/, '')));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
       throw new BridgeError(
         'INVALID_CONFIG',
-        'Invalid .local/settings.json; expected {"snapshotCacheGiB":32} with capacity greater than zero and at most 1024.',
+        'Invalid .local/settings.json; expected optional snapshotCacheGiB (1..1024) and expectedHostname (Windows hostname).',
       );
+  }
+  if (settings.expectedHostname && os.hostname().toUpperCase() !== settings.expectedHostname.toUpperCase()) {
+    throw new BridgeError('MACHINE_IDENTITY_MISMATCH', `Workbridge expected host ${settings.expectedHostname} but is running on ${os.hostname()}. Refusing startup.`);
   }
   const roots = await readRoots(state);
   const workspace = await Workspace.create(undefined, roots.additionalRoots);
