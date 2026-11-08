@@ -3,6 +3,12 @@ param([string]$Root = 'C:\work', [switch]$NonInteractive, [string]$CredentialPat
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Tunnel-Credential.ps1')
 $repo = Split-Path -Parent $PSScriptRoot
+$identitySettings = Join-Path $repo '.local\settings.json'
+if (!(Test-Path -LiteralPath $identitySettings -PathType Leaf)) { throw 'MACHINE_IDENTITY_MISSING: configure .local/settings.json expectedHostname before starting Workbridge.' }
+try { $expectedHost = (Get-Content -LiteralPath $identitySettings -Raw | ConvertFrom-Json).expectedHostname }
+catch { throw 'MACHINE_IDENTITY_INVALID: cannot parse Workbridge identity settings.' }
+if ([string]::IsNullOrWhiteSpace($expectedHost)) { throw 'MACHINE_IDENTITY_MISSING: expectedHostname must be configured.' }
+if ($expectedHost -ine $env:COMPUTERNAME) { throw "MACHINE_IDENTITY_MISMATCH: expected $expectedHost but running on $env:COMPUTERNAME." }
 $pointer = Join-Path $repo '.local\tunnel-client-path.txt'
 $profiles = Join-Path $repo '.local\profiles'
 if (!(Test-Path -LiteralPath $pointer)) { throw 'Run .\scripts\Install-TunnelClient.ps1 first.' }
