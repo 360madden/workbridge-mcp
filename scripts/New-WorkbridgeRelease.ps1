@@ -127,6 +127,34 @@ function Assert-WBReleasePrerequisites {
     }
 }
 
+# Resolve all command and log paths before this boundary: PowerShell command discovery
+# can repopulate PSModulePath. Only the immediate native child should inherit its absence.
+function Invoke-WBReleaseNativeGate {
+    param([string]$Executable, [string[]]$Arguments, [string]$LogPath)
+    $previousModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Process')
+    $previousPreference = $ErrorActionPreference
+    try {
+        if (![IO.Path]::IsPathRooted($Executable) -or !(Test-Path -LiteralPath $Executable -PathType Leaf)) {
+            throw 'Release gate requires an existing absolute native executable.'
+        }
+        $absoluteLogPath = [IO.Path]::GetFullPath($LogPath)
+        # Native stderr is retained in the gate log; its exit code determines success.
+        $ErrorActionPreference = 'Continue'
+        $global:LASTEXITCODE = $null
+        [Environment]::SetEnvironmentVariable('PSModulePath', [NullString]::Value, 'Process')
+        & $Executable @Arguments *> $absoluteLogPath
+        if ($null -eq $global:LASTEXITCODE) { throw 'Release native gate did not produce an exit code.' }
+        return $global:LASTEXITCODE
+    } finally {
+        if ($null -eq $previousModulePath) {
+            [Environment]::SetEnvironmentVariable('PSModulePath', [NullString]::Value, 'Process')
+        } else {
+            [Environment]::SetEnvironmentVariable('PSModulePath', $previousModulePath, 'Process')
+        }
+        $ErrorActionPreference = $previousPreference
+    }
+}
+
 # File scheduling only: test cases, deadlines and within-file concurrency stay unchanged.
 function Get-WBReleaseTestProfile {
     param([switch]$SerialTests)
@@ -146,6 +174,7 @@ $previousRoot = $env:WORKBRIDGE_ROOT
 $previousState = $env:WORKBRIDGE_STATE_DIR
 $previousValidationPath = [Environment]::GetEnvironmentVariable('Path', 'Process')
 $previousValidationDotNetRoot = [Environment]::GetEnvironmentVariable('DOTNET_ROOT', 'Process')
+$previousValidationModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Process')
 try {
     $env:CONTROL_PLANE_API_KEY = $null
     if ($RefreshUserEnvironment) {
@@ -154,7 +183,11 @@ try {
         if ($null -ne $registeredEnvironment.DotNetRoot) {
             $dotnetRoot = [Environment]::ExpandEnvironmentVariables($registeredEnvironment.DotNetRoot)
         }
-        [Environment]::SetEnvironmentVariable('DOTNET_ROOT', $dotnetRoot, 'Process')
+        if ($null -eq $dotnetRoot) {
+            [Environment]::SetEnvironmentVariable('DOTNET_ROOT', [NullString]::Value, 'Process')
+        } else {
+            [Environment]::SetEnvironmentVariable('DOTNET_ROOT', $dotnetRoot, 'Process')
+        }
         [Environment]::SetEnvironmentVariable('Path', [Environment]::ExpandEnvironmentVariables($registeredEnvironment.Path), 'Process')
         Assert-WBReleasePrerequisites
     }
@@ -191,12 +224,23 @@ try {
             $previousPreference = $ErrorActionPreference
             try {
                 $ErrorActionPreference = 'Continue'
-                if ($command.name -in @('desktop-prestage','desktop-stage')) {
-                    & node @arguments *> (Join-Path $release ($command.name + '.log'))
+                if ($RefreshUserEnvironment) {
+                    $nativeExecutable = (Get-Command -Name node -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+                    if ($command.name -notin @('desktop-prestage','desktop-stage')) {
+                        $npmExecutable = (Get-Command -Name npm -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+                        $npmCli = Join-Path (Split-Path -Parent $npmExecutable) 'node_modules\npm\bin\npm-cli.js'
+                        if (!(Test-Path -LiteralPath $npmCli -PathType Leaf)) { throw 'Release gate npm has no adjacent official npm CLI.' }
+                        $arguments = @($npmCli) + @($arguments)
+                    }
+                    $code = Invoke-WBReleaseNativeGate -Executable $nativeExecutable -Arguments $arguments -LogPath (Join-Path $release ($command.name + '.log'))
                 } else {
-                    & npm @arguments *> (Join-Path $release ($command.name + '.log'))
+                    if ($command.name -in @('desktop-prestage','desktop-stage')) {
+                        & node @arguments *> (Join-Path $release ($command.name + '.log'))
+                    } else {
+                        & npm @arguments *> (Join-Path $release ($command.name + '.log'))
+                    }
+                    $code = $LASTEXITCODE
                 }
-                $code = $LASTEXITCODE
             } finally { $ErrorActionPreference = $previousPreference }
             $checks[$command.name] = $code
             Write-Host "$($command.name): exit $code"
@@ -251,6 +295,15 @@ try {
     $env:WORKBRIDGE_STATE_DIR = $previousState
     if ($RefreshUserEnvironment) {
         [Environment]::SetEnvironmentVariable('Path', $previousValidationPath, 'Process')
-        [Environment]::SetEnvironmentVariable('DOTNET_ROOT', $previousValidationDotNetRoot, 'Process')
+        if ($null -eq $previousValidationDotNetRoot) {
+            [Environment]::SetEnvironmentVariable('DOTNET_ROOT', [NullString]::Value, 'Process')
+        } else {
+            [Environment]::SetEnvironmentVariable('DOTNET_ROOT', $previousValidationDotNetRoot, 'Process')
+        }
+        if ($null -eq $previousValidationModulePath) {
+            [Environment]::SetEnvironmentVariable('PSModulePath', [NullString]::Value, 'Process')
+        } else {
+            [Environment]::SetEnvironmentVariable('PSModulePath', $previousValidationModulePath, 'Process')
+        }
     }
 }
