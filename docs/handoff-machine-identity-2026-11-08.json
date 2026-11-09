@@ -1,0 +1,61 @@
+{
+    "schemaVersion":  1,
+    "createdLocal":  "2026-11-08 11:08 EST",
+    "project":  "workbridge-mcp",
+    "host":  "AMD-DESKTOP",
+    "goal":  "Fail-closed identity preflight across two physical hosts and two VMware guests",
+    "liveDeploymentVerified":  false,
+    "hosts":  [
+                  {
+                      "expectedHostnameConfigured":  true,
+                      "liveDeploymentVerified":  false,
+                      "name":  "LEGION"
+                  },
+                  {
+                      "expectedHostnameConfigured":  true,
+                      "liveDeploymentVerified":  false,
+                      "name":  "AMD-DESKTOP"
+                  }
+              ],
+    "labs":  [
+                 {
+                     "controllerConnected":  true,
+                     "name":  "RIFT-Lab-1",
+                     "guestReportedName":  "RIFT-LAB-1",
+                     "vmx":  "C:\\rift modding\\VMs\\RIFT-Lab-1\\RIFT-Lab.vmx",
+                     "guestOperationsAllowed":  false,
+                     "biosUuid":  "56 4d c7 a3 99 ee e3 57-3d 9d 93 5b 4b f5 d8 56",
+                     "guestResponseVerified":  false
+                 },
+                 {
+                     "controllerConnected":  true,
+                     "name":  "RIFT-Lab-2",
+                     "guestReportedName":  "RIFT-LAB-2",
+                     "vmx":  "C:\\rift modding\\VMs\\RIFT-Lab-2\\RIFT-Lab.vmx",
+                     "guestOperationsAllowed":  false,
+                     "biosUuid":  "56 4d 48 19 3d e6 d1 b9-b4 e8 4a 94 7e 47 0c c2",
+                     "guestResponseVerified":  false
+                 }
+             ],
+    "amdCommits":  [
+                       "664de94",
+                       "a58b6e5",
+                       "c725e95",
+                       "24cc15a",
+                       "e6980d8"
+                   ],
+    "legionCommits":  [
+                          "dd9cc1c",
+                          "07d864c",
+                          "237d3a2",
+                          "a7b0146",
+                          "b2d274f"
+                      ],
+    "pending":  [
+                    "Check LEGION staged release validation",
+                    "Deploy safely with WB-001 after validation",
+                    "Obtain fresh independently authenticated RR2 guest identity response",
+                    "Integrate three-level identity preflight",
+                    "Preserve unrelated worktree changes"
+                ]
+}
