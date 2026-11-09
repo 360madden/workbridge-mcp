@@ -391,6 +391,7 @@ export const resultSchemas: Record<string, z.ZodObject> = {
   agent_finish: agentTaskResult,
   agent_verify: agentTaskResult,
   workspace_info: z.object({
+    computerName: z.string(),
     root: z.string(),
     roots: z.array(z.string()),
     version: z.string(),

@@ -88,6 +88,8 @@ test('MCP initialize, discovery, and accurate read/write annotations', async () 
   assert.equal(tools.find((t) => t.name === 'terminal_run').annotations.destructiveHint, true);
   const info = await call('workspace_info');
   assert.equal(info.data.root.toLowerCase(), root.toLowerCase());
+  assert.equal(info.data.computerName, os.hostname());
+  assert.ok(info.data.computerName.length > 0);
   const found = await call('discover_projects');
   assert.ok(found.data.projects.some((p) => p.path === 'Project with spaces' && p.git));
 });
