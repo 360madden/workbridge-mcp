@@ -5,6 +5,7 @@
   "machine": "LEGION",
   "repository": "C:\\work\\workbridge-mcp",
   "baseCommit": "34195f2e876663a1b3678a8008447d80fdcfc216",
+  "sourceMilestoneCommit": "ec49d81f21041566515ec161b62c73df57824644",
   "status": "source_environment_fixes_verified_release_blocked",
   "authorization": {
     "freshDiagnosticBuild": true,

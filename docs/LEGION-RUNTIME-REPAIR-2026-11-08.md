@@ -44,7 +44,7 @@ Final source checks are `legion-environment-final-gates-20261108-01`; startup fi
 Evidence is retained in `C:\work\workbridge-diagnostics\legion-desktop-20261108-2213`:
 `provenance.json`, `diagnostic-results.json`, `full-suite-concurrency2-results.json`,
 `four-file-fs-trace-results.json`, and bounded per-process trace summaries.
-Exact hashes and all job IDs are in the companion JSON.
+Selected evidence hashes and verification job IDs are in the companion JSON.
 
 ## Next authority boundary
 
@@ -68,4 +68,4 @@ The original background launcher is available in parent commit `34195f2e876663a1
 Durable patch journals retain before/after files; inspect status and current hashes before any guarded restore.
 
 Preserved unchanged: user-modified `scripts/freebuff-conpty-probe.py` and untracked `LEGION-COPY-MANIFEST.json`.
-No push was performed. This handoff belongs to the source milestone commit; consult Git history for its final commit ID.
+No push was performed. Verified source milestone: `ec49d81f21041566515ec161b62c73df57824644`; later handoff-only commits do not imply deployment.
