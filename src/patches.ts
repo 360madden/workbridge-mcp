@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { applyPatch, createTwoFilesPatch, parsePatch } from 'diff';
 import { z } from 'zod';
-import { atomicWrite, digest, encodeText, type Serial } from './changes.js';
+import { atomicReplaceJournal, atomicWrite, digest, encodeText, type Serial } from './changes.js';
 import { BridgeError, errorDetails, limits } from './core.js';
 import { decodeText, fingerprint } from './text.js';
 import type { Workspace } from './workspace.js';
@@ -75,6 +75,7 @@ const key = (value: string) => (process.platform === 'win32' ? value.toLowerCase
 
 /** Recoverable file sets, serialized with single-file edits and selected-file commits. */
 export class Patches {
+  private readonly savedHashes = new WeakMap<RecordData, string>();
   constructor(
     private workspace: Workspace,
     private directory: string,
@@ -146,9 +147,8 @@ export class Patches {
   private async load(id: string): Promise<RecordData | null> {
     try {
       const directory = await this.journalDirectory(id);
-      const value = JSON.parse(
-        (await this.bytes(path.join(directory, 'record.json'), historyLimits.metadataBytes)).toString('utf8'),
-      );
+      const saved = await this.bytes(path.join(directory, 'record.json'), historyLimits.metadataBytes);
+      const value = JSON.parse(saved.toString('utf8'));
       const result = recordSchema.safeParse(value);
       if (!result.success || result.data.operationId !== id) throw new Error('schema');
       const record = result.data;
@@ -194,6 +194,7 @@ export class Patches {
         )
           throw new Error('entry');
       }
+      this.savedHashes.set(record, digest(saved));
       return record;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
@@ -216,8 +217,13 @@ export class Patches {
     const entry = await lstat(file);
     if (!entry.isFile() || entry.isSymbolicLink())
       throw new BridgeError('CORRUPT_PATCH', 'Patch metadata must be a regular file, not a link.');
+    const expected = this.savedHashes.get(record);
+    if (expected === undefined)
+      throw new BridgeError('JOURNAL_SAVE_CONFLICT', 'Patch predecessor was not verified.');
     record.updatedAt = new Date().toISOString();
-    await atomicWrite(file, JSON.stringify(record));
+    const data = JSON.stringify(record);
+    await atomicReplaceJournal(file, data, expected, historyLimits.metadataBytes);
+    this.savedHashes.set(record, digest(data));
   }
   private async prepare(input: PatchFile[]) {
     const checked = patchFilesSchema.safeParse(input);
@@ -432,6 +438,7 @@ export class Patches {
         await atomicWrite(path.join(stage, 'combined.diff'), plan.diff, true);
         await atomicWrite(path.join(stage, 'record.json'), JSON.stringify(record), true);
         await rename(stage, this.location(id));
+        this.savedHashes.set(record, digest(JSON.stringify(record)));
       } finally {
         await rm(stage, { recursive: true, force: true });
       }

@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createTwoFilesPatch } from 'diff';
 import type { Workspace } from './workspace.js';
 import { BridgeError, limits } from './core.js';
-import { decodeText, fileHash } from './text.js';
+import { decodeText, fileHash, fingerprint } from './text.js';
 import { z } from 'zod';
 import { historyJson, historyMatch, historyPage, type HistoryFilters } from './history.js';
 
@@ -49,6 +49,73 @@ export async function atomicWrite(file: string, data: Buffer | string, exclusive
     else await rename(temporary, file);
   } finally {
     await unlink(temporary).catch(() => {});
+  }
+}
+// Only durable Patch/Workflow journal replacements use bounded Windows contention handling.
+async function journalHash(file: string, maximumBytes: number) {
+  const named = await lstat(file).catch((error) => {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+      throw new BridgeError('JOURNAL_SAVE_CONFLICT', 'Journal disappeared before publication.');
+    throw error;
+  });
+  if (!named.isFile() || named.isSymbolicLink() || named.size > maximumBytes)
+    throw new BridgeError('JOURNAL_SAVE_CONFLICT', 'Journal must remain a bounded regular file.');
+  const handle = await open(file, 'r');
+  try {
+    const opened = await handle.stat();
+    if (!opened.isFile() || fingerprint(named) !== fingerprint(opened))
+      throw new BridgeError('JOURNAL_SAVE_CONFLICT', 'Journal changed before verification.');
+    const bytes = Buffer.alloc(opened.size + 1);
+    let length = 0;
+    while (length < bytes.length) {
+      const result = await handle.read(bytes, length, bytes.length - length, length);
+      if (!result.bytesRead) break;
+      length += result.bytesRead;
+    }
+    const after = await lstat(file);
+    if (
+      length !== opened.size ||
+      fingerprint(opened) !== fingerprint(await handle.stat()) ||
+      !after.isFile() ||
+      after.isSymbolicLink() ||
+      fingerprint(opened) !== fingerprint(after)
+    )
+      throw new BridgeError('JOURNAL_SAVE_CONFLICT', 'Journal changed during verification.');
+    return digest(bytes.subarray(0, length));
+  } finally {
+    await handle.close();
+  }
+}
+
+export async function atomicReplaceJournal(
+  file: string,
+  data: string,
+  expectedHash: string,
+  maximumBytes: number,
+) {
+  const desiredHash = digest(data);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const currentHash = await journalHash(file, maximumBytes);
+      if (currentHash === desiredHash) return;
+      if (currentHash !== expectedHash)
+        throw new BridgeError('JOURNAL_SAVE_CONFLICT', 'Journal changed; newer state was preserved.');
+      await atomicWrite(file, data);
+      if ((await journalHash(file, maximumBytes)) !== desiredHash)
+        throw new BridgeError('JOURNAL_SAVE_CONFLICT', 'Journal changed after publication.');
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (
+        error instanceof BridgeError ||
+        process.platform !== 'win32' ||
+        attempt >= 9 ||
+        (error as NodeJS.ErrnoException).syscall !== 'rename' ||
+        !['EPERM', 'EACCES', 'EBUSY'].includes(code ?? '')
+      )
+        throw error;
+      await new Promise((resolve) => setTimeout(resolve, Math.min(100, 25 * 2 ** attempt)));
+    }
   }
 }
 export class Serial {
