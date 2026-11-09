@@ -103,6 +103,87 @@ function Get-PlainFiles([string]$Root) {
         }
     }
 }
+# Inspect deployed bytes, not mutable source copies. This observation never
+# imports a helper or grants desktop input, and it does not repair an active dist.
+function Inspect-InstalledDesktopRuntime([string]$Root) {
+    $result = [ordered]@{required=$false; verified=$false; status='not_required'; missingFiles=@(); manifestSha256=$null}
+    try {
+        foreach ($signal in @('dist\desktop-cli-runner.js', 'dist\desktop-registration.js')) {
+            if (Test-Path -LiteralPath (Get-ChildPath $Root $signal) -PathType Leaf) { $result.required = $true }
+        }
+        if (!$result.required) { return [pscustomobject]$result }
+        $result.status = 'unverified'
+        $dist = Get-ChildPath $Root 'dist'
+        foreach ($item in Get-ChildItem -LiteralPath $dist -Force) {
+            if ($item.Name -ceq '.desktop-runtime-stage.lock' -or $item.Name.StartsWith('.desktop-stage-', [StringComparison]::Ordinal)) {
+                Add-Finding 'INSTALLED_DESKTOP_STAGE_INCOMPLETE'
+                return [pscustomobject]$result
+            }
+        }
+        foreach ($name in $desktopScripts) {
+            if (!(Test-Path -LiteralPath (Get-ChildPath $dist $name) -PathType Leaf)) { $result.missingFiles += ('dist/' + $name) }
+        }
+        if ($result.missingFiles.Count) { Add-Finding 'INSTALLED_DESKTOP_RUNTIME_MISSING' }
+        $manifestPath = Get-ChildPath $dist 'desktop-runtime-manifest.json'
+        $manifestMissing = !(Test-Path -LiteralPath $manifestPath -PathType Leaf)
+        if ($manifestMissing) { Add-Finding 'INSTALLED_DESKTOP_MANIFEST_MISSING' }
+        if ($result.missingFiles.Count -or $manifestMissing) {
+            $result.status = 'missing'
+            return [pscustomobject]$result
+        }
+        try {
+            $manifest = Read-Json $manifestPath 64KB
+            if (($manifest.schemaVersion -isnot [int] -and $manifest.schemaVersion -isnot [long]) -or
+                $manifest.schemaVersion -ne 1 -or $manifest.files -isnot [array] -or
+                @($manifest.files).Count -ne $desktopScripts.Count) { throw 'MANIFEST_INVALID' }
+            # Recreate the stage helper's exact UTF-8/LF serialization. The final
+            # digest rejects duplicate/extra properties, BOMs and noncanonical bytes.
+            $lines = [Collections.Generic.List[string]]::new()
+            $lines.Add('{')
+            $lines.Add('  "schemaVersion": 1,')
+            $lines.Add('  "files": [')
+            for ($index = 0; $index -lt $desktopScripts.Count; $index++) {
+                $name = $desktopScripts[$index]
+                $entry = $manifest.files[$index]
+                if ($entry -isnot [pscustomobject] -or $entry.name -isnot [string] -or $entry.name -cne $name -or
+                    ($entry.sizeBytes -isnot [int] -and $entry.sizeBytes -isnot [long]) -or
+                    $entry.sizeBytes -le 0 -or $entry.sizeBytes -gt 1048576 -or
+                    $entry.sha256 -isnot [string] -or $entry.sha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'MANIFEST_ENTRY_INVALID' }
+                $lines.Add('    {')
+                $lines.Add('      "name": "' + $name + '",')
+                $lines.Add('      "sizeBytes": ' + $entry.sizeBytes.ToString([Globalization.CultureInfo]::InvariantCulture) + ',')
+                $lines.Add('      "sha256": "' + $entry.sha256 + '"')
+                $suffix = if ($index -eq ($desktopScripts.Count - 1)) { '' } else { ',' }
+                $lines.Add('    }' + $suffix)
+            }
+            $lines.Add('  ]')
+            $lines.Add('}')
+            $canonical = [Text.Encoding]::UTF8.GetBytes(($lines -join [char]10) + [char]10)
+            $algorithm = [Security.Cryptography.SHA256]::Create()
+            try { $expectedDigest = ([BitConverter]::ToString($algorithm.ComputeHash($canonical))).Replace('-', '') }
+            finally { $algorithm.Dispose() }
+            $result.manifestSha256 = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash
+            if ($result.manifestSha256 -cne $expectedDigest) { throw 'MANIFEST_NONCANONICAL' }
+        } catch {
+            Add-Finding 'INSTALLED_DESKTOP_MANIFEST_INVALID'
+            return [pscustomobject]$result
+        }
+        foreach ($entry in $manifest.files) {
+            $filePath = Get-ChildPath $dist $entry.name
+            $item = Get-Item -LiteralPath $filePath -Force
+            if ($item.PSIsContainer -or $item.Length -ne $entry.sizeBytes -or
+                (Get-FileHash -LiteralPath $filePath -Algorithm SHA256).Hash -cne (Safe-Digest $entry.sha256)) {
+                Add-Finding 'INSTALLED_DESKTOP_RUNTIME_INVALID'
+                return [pscustomobject]$result
+            }
+        }
+        # The hash must still match after checking all six deployed files.
+        if ((Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash -cne $result.manifestSha256) { throw 'MANIFEST_CHANGED' }
+        $result.verified = $true
+        $result.status = 'verified'
+    } catch { Add-Finding 'INSTALLED_DESKTOP_RUNTIME_UNVERIFIED' }
+    return [pscustomobject]$result
+}
 function Inspect-Release([string]$Path) {
     $result = [ordered]@{requested=$true; sealed=$false; version=$null; builtVersion=$null; manifestSha256=$null; fileCount=0; checksPassed=$false; scripts=@(); scriptsOmittedByUpdater=@(); scriptGaps=@()}
     try {
@@ -216,7 +297,7 @@ function Inspect-Health([string]$Root) {
 
 $report = [ordered]@{
     schemaVersion=1; readOnly=$true; hostedVerified=$false
-    installation=[ordered]@{packageVersion=$null; builtVersion=$null; serverSha256=$null; missingRuntime=@(); missingScripts=@()}
+    installation=[ordered]@{packageVersion=$null; builtVersion=$null; serverSha256=$null; missingRuntime=@(); missingScripts=@(); desktopRuntime=$null}
     marker=[ordered]@{present=$false; valid=$false; version=$null; operationId=$null; releaseDigest=$null; matchesDisk=$null}
     candidate=[pscustomobject]@{requested=$false; sealed=$false}
     live=$null; operations=@(); issues=@(); ok=$false
@@ -253,6 +334,7 @@ try {
     }
     if ($report.installation.missingScripts.Count) { Add-Finding 'INSTALLED_SCRIPT_DEPENDENCY_MISSING' }
 } catch { Add-Finding 'INSTALLED_SCRIPTS_UNVERIFIED' }
+$report.installation.desktopRuntime = Inspect-InstalledDesktopRuntime $install
 try {
     $markerPath = Get-ChildPath $install '.local\installed-release.json'
     if (Test-Path -LiteralPath $markerPath) {
@@ -314,6 +396,9 @@ if ('DISK_LIVE_VERSION_MISMATCH' -in $codes) {
 } elseif ('CANDIDATE_RELEASE_INVALID' -in $codes) {
     $report.nextAction.code = 'VALIDATE_CANDIDATE'
     $report.nextAction.message = 'Use an unchanged sealed candidate with matching manifest, payload and successful validation checks before planning an update.'
+} elseif (@($codes | Where-Object { $_ -like 'INSTALLED_DESKTOP_*' }).Count) {
+    $report.nextAction.code = 'REVIEW_DESKTOP_RUNTIME_PACKAGING'
+    $report.nextAction.message = 'Deployed desktop helpers are incomplete or unverified. Preserve the active owner; prepare and validate the complete desktop closure in an isolated WB-001 release. Do not copy into active dist or restart automatically.'
 } elseif ('CANDIDATE_SCRIPTS_NOT_INSTALLED_BY_WB001' -in $codes -or 'INSTALLED_SCRIPT_DEPENDENCY_MISSING' -in $codes) {
     $report.nextAction.code = 'REVIEW_SCRIPT_PACKAGING'
     $report.nextAction.message = 'WB-001 copies dist, node_modules and package files only. Plan and test a guarded script dependency rollout; this inspector changes nothing.'

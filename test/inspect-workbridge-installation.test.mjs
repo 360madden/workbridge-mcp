@@ -8,6 +8,7 @@ import { mkdtemp, mkdir, readFile, readdir, writeFile, rm, symlink } from 'node:
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stageDesktopRuntime } from '../scripts/stage-desktop-runtime.mjs';
 
 const inspector = fileURLToPath(new URL('../scripts/Inspect-WorkbridgeInstallation.ps1', import.meta.url));
 const windows = { skip: process.platform !== 'win32' };
@@ -53,6 +54,20 @@ async function snapshot(root) {
   );
 }
 
+async function desktopManifest(root, mutate = (value) => value) {
+  const files = await Promise.all(
+    desktopScripts.map(async (name) => {
+      const bytes = await readFile(path.join(root, 'dist', name));
+      return { name, sizeBytes: bytes.length, sha256: digest(bytes).toLowerCase() };
+    }),
+  );
+  await put(
+    root,
+    'dist/desktop-runtime-manifest.json',
+    JSON.stringify(mutate({ schemaVersion: 1, files }), null, 2) + '\n',
+  );
+}
+
 async function installation(root, { desktop = false, built = version, pkg = built } = {}) {
   await put(root, 'package.json', { name: 'workbridge-mcp', version: pkg });
   await put(root, 'package-lock.json', {});
@@ -65,7 +80,11 @@ async function installation(root, { desktop = false, built = version, pkg = buil
   for (const file of [...launcherScripts, ...(desktop ? desktopScripts : [])]) {
     await put(root, `scripts/${file}`, `inert fixture ${file}`);
   }
-  if (desktop) await put(root, 'dist/desktop-cli-runner.js', '// desktop dependency signal');
+  if (desktop) {
+    await put(root, 'dist/desktop-cli-runner.js', '// desktop dependency signal');
+    for (const name of desktopScripts) await put(root, 'dist/' + name, 'inert fixture ' + name);
+    await desktopManifest(root);
+  }
 }
 
 async function seal(root, mutateManifest = (value) => value, mutateReceipt = (value) => value) {
@@ -176,6 +195,14 @@ test(
     assert.equal(report.ok, true);
     assert.equal(report.installation.packageVersion, version);
     assert.equal(report.installation.builtVersion, version);
+    assert.equal(report.installation.desktopRuntime.required, true);
+    assert.equal(report.installation.desktopRuntime.verified, true);
+    assert.equal(report.installation.desktopRuntime.status, 'verified');
+    assert.deepEqual(report.installation.desktopRuntime.missingFiles, []);
+    assert.equal(
+      report.installation.desktopRuntime.manifestSha256,
+      digest(await readFile(path.join(f.install, 'dist/desktop-runtime-manifest.json'))),
+    );
     assert.equal(report.candidate.sealed, true);
     assert.equal(report.candidate.checksPassed, true);
     assert.equal(report.candidate.scripts.length, 10);
@@ -486,4 +513,187 @@ test('malformed installed package and missing runtime directory are safe finding
   const report = await inspect(f.install, [], 1);
   assert.ok(codes(report).includes('INSTALLED_PACKAGE_INVALID'));
   assert.deepEqual(report.installation.missingRuntime, ['node_modules']);
+});
+
+test(
+  'legacy installation without a desktop runner does not require a desktop closure',
+  windows,
+  async (t) => {
+    const f = await fixture(t, { built: '0.16.3-dev' });
+    const report = await inspect(f.install);
+    assert.equal(report.installation.desktopRuntime.required, false);
+    assert.equal(report.installation.desktopRuntime.verified, false);
+    assert.equal(report.installation.desktopRuntime.status, 'not_required');
+  },
+);
+
+test(
+  'copied installation missing all deployed helpers fails despite complete source copies',
+  windows,
+  async (t) => {
+    const f = await fixture(t, { desktop: true });
+    for (const name of [...desktopScripts, 'desktop-runtime-manifest.json']) {
+      await rm(path.join(f.install, 'dist', name));
+    }
+    const before = await snapshot(f.root);
+    const report = await inspect(f.install, [], 1);
+    assert.deepEqual(report.installation.missingScripts, []);
+    assert.deepEqual(
+      report.installation.desktopRuntime.missingFiles,
+      desktopScripts.map((name) => 'dist/' + name),
+    );
+    assert.equal(report.installation.desktopRuntime.required, true);
+    assert.equal(report.installation.desktopRuntime.verified, false);
+    assert.equal(report.installation.desktopRuntime.status, 'missing');
+    assert.ok(codes(report).includes('INSTALLED_DESKTOP_RUNTIME_MISSING'));
+    assert.ok(codes(report).includes('INSTALLED_DESKTOP_MANIFEST_MISSING'));
+    assert.equal(report.nextAction.code, 'REVIEW_DESKTOP_RUNTIME_PACKAGING');
+    assert.match(report.nextAction.message, /Do not copy into active dist/);
+    assert.deepEqual(await snapshot(f.root), before);
+  },
+);
+
+test('registration-only signal still requires deployed desktop helpers', windows, async (t) => {
+  const f = await fixture(t, { desktop: true });
+  await rm(path.join(f.install, 'dist/desktop-cli-runner.js'));
+  await put(f.install, 'dist/desktop-registration.js', '// no execution');
+  await rm(path.join(f.install, 'dist/desktop-turn-admission.mjs'));
+  const report = await inspect(f.install, [], 1);
+  assert.equal(report.installation.desktopRuntime.required, true);
+  assert.deepEqual(report.installation.desktopRuntime.missingFiles, ['dist/desktop-turn-admission.mjs']);
+});
+
+for (const [name, corrupt, expectedCode] of [
+  [
+    'missing manifest',
+    (f) => rm(path.join(f.install, 'dist/desktop-runtime-manifest.json')),
+    'INSTALLED_DESKTOP_MANIFEST_MISSING',
+  ],
+  [
+    'same-size helper byte tampering',
+    async (f) => {
+      const file = path.join(f.install, 'dist/desktop-ui.mjs');
+      const text = await readFile(file, 'utf8');
+      await writeFile(file, 'X' + text.slice(1));
+    },
+    'INSTALLED_DESKTOP_RUNTIME_INVALID',
+  ],
+  [
+    'malformed manifest',
+    (f) => put(f.install, 'dist/desktop-runtime-manifest.json', '{ ' + secret),
+    'INSTALLED_DESKTOP_MANIFEST_INVALID',
+  ],
+  [
+    'noncanonical compact manifest',
+    async (f) => {
+      const file = path.join(f.install, 'dist/desktop-runtime-manifest.json');
+      await writeFile(file, JSON.stringify(JSON.parse(await readFile(file, 'utf8'))));
+    },
+    'INSTALLED_DESKTOP_MANIFEST_INVALID',
+  ],
+  [
+    'interrupted stage lock',
+    (f) => put(f.install, 'dist/.desktop-runtime-stage.lock', secret),
+    'INSTALLED_DESKTOP_STAGE_INCOMPLETE',
+  ],
+  [
+    'orphaned stage artifact',
+    (f) => put(f.install, 'dist/.desktop-stage-fixture-0.bak', secret),
+    'INSTALLED_DESKTOP_STAGE_INCOMPLETE',
+  ],
+]) {
+  test('installed desktop closure fails closed: ' + name, windows, async (t) => {
+    const f = await fixture(t, { desktop: true });
+    await corrupt(f);
+    const before = await snapshot(f.root);
+    const report = await inspect(f.install, [], 1);
+    assert.equal(report.installation.desktopRuntime.verified, false);
+    assert.ok(codes(report).includes(expectedCode));
+    assert.equal(report.nextAction.code, 'REVIEW_DESKTOP_RUNTIME_PACKAGING');
+    assert.deepEqual(await snapshot(f.root), before);
+  });
+}
+
+for (const [name, mutate] of [
+  ['quoted schema', (m) => ({ ...m, schemaVersion: '1' })],
+  [
+    'quoted size',
+    (m) => {
+      m.files[0].sizeBytes = String(m.files[0].sizeBytes);
+      return m;
+    },
+  ],
+  [
+    'fractional size',
+    (m) => {
+      m.files[0].sizeBytes += 0.5;
+      return m;
+    },
+  ],
+  [
+    'uppercase digest',
+    (m) => {
+      m.files[0].sha256 = m.files[0].sha256.toUpperCase();
+      return m;
+    },
+  ],
+  ['wrong order', (m) => ({ ...m, files: [...m.files].reverse() })],
+  ['missing entry', (m) => ({ ...m, files: m.files.slice(1) })],
+  ['extra entry', (m) => ({ ...m, files: [...m.files, m.files[0]] })],
+  [
+    'untrusted filename',
+    (m) => {
+      m.files[0].name = '../' + secret;
+      return m;
+    },
+  ],
+  ['extra property', (m) => ({ ...m, private: secret })],
+]) {
+  test('installed desktop manifest rejects ' + name, windows, async (t) => {
+    const f = await fixture(t, { desktop: true });
+    await desktopManifest(f.install, mutate);
+    const before = await snapshot(f.root);
+    const report = await inspect(f.install, [], 1);
+    assert.ok(codes(report).includes('INSTALLED_DESKTOP_MANIFEST_INVALID'));
+    assert.equal(report.installation.desktopRuntime.verified, false);
+    assert.deepEqual(await snapshot(f.root), before);
+  });
+}
+
+test('mutable source edits do not invalidate an intact deployed desktop manifest', windows, async (t) => {
+  const f = await fixture(t, { desktop: true });
+  await put(f.install, 'scripts/desktop-ui.mjs', 'unbuilt source edit');
+  const report = await inspect(f.install);
+  assert.equal(report.installation.desktopRuntime.verified, true);
+  assert.equal(report.installation.desktopRuntime.status, 'verified');
+});
+
+test(
+  'installed desktop directory junction is rejected without reading linked payload content',
+  windows,
+  async (t) => {
+    const f = await fixture(t, { desktop: true });
+    const outside = path.join(f.root, 'external-helper');
+    await mkdir(outside);
+    await put(outside, 'private.txt', secret);
+    await rm(path.join(f.install, 'dist/desktop-ui.mjs'));
+    await symlink(outside, path.join(f.install, 'dist/desktop-ui.mjs'), 'junction');
+    const report = await inspect(f.install, [], 1);
+    assert.ok(codes(report).includes('INSTALLED_DESKTOP_RUNTIME_UNVERIFIED'));
+    assert.equal(report.installation.desktopRuntime.verified, false);
+  },
+);
+
+test('canonical manifest emitted by the real isolated stager is accepted', windows, async (t) => {
+  const f = await fixture(t, { desktop: true });
+  for (const name of [...desktopScripts, 'desktop-runtime-manifest.json']) {
+    await rm(path.join(f.install, 'dist', name));
+  }
+  const staged = await stageDesktopRuntime({ repoRoot: f.install });
+  assert.equal(staged.ok, true);
+  const before = await snapshot(f.root);
+  const report = await inspect(f.install);
+  assert.equal(report.installation.desktopRuntime.verified, true);
+  assert.equal(report.installation.desktopRuntime.manifestSha256, staged.manifest.sha256.toUpperCase());
+  assert.deepEqual(await snapshot(f.root), before);
 });
