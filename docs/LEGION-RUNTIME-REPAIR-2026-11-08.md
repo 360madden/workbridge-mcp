@@ -1,71 +1,67 @@
-# LEGION runtime repair checkpoint — 2026-11-08
+# LEGION runtime repair checkpoint — 2026-11-08/09
 
-As of **22:41 EST**. Status: **source environment fixes verified; release/deployment blocked**.
-This supplements `LEGION-TOOLS-SETUP-2026-11-08.md`; it does not replace its completed installation evidence.
+Recorded **00:19 EST on November 9** (America/New_York), **2026-11-09T05:19:24Z**. Status: **tool environment repaired; runtime release still blocked by Windows state-file publication failures**.
+This supplements `LEGION-TOOLS-SETUP-2026-11-08.md`; installed-tool evidence remains valid.
 
-## Authority and preservation
+## Current machine and preservation
 
-- Joey approved a fresh source-derived diagnostic build and a **Workbridge-only restart after every validation gate passes**.
-- No Workbridge, RIFT, or Windows restart occurred. No Apply action or new validated release was produced.
-- Verified machine: **LEGION**. Active owner remains PID **23232**, instance `dca381aa-a8f1-4eda-9777-e6d4732610f7`.
-- Active server SHA-256 remains `18dc464cc84e07e21dcbe9a33c9fe1a4a3ddab2159ff2ca531e514e1dd143207`.
-- Diagnostic snapshot came from exact commit `34195f2e876663a1b3678a8008447d80fdcfc216`; unrelated dirty files were excluded. The previously denied failed payload was not accessed through another route.
+- Verified target: **LEGION**, repository `C:\work\workbridge-mcp`. Do not substitute AMD-DESKTOP or a VMware guest.
+- Active Workbridge owner remains PID **23232**, instance `dca381aa-a8f1-4eda-9777-e6d4732610f7`; RIFT remains PID **21140**, process birth `2026-11-08T10:52:35.8105227Z`.
+- Active `dist/server.js` remains SHA-256 `18dc464cc84e07e21dcbe9a33c9fe1a4a3ddab2159ff2ca531e514e1dd143207`.
+- **No Apply, Workbridge restart, RIFT restart, Windows restart, game input, or push occurred.** Unrelated FreeBuff changes and `LEGION-COPY-MANIFEST.json` remain untouched.
+- Final bridge inventory was complete: zero running/retained jobs, 36/36 slots available. A scoped process check found no command line matching the focused diagnostic directory; this is not whole-descendant-tree proof.
 
-## Verified source changes
+## Completed source milestones
 
-1. Release builder now supports explicit `-RefreshUserEnvironment`: refresh only process PATH/DOTNET_ROOT, check prerequisite versions before creating the payload, and restore original process values on every exit. Default custom/virtual-environment shells remain unchanged.
-2. Tunnel-key process variable is cleared before prerequisite child processes; tests inspect structure without reading real credentials.
-3. Dedicated background launcher reads raw registered PATH/DOTNET_ROOT, refreshes SDK root before expanding PATH, and leaves interactive `Start-Tunnel.ps1` unchanged. This takes effect at the next background startup, not in the currently running owner.
-4. Startup test fixture now supplies its own machine identity and separately rejects missing, malformed, blank, and mismatched identity settings. Production identity checks are unchanged.
+- `c7a87c1671085b3c909d2a8e72fbc65bf5d0e83a`: explicit serial-files release profile and source-isolated bounded validation runner; original gates/assertions/deadlines preserved.
+- `4b200a1ee1f598267826d1025b3f881dee61d635`: native release-gate module-path isolation and exact absent-value restoration, with regression tests and update guidance.
+- The real PS7 → Node → Windows PowerShell 5.1 chain inherited incompatible PS7 modules, making `Get-FileHash` unavailable and causing all eight Git-audit failures.
+- With `-RefreshUserEnvironment`, each gate resolves absolute Node and official npm CLI first, removes `PSModulePath` immediately at the native launch boundary, then restores its exact original state. Default dispatch is unchanged.
+- A one-time clear before prerequisite checks was rejected because real command discovery repopulated the variable. A local `$LASTEXITCODE` shadow was caught before commit; the accepted helper uses the native global exit slot.
+- `DOTNET_ROOT` absence-to-empty coercion on current PS7/.NET was reproduced and fixed with `[NullString]::Value`. User/machine PATH, DOTNET_ROOT and PSModulePath hashes were unchanged.
 
-## Results (do not aggregate overlapping checks)
+## Verification — keep full and focused results separate
 
-| Verification | Result |
+| Check | Result |
 |---|---|
-| Fresh clean-source install/build and six desktop helpers | Passed; only diagnostic output changed |
-| Original five failure-bearing files, serial | 63 passed, 0 failed, 1 existing privilege skip; 143.9 seconds |
-| Complete baseline suite, two test files at a time | **1,128 passed, 11 failed, 3 existing skips; 381.0 seconds** |
-| Four newly failing files, unchanged serial trace | 39/39 passed; 39.8 seconds; did not reproduce full-suite errors |
-| Final current-source environment/manifest tests | 5/5 passed, including PowerShell 5.1 and 7 |
-| Actual refreshed process tool discovery | Node 24.20.0, npm 11.19.0, Python 3.14.10, .NET 10.0.403, Git 2.56.0.windows.4, gh 2.103.3, Windows PowerShell 5.1.26100.9818, WinApp 0.7.1 |
-| Isolated startup/restart fixtures | Passed; these printed fixture restart messages, not an actual service restart |
+| One approved complete serial suite, source c7a87c1 | **1,151 tests: 1,137 passed, 11 failed, 3 existing skips**; suite 914.856 s |
+| Bounded wrapper / scheduled task | Failed normally in **973.017 s**; task exit 1, within 20-minute cap |
+| Final native-gate/environment/profile tests | **7/7 passed**, zero skips; Windows PowerShell 5.1 and 7 executed |
+| Real seven prerequisites + exact helper + unchanged Git-audit file | **8/8 passed**, zero skips; all three process environment values restored exactly |
+| Full formatting and diff checks | Passed; unrelated file hashes preserved |
+| One three-file native-filesystem diagnostic | **30 tests: 27 passed, 3 failed, zero skips**; native test exit 1 after 78.086 s |
+| Outer focused diagnostic helper | **Timed out at 300 s after the test phase returned**; do not describe it as a successful overall run |
 
-The full-suite job is `legion-fresh-full-suite-concurrency2-20261108-2223-01`.
-Final source checks are `legion-environment-final-gates-20261108-01`; startup fixtures are `legion-startup-identity-gate-20261108-01`.
+The approved task `\Workbridge Validation legion-20261108-bounded01` ran once and was removed after exact binding/SID/receipt verification and confirmed wrapper/child exit. All source, logs and recovery evidence remain. The bridge's 600-second command limit was not changed. **No second long validation task is authorized.**
 
-## Remaining blocker
+The full release passed install, desktop prebuild and prestage, then failed the tests gate. Later gates were not run; no `validated.json` was issued. Subsequent focused passes do not convert that failed release into a valid candidate.
 
-- `job-result-cli.test.mjs:211` expected COMMAND_RESULT_EXISTS but received JOB_RECORD_SAVE_FAILED.
-- Ten further outcomes were PATCH_BLOCKED/EPERM during fixture patch application: six shared workflow-catalog-cli setup failures, one workflow-catalog case, and three workflows cases.
-- Exception-only tracing in the ordinary diagnostic directory covered 40 processes, 453 renames, 207 links, and 2,584 opens. No relevant exception, dropped record, or truncation was captured.
-- Therefore the exact syscall/lock owner remains **unproven**. Do not label the failures fixed, weaken expected errors, add blanket retries, change ACLs, or treat the isolated pass as a full release pass.
-- Package test scheduling, assertions, deadlines, and required release gates remain unchanged.
+## Remaining causal evidence
 
-Evidence is retained in `C:\work\workbridge-diagnostics\legion-desktop-20261108-2213`:
-`provenance.json`, `diagnostic-results.json`, `full-suite-concurrency2-results.json`,
-`four-file-fs-trace-results.json`, and bounded per-process trace summaries.
-Selected evidence hashes and verification job IDs are in the companion JSON.
+- Full-run residual failures were `job-capacity.test.mjs:86` (`JOB_RECORD_SAVE_FAILED`), `job-settlement-cli.test.mjs:265`, and `workflow-cli.test.mjs:404` (fixture `PATCH_BLOCKED/EPERM`). The exact original capacity error/ordinal remains unknown.
+- The unchanged focused run passed capacity **14/14** and workflow CLI **8/8**, but settlement **5/8**. It reproduced **five genuine `fs.rename` errors: EPERM, errno -4048**.
+- One native failure replaced fixture `State\workflows\wf.json` via `atomicWrite → Workflows.save`. Four replaced `State\patches\patch\record.json` via `atomicWrite → Patches.save → Patches.execute`, including error-journal updates.
+- The temporary replacement and destination were distinct regular files. Native stacks were captured before error sanitization. The Windows lock holder or other underlying access cause is **not established**.
+- Trace census: 40 files with exit summaries, 298 renames, 1,741 opens; zero recorded dropped events, log-write failures or truncation. Per-prefix call counts and complete descendant coverage were not instrumented.
+- Synthetic capacity-test EIO is not one of the five native EPERM events. No assertion/deadline relaxation, blanket retry, ACL change or production filesystem fix was made.
+- The prior concurrency-2 full result (**1,128 pass / 11 fail / 3 skip**) and earlier nonreproducing trace remain authoritative historical evidence; serial scheduling did not resolve the native publication issue.
 
-## Next authority boundary
+## Evidence and next actions
 
-The existing bridge enforces a **600-second** command limit in its job/schema code.
-A complete serial run is estimated at **11.5–12.5 minutes before build and other gates**; full-run case times totaled 735.17 seconds.
-No longer task was created and the command limit was not altered.
+Evidence root: `C:\work\workbridge-diagnostics\legion-validation-20261108-bounded01`.
 
-Request approval for **one bounded 20-minute standalone validation task**, leaving all individual test deadlines intact. After approval, select an explicit test-file-concurrency-1 profile and run every official release gate from a fresh committed-source archive. Serial file scheduling does not disable the suite's internal multi-owner, Promise.all, capacity, or native-child concurrency tests. A serial pass would validate that profile, not explain the prior parallel failures.
+- `bounded-validation-result.json` plus `validation\completed.json`: full failed run and verified temporary-task removal.
+- `modulepath-audit-focused-02.log`: final unchanged-audit pass through the exact native helper.
+- `fsdiag-three-20261109-0003\results-postmortem.json`: final corrected native-error report; SHA-256 `d73d90d9167f06a67b671c8a5176a7da4474ef7eca27e993169ca321488c2e6d`.
+- Companion JSON records key hashes, job IDs, timings, provenance and preservation details. The diagnostic's ordinary `results.json` was not issued; use the explicit postmortem record.
 
-Then, in priority order:
+Priorities:
 
-1. Seal a fully passing official release; retain the failed parallel evidence separately.
-2. Establish a quiet window and use reviewed WB-001 Apply/Status with rollback readiness; restart Workbridge only.
-3. Reverify actual LEGION hostname/new owner and hosted WinApp/desktop helper behavior before separate LuaPad/RIFT acceptance. Do not restart RIFT or Windows.
+1. Diagnose and fix atomic **state-record** replacement using the captured native traces; determine the Windows access/handle cause before changing retry policy. Preserve guarded writes and newer data.
+2. Verify the narrow fix, then obtain authorization for a fresh complete bounded release validation from a new committed-source archive. Do not retry the consumed task or reuse the failed candidate.
+3. Only after every gate passes, establish an all-client quiet window and perform the already conditionally approved Workbridge-only WB-001 update; then verify fresh LEGION identity, hosted desktop/WinApp and separate LuaPad/RIFT acceptance.
 
-## Recovery and unrelated work
+## Recovery
 
-WB-001 runtime rollback restores runtime/package files, **not launcher edits**.
-The original background launcher is available in parent commit `34195f2e876663a1b3678a8008447d80fdcfc216` with SHA-256
-`870b5d3223d36ef02b151fb9c3a243f18af9e670a3e4b8998862521a45727328`.
-Durable patch journals retain before/after files; inspect status and current hashes before any guarded restore.
-
-Preserved unchanged: user-modified `scripts/freebuff-conpty-probe.py` and untracked `LEGION-COPY-MANIFEST.json`.
-No push was performed. Verified source milestone: `ec49d81f21041566515ec161b62c73df57824644`; later handoff-only commits do not imply deployment.
+WB-001 runtime rollback does **not** restore launcher edits. The original launcher is retained at `launcher-before\scripts\Start-BackgroundTunnel.ps1` under the evidence root, archive hash `0f006dbe489dcdae6870b1aa8681a0015d86e8fef0b351b907a7082f2627f434` (original commit `34195f2e876663a1b3678a8008447d80fdcfc216`). Restore only with current-hash guards.
+Live-owner admission-lock code is not proven: its on-disk `dist/jobs.js` timestamp postdates owner startup. Candidate tests and an idle snapshot do not replace the explicit maintenance window.
