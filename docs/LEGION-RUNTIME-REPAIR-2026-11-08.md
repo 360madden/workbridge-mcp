@@ -3,6 +3,16 @@
 Recorded **00:19 EST on November 9** (America/New_York), **2026-11-09T05:19:24Z**. Status: **tool environment repaired; runtime release still blocked by Windows state-file publication failures**.
 This supplements `LEGION-TOOLS-SETUP-2026-11-08.md`; installed-tool evidence remains valid.
 
+## November 9, 01:53 EST — guarded Windows journal replacement milestone
+
+- **Committed source checkpoint:** `d5faa5aefd1eb06e37fe3213e6a9280243469a78` on LEGION `main`; this does **not** constitute a validated release or live deployment.
+- The new journal-specific helper rechecks predecessor SHA-256 and file identity before replacing existing workflow/patch JSON records. On Windows only, native rename `EPERM`/`EACCES`/`EBUSY` has at most nine bounded delays and ten attempts. Changed/newer records fail closed as `JOURNAL_SAVE_CONFLICT`; generic `atomicWrite` is unchanged.
+- The Windows handle-sharing test reproduced native rename-over-existing `EPERM` using a disposable PowerShell file handle with delete sharing excluded. The exact process causing earlier fixture failures remains **unknown**.
+- Isolated built source: `tsc --noEmit` and Prettier passed. New regression tests **4/4 passed**. Existing `patches.test.mjs` passed **25/25** on the third full attempt after two distinct intermittent failures. Direct workflow/catalog/patch recovery suite **47/48**, with one `PATCH_BLOCKED/EPERM` failure that passed **1/1** when rerun alone. These are **not** stable full-suite proof.
+- The CLI workflow/settlement isolated harness initially lacked a service sidecar; after it was supplied, the CLI cases still timed out or failed in that synthetic harness and the run was cancelled. Do not infer passing CLI integration tests.
+- No live `dist/server.js` rebuild, Workbridge owner restart, RIFT action, Windows restart, or Git push. The earlier 20-minute full validation approval was consumed; a new complete release run needs separate authorization.
+- Continue with targeted Windows fixture stability and complete source-built release gating. Only after an all-green new release and an all-client quiet window consider the separate WB-001 deployment.
+
 ## Current machine and preservation
 
 - Verified target: **LEGION**, repository `C:\work\workbridge-mcp`. Do not substitute AMD-DESKTOP or a VMware guest.
