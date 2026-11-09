@@ -25,6 +25,28 @@
     "newLongValidationApproved": false,
     "gitPushPerformed": false
   },
+  "focusedContinuation": {
+    "recordedUtc": "2026-11-09T08:31:00Z",
+    "verifiedMachine": "LEGION",
+    "machineCheckJob": "legion-journal-phase2-hostname-20261109-01",
+    "activeOwnerPidUnchanged": 23232,
+    "traceCommit": "4e35da8c1bce272d9dee6c720c57d4f54dc77e97",
+    "isolatedBuildRoot": ".tools/journal-verify-20261109-01",
+    "missingCommandHostRestoredOnlyToIsolatedDist": true,
+    "commandHostSha256": "b9754c9fe95ac252b8b24bf2304c10a83a3e20b75456da73b0724a5a845b0147",
+    "correctedHarnessSmoke": {"passed": 1, "failed": 0},
+    "initialSerialCli": {"passed": 14, "failed": 2, "settlementPassed": 8, "workflowPassed": 6, "error": "PATCH_BLOCKED/EPERM"},
+    "failingTwoCasesIsolatedRetest": {"passed": 2, "failed": 0},
+    "nativeTraceSanity": {"passed": true, "code": "EPERM", "syscall": "rename", "leaf": "record.json"},
+    "tracedSerialCli": {"passed": 16, "failed": 0, "skipped": 0, "durationSeconds": 76.745},
+    "tracedDirectWorkflowsAndRecovery": {"passed": 48, "failed": 0, "skipped": 0, "durationSeconds": 16.724},
+    "postRepairIntermittentFailureDestination": "unproven",
+    "earlierLockHolder": "unproven",
+    "completeReleaseValidated": false,
+    "liveRuntimeUpdated": false,
+    "newLongValidationApproved": false,
+    "gitPushPerformed": false
+  },
   "boundedValidationSourceCommit": "c7a87c1671085b3c909d2a8e72fbc65bf5d0e83a",
   "toolingCheckpoint": "docs/LEGION-TOOLS-SETUP-2026-11-08.md",
   "authorization": {

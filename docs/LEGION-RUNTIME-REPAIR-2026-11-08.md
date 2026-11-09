@@ -13,6 +13,15 @@ This supplements `LEGION-TOOLS-SETUP-2026-11-08.md`; installed-tool evidence rem
 - No live `dist/server.js` rebuild, Workbridge owner restart, RIFT action, Windows restart, or Git push. The earlier 20-minute full validation approval was consumed; a new complete release run needs separate authorization.
 - Continue with targeted Windows fixture stability and complete source-built release gating. Only after an all-green new release and an all-client quiet window consider the separate WB-001 deployment.
 
+### November 9, 03:31 EST — isolated CLI harness and native tracing
+
+- Identity was freshly verified with `hostname.exe` on **LEGION**, exit 0; active owner remains PID **23232**, instance `dca381aa-a8f1-4eda-9777-e6d4732610f7`.
+- The isolated TSC-only build omitted `dist/command-host.exe` and its `command-host-build.json` receipt, although the normal repository build includes them. Copied the verified files **only into disposable `.tools/journal-verify-20261109-01/dist`** (EXE SHA-256 `b9754c9fe95ac252b8b24bf2304c10a83a3e20b75456da73b0724a5a845b0147`).
+- One corrected-harness settlement smoke case **1/1 passed**. A first untraced, serial CLI run passed **14/16** (settlement **8/8**, workflow **6/8**; two `PATCH_BLOCKED/EPERM` cases). Those two cases then passed **2/2** in isolation.
+- Committed optional test-only rename tracer `4e35da8c1bce272d9dee6c720c57d4f54dc77e97`. A deliberate Windows sharing-lock test emitted the expected `EPERM/rename/record.json` trace. With tracing enabled, serial CLI tests passed **16/16** (76.745 s), and direct workflow/catalog/patch recovery tests passed **48/48** (16.724 s), both zero skips.
+- **Limit:** the intermittent under-load `EPERM` was not reproduced in traced suites; the post-repair failing destination and external lock holder remain unproven. The targeted tests do **not** constitute a complete release gate. Do not broaden generic writes or silently deploy.
+- Next: capture path/syscall if contention recurs, obtain a **new** bounded full-validation authorization, and only after green gates plus a quiet window consider WB-001.
+
 ## Current machine and preservation
 
 - Verified target: **LEGION**, repository `C:\work\workbridge-mcp`. Do not substitute AMD-DESKTOP or a VMware guest.
