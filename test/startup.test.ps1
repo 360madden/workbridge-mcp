@@ -52,6 +52,23 @@ try {
     }
     Set-Content -LiteralPath (Join-Path $launcherFixture '.local\tunnel-client-path.txt') -Value 'not-executed'
     Set-Content -LiteralPath (Join-Path $launcherFixture '.local\profiles\workbridge.yaml') -Value 'fixture'
+    # Mirror production's identity prerequisite only in this GUID-scoped fixture.
+    $fixtureIdentity = Join-Path $launcherFixture '.local\settings.json'
+    foreach ($case in @(
+        @{ Name = 'missing'; Json = $null; Code = 'MACHINE_IDENTITY_MISSING' }
+        @{ Name = 'malformed'; Json = '{'; Code = 'MACHINE_IDENTITY_INVALID' }
+        @{ Name = 'blank'; Json = '{"expectedHostname":" "}'; Code = 'MACHINE_IDENTITY_MISSING' }
+        @{ Name = 'mismatched'; Json = (@{ expectedHostname = ([Environment]::MachineName + '-fixture-mismatch') } | ConvertTo-Json -Compress); Code = 'MACHINE_IDENTITY_MISMATCH' }
+    )) {
+        if ($null -ne $case.Json) {
+            Set-Content -LiteralPath $fixtureIdentity -Value $case.Json -Encoding UTF8
+        }
+        $failed = $false
+        try { & (Join-Path $fixtureScripts 'Start-Tunnel.ps1') -Root $fixtureRoot -NonInteractive }
+        catch { $failed = $_.Exception.Message -like ($case.Code + ':*') }
+        if (!$failed) { throw "Launcher must reject $($case.Name) identity before credentials or connecting." }
+    }
+    @{ expectedHostname = [Environment]::MachineName } | ConvertTo-Json -Compress | Set-Content -LiteralPath $fixtureIdentity -Encoding UTF8
     $failed = $false
     try { & (Join-Path $fixtureScripts 'Start-Tunnel.ps1') -Root $fixtureRoot -NonInteractive } catch { $failed = $_.Exception.Message -like 'No saved Workbridge runtime key*' }
     if (!$failed) { throw 'Unattended launcher must fail before prompting or connecting when no key is saved.' }

@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "recordedUtc": "2026-11-09T03:41:47Z",
+  "userTimezone": "America/New_York",
+  "machine": "LEGION",
+  "repository": "C:\\work\\workbridge-mcp",
+  "baseCommit": "34195f2e876663a1b3678a8008447d80fdcfc216",
+  "status": "source_environment_fixes_verified_release_blocked",
+  "authorization": {
+    "freshDiagnosticBuild": true,
+    "workbridgeOnlyRestart": "approved only after every release gate passes",
+    "riftRestart": false,
+    "windowsRestart": false,
+    "longerScheduledValidationTask": "not yet authorized or created"
+  },
+  "activeOwner": {
+    "pid": 23232,
+    "instanceId": "dca381aa-a8f1-4eda-9777-e6d4732610f7",
+    "startedUtc": "2026-11-08T10:45:32.775Z",
+    "serverSha256": "18dc464cc84e07e21dcbe9a33c9fe1a4a3ddab2159ff2ca531e514e1dd143207",
+    "restarted": false
+  },
+  "implemented": [
+    "Opt-in -RefreshUserEnvironment on New-WorkbridgeRelease.ps1; process PATH/DOTNET_ROOT only, prerequisite checks before payload creation, exact finally restoration.",
+    "Clear tunnel-key process variable before prerequisite children; never read a real credential during tests.",
+    "Dedicated background launcher reads only raw registered PATH/DOTNET_ROOT, applies new SDK root before PATH expansion; interactive launcher untouched.",
+    "Correct GUID-scoped startup identity fixture and test missing/malformed/blank/mismatched identities."
+  ],
+  "verification": [
+    {
+      "kind": "fresh_snapshot_build",
+      "sourceCommit": "34195f2e876663a1b3678a8008447d80fdcfc216",
+      "passed": true,
+      "desktopHelpers": 6,
+      "activeRuntimeChanged": false
+    },
+    {
+      "kind": "original_five_files_serial",
+      "jobId": "legion-fresh-failing-files-sequential-20261108-2218-01",
+      "tests": 64,
+      "passed": 63,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 1,
+      "durationSeconds": 143.911
+    },
+    {
+      "kind": "complete_baseline_suite_concurrency2",
+      "jobId": "legion-fresh-full-suite-concurrency2-20261108-2223-01",
+      "tests": 1142,
+      "passed": 1128,
+      "failed": 11,
+      "cancelled": 0,
+      "skipped": 3,
+      "durationSeconds": 380.958
+    },
+    {
+      "kind": "newly_failing_four_files_serial_instrumented",
+      "jobId": "legion-fresh-four-file-fs-trace-20261108-2236-01",
+      "tests": 39,
+      "passed": 39,
+      "failed": 0,
+      "skipped": 0,
+      "durationSeconds": 39.83,
+      "sourceUnchanged": true,
+      "trace": {
+        "processes": 40,
+        "renameCalls": 453,
+        "linkCalls": 207,
+        "openCalls": 2584,
+        "relevantExceptions": 0,
+        "truncated": false
+      }
+    },
+    {
+      "kind": "final_current_source_focused_and_real_tool_preflight",
+      "jobId": "legion-environment-final-gates-20261108-01",
+      "tests": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "processEnvironmentOnly": true,
+      "checks": [
+        "PowerShell5.1 and7 synthetic background environment",
+        "release environment restoration and credential ordering",
+        "strict desktop manifest metadata",
+        "actual Node/npm/Python/dotnet/Git/gh/Windows PowerShell versions",
+        "WinApp0.7.1 resolved by PATH",
+        "formatting",
+        "git diff --check"
+      ]
+    },
+    {
+      "kind": "isolated_startup_restart_fixtures",
+      "jobId": "legion-startup-identity-gate-20261108-01",
+      "exitCode": 0,
+      "actualServiceRestart": false
+    }
+  ],
+  "fullGateFailures": {
+    "jobResultCli": {
+      "test": "test/job-result-cli.test.mjs:211",
+      "expected": "COMMAND_RESULT_EXISTS",
+      "actual": "JOB_RECORD_SAVE_FAILED"
+    },
+    "patchBlockedEperm": {
+      "count": 10,
+      "tests": [
+        "workflow-catalog-cli: shared before hook affects 6 cases",
+        "workflow-catalog:213",
+        "workflows:285",
+        "workflows:300",
+        "workflows:419"
+      ]
+    },
+    "cause": "Exact failing syscall/lock holder unproven. Passing isolated trace did not reproduce; it does not replace the failed full gate."
+  },
+  "evidenceDirectory": "C:\\work\\workbridge-diagnostics\\legion-desktop-20261108-2213",
+  "evidence": [
+    {
+      "file": "full-suite-concurrency2-results.json",
+      "sha256": "529a08e9cbc179e7200fe7a5d18a0c707b1e5b366ea8f8233b0a2e1c64378b6f"
+    },
+    {
+      "file": "four-file-fs-trace-results.json",
+      "sha256": "aa7037d87a2076a58518462b762430d476b1e4cd284ff958c6ad97985fec07a7"
+    }
+  ],
+  "deployment": {
+    "newValidatedRelease": false,
+    "applyInvoked": false,
+    "packageTestSchedulingChanged": false,
+    "assertionsOrDeadlinesRelaxed": false,
+    "protectedFailedPayloadAccessed": false
+  },
+  "nextBoundary": {
+    "commandTimeoutLimitSeconds": 600,
+    "serialSuiteEstimatedSeconds": [
+      690,
+      750
+    ],
+    "estimateBasis": "sum of full-run case times735.17s plus isolated timing comparison; build/other gates additional",
+    "proposal": "Ask approval for one bounded1200s standalone validation task. Do not alter the bridge limit or detach a job without approval. Then explicitly select test-file concurrency1, preserve every test/internal concurrency assertion/deadline, and run every official gate from a fresh committed-source archive."
+  },
+  "preservation": {
+    "unrelatedDirtyFile": {
+      "path": "scripts/freebuff-conpty-probe.py",
+      "sha256": "c29fbfd898c5fe54e86e34403a79ef4d1107761f4828deed153be4be3de3c07f"
+    },
+    "unrelatedUntrackedFile": {
+      "path": "LEGION-COPY-MANIFEST.json",
+      "sha256": "1021d2ae132d80fd477278311e9985ac0a42b34de78e6a178cebf1903be93bf1"
+    },
+    "originalBackgroundLauncher": {
+      "sha256": "870b5d3223d36ef02b151fb9c3a243f18af9e670a3e4b8998862521a45727328",
+      "commit": "34195f2e876663a1b3678a8008447d80fdcfc216",
+      "patchJournals": [
+        "legion-background-env-20261108-01",
+        "legion-background-env-crlf-20261108-01",
+        "legion-background-env-raw-order-20261108-01"
+      ],
+      "note": "WB-001 runtime rollback does not revert launcher scripts. Restore only with current-hash checks and preserved newer edits."
+    },
+    "pushed": false
+  },
+  "priorities": [
+    "Obtain longer bounded validation authority; choose explicit serial file scheduling and run the complete official gate once.",
+    "Only after sealed validation, coordinate a quiet window and use WB-001 Workbridge-only Apply with rollback readiness.",
+    "Verify fresh LEGION owner and hosted desktop WinApp lookup, then resume separate LuaPad/RIFT live acceptance without restarting game or Windows."
+  ]
+}

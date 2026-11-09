@@ -2,7 +2,8 @@
 param(
     [string]$SourceRoot = '',
     [string]$ReleaseId = ('release-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ')),
-    [string]$WorkspaceRoot = 'C:\work'
+    [string]$WorkspaceRoot = 'C:\work',
+    [switch]$RefreshUserEnvironment
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Workbridge-Update.ps1')
@@ -36,20 +37,121 @@ function Assert-WBDesktopManifestMetadata {
         }
     }
 }
+# Explicit opt-in only: a release builder may inherit an owner process older than
+# a user-scoped tool installation. Never replace a caller's custom/venv PATH by default.
+function Get-WBRegisteredValidationEnvironment {
+    $scopes = @(
+        @{ Name = 'Machine'; Hive = [Microsoft.Win32.Registry]::LocalMachine; Key = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment' },
+        @{ Name = 'User'; Hive = [Microsoft.Win32.Registry]::CurrentUser; Key = 'Environment' }
+    )
+    $values = @{}
+    foreach ($scope in $scopes) {
+        $key = $scope.Hive.OpenSubKey($scope.Key, $false)
+        try {
+            $entry = @{}
+            foreach ($name in @('Path', 'DOTNET_ROOT')) {
+                $value = $null
+                if ($null -ne $key) {
+                    $value = $key.GetValue($name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+                    if ($null -ne $value -and $value -isnot [string]) { throw "Registered $($scope.Name) $name must be a string." }
+                }
+                $entry[$name] = $value
+            }
+            $values[$scope.Name] = $entry
+        } finally { if ($null -ne $key) { $key.Dispose() } }
+    }
+    $parts = @($values.Machine.Path, $values.User.Path) | Where-Object { ![string]::IsNullOrEmpty($_) }
+    $dotnet = $values.Machine.DOTNET_ROOT
+    if ($null -ne $values.User.DOTNET_ROOT) { $dotnet = $values.User.DOTNET_ROOT }
+    return [pscustomobject]@{ Path = ($parts -join ';'); DotNetRoot = $dotnet }
+}
+
+function Invoke-WBPrerequisiteVersion {
+    param(
+        [string]$Name,
+        [string]$Executable,
+        [string]$Arguments,
+        [ValidateRange(100, 15000)][int]$TimeoutMilliseconds = 15000
+    )
+    $process = New-Object Diagnostics.Process
+    try {
+        $process.StartInfo = New-Object Diagnostics.ProcessStartInfo
+        $process.StartInfo.FileName = $Executable
+        $process.StartInfo.Arguments = $Arguments
+        $process.StartInfo.UseShellExecute = $false
+        $process.StartInfo.CreateNoWindow = $true
+        $process.StartInfo.RedirectStandardOutput = $true
+        $process.StartInfo.RedirectStandardError = $true
+        if (!$process.Start()) { throw "Release prerequisite $Name could not start." }
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        if (!$process.WaitForExit($TimeoutMilliseconds)) {
+            try { $process.Kill() } catch { throw "Release prerequisite $Name timed out; its version probe could not be terminated: $($_.Exception.Message)" }
+            if (!$process.WaitForExit(2000)) { throw "Release prerequisite $Name timed out; its version probe has not exited." }
+            throw "Release prerequisite $Name version probe timed out."
+        }
+        if (![Threading.Tasks.Task]::WaitAll([Threading.Tasks.Task[]]@($stdout, $stderr), 2000)) {
+            throw "Release prerequisite $Name version output did not close."
+        }
+        $output = ($stdout.Result + ' ' + $stderr.Result).Trim()
+        if ($process.ExitCode -ne 0) { throw "Release prerequisite $Name version probe exited $($process.ExitCode): $output" }
+        if (!$output) { throw "Release prerequisite $Name returned no version output." }
+        return ($output -split '\r?\n')[0]
+    } finally { $process.Dispose() }
+}
+
+function Assert-WBReleasePrerequisites {
+    $resolved = @{}
+    foreach ($name in @('node', 'npm', 'python', 'dotnet', 'git', 'gh', 'powershell.exe')) {
+        try {
+            $command = Get-Command -Name $name -CommandType Application -ErrorAction Stop | Select-Object -First 1
+        } catch { throw "Release prerequisite $name is not available on the refreshed PATH." }
+        if ($null -eq $command -or !$command.Source) { throw "Release prerequisite $name has no executable path." }
+        $resolved[$name] = $command.Source
+    }
+    foreach ($name in @('node', 'npm', 'python', 'dotnet', 'git', 'gh', 'powershell.exe')) {
+        $executable = $resolved[$name]
+        $arguments = '--version'
+        if ($name -eq 'npm' -and [IO.Path]::GetExtension($executable) -in @('.cmd', '.bat')) {
+            # Do not pass a batch file to CreateProcess or add an implicit cmd.exe shell.
+            $npmCli = Join-Path (Split-Path -Parent $executable) 'node_modules\npm\bin\npm-cli.js'
+            if (!(Test-Path -LiteralPath $npmCli -PathType Leaf)) { throw 'Release prerequisite npm has no adjacent official npm CLI.' }
+            $executable = $resolved.node
+            $arguments = '"' + $npmCli + '" --version'
+        } elseif ($name -eq 'powershell.exe') {
+            $arguments = '-NoLogo -NoProfile -NonInteractive -Command "[Console]::WriteLine($PSVersionTable.PSVersion.ToString())"'
+        }
+        $version = Invoke-WBPrerequisiteVersion -Name $name -Executable $executable -Arguments $arguments
+        Write-Host "prerequisite $($name): $version [$($resolved[$name])]"
+    }
+}
+
 $release = Get-WBChild $source ('.local\releases\' + $ReleaseId)
 if (Test-Path -LiteralPath $release) { throw 'Release already exists. Use a new release ID; existing evidence is retained.' }
 $payload = Get-WBChild $release 'payload'
-New-Item -ItemType Directory -Path $payload -Force | Out-Null
-foreach ($name in $script:WBSourceNames) {
-    $path = Get-WBChild $source $name
-    if (Test-Path -LiteralPath $path) { Copy-WBTree $path (Join-Path $payload $name) }
-}
 $checks = [ordered]@{}
 $previousKey = $env:CONTROL_PLANE_API_KEY
 $previousRoot = $env:WORKBRIDGE_ROOT
 $previousState = $env:WORKBRIDGE_STATE_DIR
+$previousValidationPath = [Environment]::GetEnvironmentVariable('Path', 'Process')
+$previousValidationDotNetRoot = [Environment]::GetEnvironmentVariable('DOTNET_ROOT', 'Process')
 try {
     $env:CONTROL_PLANE_API_KEY = $null
+    if ($RefreshUserEnvironment) {
+        $registeredEnvironment = Get-WBRegisteredValidationEnvironment
+        $dotnetRoot = $null
+        if ($null -ne $registeredEnvironment.DotNetRoot) {
+            $dotnetRoot = [Environment]::ExpandEnvironmentVariables($registeredEnvironment.DotNetRoot)
+        }
+        [Environment]::SetEnvironmentVariable('DOTNET_ROOT', $dotnetRoot, 'Process')
+        [Environment]::SetEnvironmentVariable('Path', [Environment]::ExpandEnvironmentVariables($registeredEnvironment.Path), 'Process')
+        Assert-WBReleasePrerequisites
+    }
+    New-Item -ItemType Directory -Path $payload -Force | Out-Null
+    foreach ($name in $script:WBSourceNames) {
+        $path = Get-WBChild $source $name
+        if (Test-Path -LiteralPath $path) { Copy-WBTree $path (Join-Path $payload $name) }
+    }
     $env:WORKBRIDGE_ROOT = (Assert-WBPath $WorkspaceRoot)
     $env:WORKBRIDGE_STATE_DIR = Join-Path $release 'validation-state'
     Push-Location $payload
@@ -136,4 +238,8 @@ try {
     $env:CONTROL_PLANE_API_KEY = $previousKey
     $env:WORKBRIDGE_ROOT = $previousRoot
     $env:WORKBRIDGE_STATE_DIR = $previousState
+    if ($RefreshUserEnvironment) {
+        [Environment]::SetEnvironmentVariable('Path', $previousValidationPath, 'Process')
+        [Environment]::SetEnvironmentVariable('DOTNET_ROOT', $previousValidationDotNetRoot, 'Process')
+    }
 }

@@ -10,6 +10,14 @@ From a trusted Workbridge source directory in PowerShell:
 .\scripts\New-WorkbridgeRelease.ps1 -ReleaseId 'next-release' -WorkspaceRoot 'C:\work'
 ```
 
+If developer tools were just installed but this shell or Workbridge owner predates the install, explicitly opt into a fresh registered tool environment:
+
+```powershell
+.\scripts\New-WorkbridgeRelease.ps1 -ReleaseId 'next-release-fresh-env' -WorkspaceRoot 'C:\work' -RefreshUserEnvironment
+```
+
+The switch refreshes only the builder process's `PATH` and `DOTNET_ROOT` from registered machine/user values, checks required tool versions before creating a payload, and restores its original environment on success or failure. It does not edit the registry or change the running Workbridge owner's environment. Omit it to preserve a deliberate custom/virtual-environment shell. The dedicated background launcher refreshes those same two values at its next startup; the interactive `Start-Tunnel.ps1` launcher is unchanged. Launcher source edits are separate from WB-001 runtime rollback: retain their before-file hash and guarded patch/commit recovery until hosted acceptance passes.
+
 This copies the source into a new `.local\releases\next-release\payload`, runs `npm ci` from the pinned lockfile, builds and runs the integration tests, runs Windows startup and updater tests, checks formatting, runs self-contained disposable acceptance, and checks actual stdio MCP initialization, version, its expected tool catalog (33 tools at 0.4.0; 32 at 0.3.0 for rollback), and `workspace_info`. Building 0.4.0 also compiles the Windows command host using the built-in .NET Framework compiler. Commands write separate logs outside the payload. The tunnel API key is removed from the validation environment. No running service is stopped.
 
 Only a successful run creates `validated.json`, bound to the SHA256 manifest of every payload file. A failed check leaves its logs and produces no valid receipt. Use a new release ID to retry; existing release folders are never overwritten. Dependencies and validation scripts are trusted project code and can use the network and filesystem.
