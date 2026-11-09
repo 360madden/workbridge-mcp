@@ -12,6 +12,7 @@
     "build": "tsc && node scripts/build-command-host.mjs",
     "start": "node dist/server.js",
     "test": "npm run build && node --test test/*.test.mjs",
+    "test:serial": "npm run build && node --test --test-concurrency=1 test/*.test.mjs",
     "test:startup": "powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File test/startup.test.ps1",
     "test:updater": "powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File test/updater.test.ps1",
     "acceptance:release": "node scripts/release-acceptance.mjs",

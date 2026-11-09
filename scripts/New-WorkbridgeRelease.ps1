@@ -3,7 +3,8 @@ param(
     [string]$SourceRoot = '',
     [string]$ReleaseId = ('release-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ')),
     [string]$WorkspaceRoot = 'C:\work',
-    [switch]$RefreshUserEnvironment
+    [switch]$RefreshUserEnvironment,
+    [switch]$SerialTests
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Workbridge-Update.ps1')
@@ -126,6 +127,16 @@ function Assert-WBReleasePrerequisites {
     }
 }
 
+# File scheduling only: test cases, deadlines and within-file concurrency stay unchanged.
+function Get-WBReleaseTestProfile {
+    param([switch]$SerialTests)
+    if ($SerialTests) {
+        return [pscustomobject]@{ name='serial-files'; fileConcurrency=1; arguments=@('run','test:serial') }
+    }
+    return [pscustomobject]@{ name='default'; fileConcurrency=$null; arguments=@('test') }
+}
+
+$testProfile = Get-WBReleaseTestProfile -SerialTests:$SerialTests
 $release = Get-WBChild $source ('.local\releases\' + $ReleaseId)
 if (Test-Path -LiteralPath $release) { throw 'Release already exists. Use a new release ID; existing evidence is retained.' }
 $payload = Get-WBChild $release 'payload'
@@ -165,7 +176,7 @@ try {
             $commands += @{name='desktop-prestage'; args=@('scripts/stage-desktop-runtime.mjs','--repo-root',$payload)}
         }
         $commands += @(
-            @{name='tests'; args=@('test')},
+            @{name='tests'; args=$testProfile.arguments},
             @{name='startup'; args=@('run','test:startup')},
             @{name='updater'; args=@('run','test:updater')},
             @{name='format'; args=@('run','format:check')},
@@ -230,7 +241,7 @@ try {
     $files = @(Get-WBManifest $payload)
     $manifest = [pscustomobject]@{schema=1; releaseId=$ReleaseId; version=$package.version; createdUtc=[DateTime]::UtcNow.ToString('o'); files=$files}
     Write-WBJson (Join-Path $release 'manifest.json') $manifest
-    Write-WBJson (Join-Path $release 'validated.json') ([pscustomobject]@{schema=1; version=$package.version; result='passed'; checks=$checks; manifestSha256=(Get-FileHash -LiteralPath (Join-Path $release 'manifest.json') -Algorithm SHA256).Hash; probe=$probe; hostedVerified=$false})
+    Write-WBJson (Join-Path $release 'validated.json') ([pscustomobject]@{schema=1; version=$package.version; result='passed'; checks=$checks; testProfile=$testProfile; manifestSha256=(Get-FileHash -LiteralPath (Join-Path $release 'manifest.json') -Algorithm SHA256).Hash; probe=$probe; hostedVerified=$false})
     $null = Get-WBRelease $release
     Write-Host "Validated release: $release"
     Write-Host 'No service was stopped or deployed. Keep this directory unchanged.'
