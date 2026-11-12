@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "localDate": "2026-11-08",
+  "timezone": "America/New_York",
+  "recordedAtUtc": "2026-11-09T01:54:30Z",
+  "scope": "LEGION laptop only; no assertion about AMD-DESKTOP or VMware labs",
+  "machine": {
+    "observedHostname": "LEGION",
+    "verificationJob": "legion-tools-repair-hostname-20261108-2031-01",
+    "workbridge": {
+      "pid": 23232,
+      "instanceId": "dca381aa-a8f1-4eda-9777-e6d4732610f7",
+      "version": "0.16.4-dev",
+      "activeServerSha256": "18dc464cc84e07e21dcbe9a33c9fe1a4a3ddab2159ff2ca531e514e1dd143207",
+      "restarted": false
+    }
+  },
+  "outcomes": {
+    "toolPathsAndNativeFixtures": "verified",
+    "pythonSetup": "verified",
+    "luapadDependencies": "verified",
+    "workbridgeDeployedDesktopRepair": "blocked_not_deployed"
+  },
+  "tools": {
+    "powershell": {
+      "version": "7.6.9",
+      "executable": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+      "installation": "WinGet traditional MSI; Windows PowerShell 5.1 preserved"
+    },
+    "python": {
+      "version": "3.14.10",
+      "architecture": "standard x64",
+      "executable": "C:\\Users\\mrkoo\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "launcher": "C:\\Users\\mrkoo\\AppData\\Local\\Programs\\Python\\Launcher\\py.exe",
+      "pip": "26.2.2",
+      "venv": "C:\\work\\workbridge-mcp\\.venv",
+      "venvExecutable": "C:\\work\\workbridge-mcp\\.venv\\Scripts\\python.exe",
+      "thirdPartyPackagesRequired": 0,
+      "installerSha256": "92480239264744fe0386a1bd8275786fefa126e3129e56a68e22b52c73329965",
+      "authenticode": "Valid; Python Software Foundation"
+    },
+    "dotnet": {
+      "sdk": "10.0.403",
+      "runtime": "10.0.14",
+      "root": "C:\\work\\tools\\dotnet\\10.0.403",
+      "existingLuaPadPrivateSdkPreserved": true
+    },
+    "winapp": {
+      "version": "0.7.1",
+      "executable": "C:\\work\\tools\\winappcli\\0.7.1\\winapp.exe",
+      "reasonPinned": "Existing Workbridge desktop source expects this version"
+    },
+    "node": "24.20.0",
+    "npm": "11.19.0",
+    "git": "2.56.0.windows.4",
+    "githubCli": "2.103.3",
+    "winget": "1.29.380"
+  },
+  "paths": {
+    "configurationScript": "C:\\work\\workbridge-mcp\\scripts\\Configure-DeveloperToolPaths.ps1",
+    "scriptSha256": "f3829c6a27f2ff8ea2162c88955d7ccba9165c3e1e5fdb6baa55b353129ab3e2",
+    "changedUserValues": [
+      "Path",
+      "DOTNET_ROOT",
+      "WORKBRIDGE_WINAPP_EXE"
+    ],
+    "machineEnvironmentChangedByThisStep": false,
+    "userPathKind": "ExpandString",
+    "backup": "C:\\work\\workbridge-mcp\\.local\\environment-backups\\developer-paths-20261109T014426037Z-4a92593a.json",
+    "backupSha256": "62ac5950b469a7f75eaaf6432f81d3b528e80ea0cfb60ec86edc96102c924435",
+    "secondApply": "unchanged; no extra backup",
+    "notification": "sent",
+    "verification": "All 10 bare commands verified in a bounded child with machine+user registry environment reconstructed",
+    "existingWorkbridgeOwnerEnvironment": "Not refreshed; persistent registry changes do not mutate existing processes",
+    "pythonHomeAndPath": "Not set; existing absence preserved",
+    "dotnetArchitectureOverrides": "Absent in user, machine and process scopes"
+  },
+  "nativeFixtures": {
+    "root": "C:\\work\\workbridge-mcp\\.tools\\legion-fixtures-20261108-2033",
+    "build": "Both Release publishes passed",
+    "dllSmoke": "Each no-argument call returned expected exit 2 before GUI initialization",
+    "exeSmoke": "Both standalone EXEs also returned expected exit 2 with reconstructed environment",
+    "remainingProcesses": 0,
+    "desktopProbeExeSha256": "5e94ab7b6e6e8bf5af2ef4df50d42592de98199cc669beea03b22c0ac795934f",
+    "chatInputProbeExeSha256": "16a09201609250f040697d2f84258c8d07b70d8216f3623a0791d7a97758a666"
+  },
+  "luapad": {
+    "repo": "C:\\work\\LuaPadModern",
+    "dependencyMode": "Project-local lockfile-pinned Fengari; test runner never auto-installs",
+    "packages": {
+      "fengari-node-cli": "0.1.0",
+      "fengari": "0.1.5",
+      "readline-sync": "1.4.10",
+      "sprintf-js": "1.1.3",
+      "tmp": "0.2.7"
+    },
+    "installCommand": "npm ci --ignore-scripts",
+    "actualInstall": "Offline npm ci with scripts disabled; all five versions and integrity hashes matched existing cache",
+    "structuralChecks": 60,
+    "bridgeAssertions": 538,
+    "hostCoreAssertions": 137,
+    "hostCoreArtifacts": "C:\\work\\LuaPadModern\\.tools\\legion-host-deps-20261108-2049",
+    "staleGateFixed": "Expected runtime assertions updated from 198 to the observed 204",
+    "installRule": "RIFT may remain running for new addons and updates; complete file copy, then /reloadui. No RIFT/Windows restart."
+  },
+  "workbridgeRelease": {
+    "releaseId": "legion-desktop-runtime-20261108-01",
+    "sourceCommit": "848da00803f1cb3f37fccaf26228adc5e3d8d120",
+    "job": "legion-wb001-official-preparation-20261108-01",
+    "gates": {
+      "install": "passed",
+      "desktopPrebuild": "passed",
+      "desktopPrestage": "passed",
+      "tests": "failed"
+    },
+    "tests": {
+      "total": 1142,
+      "passed": 1132,
+      "failed": 6,
+      "cancelled": 1,
+      "skipped": 3
+    },
+    "failureClasses": [
+      "Inherited test environment could not resolve Python",
+      "Deadline/timeouts",
+      "Bounded catalog scan",
+      "Synthetic file-lock/EPERM"
+    ],
+    "loadSensitivity": "Hypothesis, not established by a diagnostic rerun",
+    "validatedReceiptIssued": false,
+    "deployable": false,
+    "deployed": false,
+    "diagnosticBlocker": "terminal_run cwd in failed .local/releases payload refused PROTECTED_PATH before execution; no alternate-cwd or copied-payload workaround",
+    "concurrency": "Node24.20.0 supports CLI --test-concurrency, not NODE_OPTIONS",
+    "activeDesktopHelpers": "Six deployed helper files plus manifest still missing; source inspector now detects this"
+  },
+  "tests": {
+    "pathPure": {
+      "powershell51": 34,
+      "powershell7": 34
+    },
+    "pythonVtAssertions": 6,
+    "desktopFocusedTests": 45,
+    "desktopFormattingAffectedTests": 60,
+    "installationInspectorTests": 50,
+    "countingNote": "Suites overlap; do not add these counts into a claimed unique test total"
+  },
+  "commits": {
+    "workbridge": [
+      {
+        "hash": "22c5a7f3a1af6ff6269947edde97b3f8932f7945",
+        "purpose": "Detect missing/tampered deployed desktop helper closure"
+      },
+      {
+        "hash": "9ac7369839f2d1b3a9c240d363754f5f52d0c2ac",
+        "purpose": "Mechanical formatting required by official release gate"
+      },
+      {
+        "hash": "848da00803f1cb3f37fccaf26228adc5e3d8d120",
+        "purpose": "Backed-up idempotent user tool PATH setup"
+      }
+    ],
+    "luapad": [
+      {
+        "hash": "6fc2f5f4d12c9965bb1ed10ab4edcf159200379b",
+        "purpose": "Correct runtime gate count and reload-only install documentation"
+      },
+      {
+        "hash": "559a721ba95f23b419af2ca02597f7d2079c8e18",
+        "purpose": "Pin local Fengari dependencies and remove runtime downloads"
+      }
+    ],
+    "pushed": false
+  },
+  "preserved": {
+    "riftProcessId": 21140,
+    "riftStartUtc": "2026-11-08T10:52:35.8105227Z",
+    "riftRestartedByThisWork": false,
+    "windowsRestarted": false,
+    "workbridgeUnrelated": [
+      "scripts/freebuff-conpty-probe.py",
+      "LEGION-COPY-MANIFEST.json"
+    ],
+    "freebuffSha256": "c29fbfd898c5fe54e86e34403a79ef4d1107761f4828deed153be4be3de3c07f"
+  },
+  "next": [
+    "Verify actual hostname again; do not select machines solely from this report.",
+    "After user direction, build fresh diagnostics from ordinary source in a separate allowed directory, without accessing the protected failed payload.",
+    "Use corrected child environment and explicit Node CLI --test-concurrency=1 to diagnose original failing files; do not weaken assertions/timeouts or skip gates.",
+    "Prepare a new official release ID only after correction; keep failed candidate unchanged.",
+    "Activate only after every gate passes plus explicit Workbridge-only restart approval and exclusive quiet window; RIFT and Windows stay running.",
+    "After hosted helper acceptance, proceed through disposable fixture input checks before live LuaPad Run/focus testing."
+  ],
+  "evidenceJobs": [
+    "legion-python-install-20261108-01",
+    "legion-python-venv-smoke-20261108-02",
+    "legion-tool-path-apply-20261108-2044-01",
+    "legion-tool-path-readback-20261108-2045-01",
+    "legion-fresh-env-versions-20261108-2047-01",
+    "legion-fresh-env-native-fixtures-20261108-2047-01",
+    "legion-luapad-pinned-install-gates-20261108-01",
+    "legion-luapad-host-isolated-20261108-2051-01",
+    "legion-wb001-official-preparation-20261108-01"
+  ]
+}

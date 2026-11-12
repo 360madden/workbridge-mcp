@@ -70,20 +70,28 @@ export function parseReloadRequest(argv) {
       },
     }));
   } catch {
-    refuse('INVALID_ARGUMENTS', 'Required --pid --hwnd --started-utc --request-id --confirm; --preflight-only optional');
+    refuse(
+      'INVALID_ARGUMENTS',
+      'Required --pid --hwnd --started-utc --request-id --confirm; --preflight-only optional',
+    );
   }
   const pid = decimal(v.pid, 'pid');
   const hwnd = decimal(v.hwnd, 'hwnd');
   if (pid > 0x7fffffff) refuse('INVALID_TARGET', 'PID out of range');
   const startedUtc = v['started-utc'];
-  if (typeof startedUtc !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?Z$/.test(startedUtc) || !Number.isFinite(Date.parse(startedUtc))) {
+  if (
+    typeof startedUtc !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?Z$/.test(startedUtc) ||
+    !Number.isFinite(Date.parse(startedUtc))
+  ) {
     refuse('INVALID_PROCESS_START', 'Provide the freshly observed UTC process creation timestamp');
   }
   const requestId = v['request-id'];
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/.test(requestId ?? '')) {
     refuse('INVALID_REQUEST_ID', 'Use a unique bounded request ID');
   }
-  if (v.confirm !== CONFIRMATION) refuse('CONFIRMATION_REQUIRED', 'Explicit physical RIFT one-reload confirmation required');
+  if (v.confirm !== CONFIRMATION)
+    refuse('CONFIRMATION_REQUIRED', 'Explicit physical RIFT one-reload confirmation required');
   const executeOnce = v['execute-once'] === true;
   const focusOnly = v['focus-only'] === true;
   const preflightOnly = v['preflight-only'] === true;
@@ -91,24 +99,37 @@ export function parseReloadRequest(argv) {
     refuse('INVALID_ARGUMENTS', 'Preflight, focus-only and live execution are mutually exclusive');
   }
   if (executeOnce) {
-    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/.test(v['screenshot-request-id'] ?? '') ||
-        v['chat-visual-attestation'] !== 'chat-closed-empty') {
-      refuse('CHAT_STATE_GATE_REQUIRED', 'Live input requires a fresh verified capture ID and explicit closed-empty chat attestation');
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/.test(v['screenshot-request-id'] ?? '') ||
+      v['chat-visual-attestation'] !== 'chat-closed-empty'
+    ) {
+      refuse(
+        'CHAT_STATE_GATE_REQUIRED',
+        'Live input requires a fresh verified capture ID and explicit closed-empty chat attestation',
+      );
     }
   } else if (v['screenshot-request-id'] !== undefined || v['chat-visual-attestation'] !== undefined) {
     refuse('INVALID_ARGUMENTS', 'Chat visual attestation is valid only for --execute-once');
   }
   return Object.freeze({
-    pid, hwnd, startedUtc, requestId,
-    preflightOnly, executeOnce, focusOnly,
+    pid,
+    hwnd,
+    startedUtc,
+    requestId,
+    preflightOnly,
+    executeOnce,
+    focusOnly,
     screenshotRequestId: executeOnce ? v['screenshot-request-id'] : null,
     chatVisualAttestation: executeOnce ? v['chat-visual-attestation'] : null,
   });
 }
 
 function parseJson(raw, label) {
-  try { return JSON.parse(raw); }
-  catch { refuse('INVALID_PROVIDER_JSON', label + ' was not valid JSON'); }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    refuse('INVALID_PROVIDER_JSON', label + ' was not valid JSON');
+  }
 }
 
 function assertProcessIdentity(result, request) {
@@ -126,14 +147,25 @@ export function assertPhysicalRiftWindow(result, request, { requireForeground = 
   const matches = result.windows.filter((w) => Number(w.hwnd) === request.hwnd);
   if (matches.length !== 1) refuse('STALE_TARGET', 'Selected HWND absent or ambiguous');
   const w = matches[0];
-  if (Number(w.processId) !== request.pid ||
-      w.processName !== PROCESS || w.title !== TITLE ||
-      w.className !== CLASS || Number(w.ownerHwnd ?? 0) !== 0) {
+  if (
+    Number(w.processId) !== request.pid ||
+    w.processName !== PROCESS ||
+    w.title !== TITLE ||
+    w.className !== CLASS ||
+    Number(w.ownerHwnd ?? 0) !== 0
+  ) {
     refuse('WRONG_TARGET', 'The exact physical RIFT window identity did not match');
   }
-  if (requireForeground && w.isForeground !== true) refuse('NOT_FOREGROUND', 'Operator must foreground physical RIFT before an action');
-  if (!Number.isFinite(w.width) || !Number.isFinite(w.height) ||
-      w.width < 700 || w.height < 500 || w.width > 15000 || w.height > 15000) {
+  if (requireForeground && w.isForeground !== true)
+    refuse('NOT_FOREGROUND', 'Operator must foreground physical RIFT before an action');
+  if (
+    !Number.isFinite(w.width) ||
+    !Number.isFinite(w.height) ||
+    w.width < 700 ||
+    w.height < 500 ||
+    w.width > 15000 ||
+    w.height > 15000
+  ) {
     refuse('TARGET_NOT_VISIBLE', 'Window appears minimized, invalid, or unexpectedly sized');
   }
   return w;
@@ -143,12 +175,21 @@ export function assertPhysicalGeometry(tree, request, w) {
   const windows = tree?.windows;
   const chosen = Array.isArray(windows) ? windows.filter((x) => Number(x.hwnd) === request.hwnd) : [];
   const e = chosen[0]?.elements?.[0];
-  if (chosen.length !== 1 || e?.type !== 'Window' || e.name !== TITLE ||
-      e.className !== CLASS || e.isEnabled !== true || e.isOffscreen === true ||
-      ![e.x, e.y, e.width, e.height].every(Number.isFinite) ||
-      Math.abs(e.x) > 20000 || Math.abs(e.y) > 20000 ||
-      e.width < 700 || e.height < 500 ||
-      Math.abs(e.width - w.width) > 60 || Math.abs(e.height - w.height) > 60) {
+  if (
+    chosen.length !== 1 ||
+    e?.type !== 'Window' ||
+    e.name !== TITLE ||
+    e.className !== CLASS ||
+    e.isEnabled !== true ||
+    e.isOffscreen === true ||
+    ![e.x, e.y, e.width, e.height].every(Number.isFinite) ||
+    Math.abs(e.x) > 20000 ||
+    Math.abs(e.y) > 20000 ||
+    e.width < 700 ||
+    e.height < 500 ||
+    Math.abs(e.width - w.width) > 60 ||
+    Math.abs(e.height - w.height) > 60
+  ) {
     refuse('TARGET_NOT_VISIBLE', 'Current RIFT UIA root geometry/visibility did not match');
   }
   return { x: e.x, y: e.y, width: e.width, height: e.height };
@@ -156,25 +197,31 @@ export function assertPhysicalGeometry(tree, request, w) {
 
 // Read-only Windows process identity. It does not read command line, environment or secrets.
 export async function getWindowsProcessIdentity(pid) {
-  const script = "$ErrorActionPreference='Stop'; $p=Get-Process -Id " + String(decimal(pid, 'pid')) +
+  const script =
+    "$ErrorActionPreference='Stop'; $p=Get-Process -Id " +
+    String(decimal(pid, 'pid')) +
     " -ErrorAction Stop; [pscustomobject]@{pid=$p.Id;startedUtc=$p.StartTime.ToUniversalTime().ToString('o');sessionId=$p.SessionId} | ConvertTo-Json -Compress";
   let stdout;
   try {
-    ({ stdout } = await execFileAsync('powershell.exe', [
-      '-NoProfile', '-NonInteractive', '-Command', script,
-    ], { timeout: 10000, windowsHide: true, maxBuffer: 8192 }));
+    ({ stdout } = await execFileAsync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', script],
+      { timeout: 10000, windowsHide: true, maxBuffer: 8192 },
+    ));
   } catch {
     refuse('PROCESS_IDENTITY_UNAVAILABLE', 'Could not independently read process start/session');
   }
   return parseJson(stdout, 'Process identity');
 }
 
-export async function inspectPhysicalRift(request, {
-  runner = runWinapp,
-  getProcess = getWindowsProcessIdentity,
-  requireForeground = true,
-} = {}) {
-  const version = String(await runner(['--version'])).trim().split(/\s+/).at(-1);
+export async function inspectPhysicalRift(
+  request,
+  { runner = runWinapp, getProcess = getWindowsProcessIdentity, requireForeground = true } = {},
+) {
+  const version = String(await runner(['--version']))
+    .trim()
+    .split(/\s+/)
+    .at(-1);
   if (version !== VERSION) refuse('UNSUPPORTED_WINAPP', 'Require Microsoft WinApp CLI 0.7.1');
   const processRecord = await getProcess(request.pid);
   assertProcessIdentity(processRecord, request);
@@ -184,9 +231,15 @@ export async function inspectPhysicalRift(request, {
   if (Number(caller?.pid) !== process.pid || caller?.sessionId !== processRecord.sessionId) {
     refuse('SESSION_MISMATCH', 'Input helper is not in the physical RIFT Windows session');
   }
-  const list = parseJson(await runner(['ui', 'list-windows', '-a', String(request.pid), '--json']), 'Window list');
+  const list = parseJson(
+    await runner(['ui', 'list-windows', '-a', String(request.pid), '--json']),
+    'Window list',
+  );
   const w = assertPhysicalRiftWindow({ windows: list }, request, { requireForeground });
-  const tree = parseJson(await runner(['ui', 'inspect', '-w', String(request.hwnd), '--depth', '1', '--json']), 'UIA inspection');
+  const tree = parseJson(
+    await runner(['ui', 'inspect', '-w', String(request.hwnd), '--depth', '1', '--json']),
+    'UIA inspection',
+  );
   const bounds = assertPhysicalGeometry(tree, request, w);
   const rootSelector = tree.windows?.find((x) => Number(x.hwnd) === request.hwnd)?.elements?.[0]?.selector;
   // Confirm same PID creation/session survived the UIA work.
@@ -194,9 +247,16 @@ export async function inspectPhysicalRift(request, {
   assertProcessIdentity(after, request);
   if (after.sessionId !== processRecord.sessionId) refuse('STALE_PROCESS', 'Process session changed');
   return {
-    pid: request.pid, hwnd: request.hwnd, startedUtc: request.startedUtc,
-    sessionId: after.sessionId, process: PROCESS, title: TITLE, className: CLASS,
-    foreground: w.isForeground === true, bounds, rootSelector,
+    pid: request.pid,
+    hwnd: request.hwnd,
+    startedUtc: request.startedUtc,
+    sessionId: after.sessionId,
+    process: PROCESS,
+    title: TITLE,
+    className: CLASS,
+    foreground: w.isForeground === true,
+    bounds,
+    rootSelector,
   };
 }
 
@@ -210,13 +270,11 @@ function hash(bytes) {
  * BEFORE acquiring desktop admission/GUI locks. An arbitrary caller SHA or
  * timestamp is never accepted as capture evidence.
  */
-export async function readVerifiedChatEvidence(request, {
-  root = ROOT,
-  now = () => Date.now(),
-  getProcess = getWindowsProcessIdentity,
-} = {}) {
-  if (request?.executeOnce !== true ||
-      request.chatVisualAttestation !== 'chat-closed-empty') {
+export async function readVerifiedChatEvidence(
+  request,
+  { root = ROOT, now = () => Date.now(), getProcess = getWindowsProcessIdentity } = {},
+) {
+  if (request?.executeOnce !== true || request.chatVisualAttestation !== 'chat-closed-empty') {
     refuse('CHAT_STATE_GATE_REQUIRED', 'Explicit one-shot closed-empty chat attestation required');
   }
   const id = request.screenshotRequestId;
@@ -228,37 +286,63 @@ export async function readVerifiedChatEvidence(request, {
   const imagePath = path.join(root, stem + '.png');
   const metadataStat = await lstat(metadataPath).catch(() => null);
   const imageStat = await lstat(imagePath).catch(() => null);
-  if (!metadataStat?.isFile() || metadataStat.isSymbolicLink() ||
-      !imageStat?.isFile() || imageStat.isSymbolicLink() ||
-      metadataStat.size < 100 || metadataStat.size > 4096 ||
-      imageStat.size < 10000 || imageStat.size > 16 * 1024 * 1024) {
-    refuse('CAPTURE_EVIDENCE_UNAVAILABLE', 'Expected bounded regular screenshot and receipt files are absent');
+  if (
+    !metadataStat?.isFile() ||
+    metadataStat.isSymbolicLink() ||
+    !imageStat?.isFile() ||
+    imageStat.isSymbolicLink() ||
+    metadataStat.size < 100 ||
+    metadataStat.size > 4096 ||
+    imageStat.size < 10000 ||
+    imageStat.size > 16 * 1024 * 1024
+  ) {
+    refuse(
+      'CAPTURE_EVIDENCE_UNAVAILABLE',
+      'Expected bounded regular screenshot and receipt files are absent',
+    );
   }
   const receipt = parseJson(await readFile(metadataPath, 'utf8'), 'Capture receipt');
   const bytes = await readFile(imagePath);
   const age = now() - Date.parse(receipt.capturedUtc ?? '');
-  if (receipt.schemaVersion !== 1 || receipt.requestId !== id ||
-      receipt.pid !== request.pid || receipt.hwnd !== request.hwnd ||
-      receipt.process !== PROCESS || receipt.title !== TITLE ||
-      receipt.expectedClass !== CLASS || receipt.inputInjected !== false ||
-      typeof receipt.imagePath !== 'string' ||
-      receipt.imagePath.toLowerCase() !== path.resolve(imagePath).toLowerCase() ||
-      !Number.isInteger(receipt.sizeBytes) || receipt.sizeBytes !== bytes.length ||
-      receipt.sizeBytes !== imageStat.size ||
-      !Number.isFinite(receipt.width) || receipt.width < 700 ||
-      !Number.isFinite(receipt.height) || receipt.height < 500 ||
-      !/^[a-f0-9]{64}$/i.test(receipt.sha256 ?? '') ||
-      hash(bytes) !== receipt.sha256.toLowerCase() ||
-      !Number.isFinite(age) || age < -1000 || age > 30000) {
-    refuse('CHAT_STATE_UNVERIFIED', 'Screenshot receipt, pinned image, target identity or 30-second freshness did not match');
+  if (
+    receipt.schemaVersion !== 1 ||
+    receipt.requestId !== id ||
+    receipt.pid !== request.pid ||
+    receipt.hwnd !== request.hwnd ||
+    receipt.process !== PROCESS ||
+    receipt.title !== TITLE ||
+    receipt.expectedClass !== CLASS ||
+    receipt.inputInjected !== false ||
+    typeof receipt.imagePath !== 'string' ||
+    receipt.imagePath.toLowerCase() !== path.resolve(imagePath).toLowerCase() ||
+    !Number.isInteger(receipt.sizeBytes) ||
+    receipt.sizeBytes !== bytes.length ||
+    receipt.sizeBytes !== imageStat.size ||
+    !Number.isFinite(receipt.width) ||
+    receipt.width < 700 ||
+    !Number.isFinite(receipt.height) ||
+    receipt.height < 500 ||
+    !/^[a-f0-9]{64}$/i.test(receipt.sha256 ?? '') ||
+    hash(bytes) !== receipt.sha256.toLowerCase() ||
+    !Number.isFinite(age) ||
+    age < -1000 ||
+    age > 30000
+  ) {
+    refuse(
+      'CHAT_STATE_UNVERIFIED',
+      'Screenshot receipt, pinned image, target identity or 30-second freshness did not match',
+    );
   }
   const processRecord = await getProcess(request.pid);
   assertProcessIdentity(processRecord, request);
   return Object.freeze({
     confirmed: true,
     state: 'chat-closed-empty',
-    pid: request.pid, hwnd: request.hwnd, startedUtc: request.startedUtc,
-    sessionId: processRecord.sessionId, capturedUtc: receipt.capturedUtc,
+    pid: request.pid,
+    hwnd: request.hwnd,
+    startedUtc: request.startedUtc,
+    sessionId: processRecord.sessionId,
+    capturedUtc: receipt.capturedUtc,
     imageSha256: receipt.sha256.toLowerCase(),
   });
 }
@@ -267,15 +351,19 @@ async function writeExclusiveJson(filename, obj) {
   const bytes = Buffer.from(JSON.stringify(obj) + '\n', 'utf8');
   if (bytes.length > 4096) refuse('RECEIPT_TOO_LARGE', 'Bounded journal record exceeded 4096 bytes');
   let h;
-  try { h = await open(filename, 'wx', 0o600); }
-  catch (e) {
-    if (e?.code === 'EEXIST') refuse('ACTION_RECOVERY_REQUIRED', 'Existing one-shot intent or receipt requires review');
+  try {
+    h = await open(filename, 'wx', 0o600);
+  } catch (e) {
+    if (e?.code === 'EEXIST')
+      refuse('ACTION_RECOVERY_REQUIRED', 'Existing one-shot intent or receipt requires review');
     throw e;
   }
   try {
     await h.writeFile(bytes);
     await h.sync();
-  } finally { await h.close(); }
+  } finally {
+    await h.close();
+  }
   return { bytes, sha256: hash(bytes) };
 }
 
@@ -290,12 +378,20 @@ async function releaseOwnedTurn(filename, original, journal) {
   const before = await lstat(filename);
   const bytes = await readFile(filename);
   const after = await lstat(filename);
-  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 ||
-      before.dev !== original.dev || before.ino !== original.ino ||
-      after.dev !== before.dev || after.ino !== before.ino ||
-      before.size !== journal.bytes.length ||
-      after.size !== before.size || before.mtimeMs !== after.mtimeMs ||
-      before.ctimeMs !== after.ctimeMs || hash(bytes) !== journal.sha256) {
+  if (
+    !before.isFile() ||
+    before.isSymbolicLink() ||
+    before.nlink !== 1 ||
+    before.dev !== original.dev ||
+    before.ino !== original.ino ||
+    after.dev !== before.dev ||
+    after.ino !== before.ino ||
+    before.size !== journal.bytes.length ||
+    after.size !== before.size ||
+    before.mtimeMs !== after.mtimeMs ||
+    before.ctimeMs !== after.ctimeMs ||
+    hash(bytes) !== journal.sha256
+  ) {
     refuse('UI_TURN_RECOVERY_REQUIRED', 'Desktop turn owner changed; retain the foreign lock');
   }
   await unlink(filename);
@@ -304,16 +400,20 @@ async function releaseOwnedTurn(filename, original, journal) {
 async function createTurn(root, request, observed, producer = 'physical-rift-reloadui') {
   const filename = path.join(root, 'desktop-input-turn.lock');
   const stamp = {
-    schemaVersion: 1, kind: 'workbridge.gui-turn',
-    leaseId: randomUUID(), producer,
-    requestId: request.requestId, owner: { pid: process.pid, processStartUtc: null, sessionId: observed.sessionId },
+    schemaVersion: 1,
+    kind: 'workbridge.gui-turn',
+    leaseId: randomUUID(),
+    producer,
+    requestId: request.requestId,
+    owner: { pid: process.pid, processStartUtc: null, sessionId: observed.sessionId },
     target: { kind: 'window', pid: request.pid, hwnd: request.hwnd, process: PROCESS },
     acquiredUtc: new Date().toISOString(),
   };
   const bytes = Buffer.from(JSON.stringify(stamp) + '\n', 'utf8');
   let h;
-  try { h = await open(filename, 'wx', 0o600); }
-  catch (e) {
+  try {
+    h = await open(filename, 'wx', 0o600);
+  } catch (e) {
     if (e?.code === 'EEXIST') refuse('UI_TURN_BUSY', 'Another desktop GUI turn or retained lock exists');
     throw e;
   }
@@ -321,14 +421,17 @@ async function createTurn(root, request, observed, producer = 'physical-rift-rel
   try {
     await h.writeFile(bytes);
     await h.sync();
-  } finally { await h.close(); }
+  } finally {
+    await h.close();
+  }
   return { filename, original, leaseId: stamp.leaseId, journal: { bytes, sha256: hash(bytes) } };
 }
 
 async function readBoundedJson(filename) {
   let bytes;
-  try { bytes = await readFile(filename); }
-  catch (e) {
+  try {
+    bytes = await readFile(filename);
+  } catch (e) {
     if (e?.code === 'ENOENT') return null;
     throw e;
   }
@@ -341,18 +444,20 @@ async function readBoundedJson(filename) {
  * In --execute-once, native root focus occurs after fsynced reload intent inside one lease.
  * Once intent exists, any exception is uncertain: do not delete intent or turn lock or retry.
  */
-export async function executePhysicalReloadOnce(request, {
-  runner = runWinapp,
-  getProcess = getWindowsProcessIdentity,
-  sender,
-  root = ROOT,
-} = {}) {
+export async function executePhysicalReloadOnce(
+  request,
+  { runner = runWinapp, getProcess = getWindowsProcessIdentity, sender, root = ROOT } = {},
+) {
   if (typeof sender !== 'function') {
-    refuse('NO_VALIDATED_INPUT_TRANSPORT', 'No production-safe physical RIFT keyboard transport has been validated');
+    refuse(
+      'NO_VALIDATED_INPUT_TRANSPORT',
+      'No production-safe physical RIFT keyboard transport has been validated',
+    );
   }
   await mkdir(root, { recursive: true });
   const lockPath = path.join(root, 'desktop-input-turn.lock');
-  return await withDesktopAdmission(lockPath,
+  return await withDesktopAdmission(
+    lockPath,
     { producer: 'physical-rift-reloadui', requestId: request.requestId },
     async () => {
       await quarantineVeto(root);
@@ -360,17 +465,32 @@ export async function executePhysicalReloadOnce(request, {
       const existing = await readBoundedJson(markerPath);
       if (existing) {
         if (existing.requestId === request.requestId) {
-          const receiptPath = path.join(root, 'physical-rift-reloadui-' + request.requestId + '.receipt.json');
+          const receiptPath = path.join(
+            root,
+            'physical-rift-reloadui-' + request.requestId + '.receipt.json',
+          );
           const receipt = await readBoundedJson(receiptPath);
           if (receipt?.submitted !== true || receipt?.requestId !== request.requestId) {
             refuse('ACTION_RECOVERY_REQUIRED', 'Previous attempt outcome uncertain; no replay');
           }
-          return { ok: true, replayed: true, submitted: true,
-            verified: false, status: 'PREVIOUS_SUBMISSION_DO_NOT_RESEND' };
+          return {
+            ok: true,
+            replayed: true,
+            submitted: true,
+            verified: false,
+            status: 'PREVIOUS_SUBMISSION_DO_NOT_RESEND',
+          };
         }
-        refuse('ACTION_RECOVERY_REQUIRED', 'One physical RIFT reload already attempted; no second ID permitted');
+        refuse(
+          'ACTION_RECOVERY_REQUIRED',
+          'One physical RIFT reload already attempted; no second ID permitted',
+        );
       }
-      const observed = await inspectPhysicalRift(request, { runner, getProcess, requireForeground: request.executeOnce !== true });
+      const observed = await inspectPhysicalRift(request, {
+        runner,
+        getProcess,
+        requireForeground: request.executeOnce !== true,
+      });
       const turn = await createTurn(root, request, observed);
       let intentCreated = false;
       let intentSha256 = null;
@@ -378,18 +498,34 @@ export async function executePhysicalReloadOnce(request, {
       try {
         await quarantineVeto(root);
         // Recheck exact process/window/root; focus is planned after durable intent.
-        const latest = await inspectPhysicalRift(request, { runner, getProcess, requireForeground: request.executeOnce !== true });
-        if (latest.sessionId !== observed.sessionId ||
-            latest.rootSelector !== observed.rootSelector ||
-            !/^[A-Za-z0-9_-]{3,96}$/.test(latest.rootSelector ?? '')) {
+        const latest = await inspectPhysicalRift(request, {
+          runner,
+          getProcess,
+          requireForeground: request.executeOnce !== true,
+        });
+        if (
+          latest.sessionId !== observed.sessionId ||
+          latest.rootSelector !== observed.rootSelector ||
+          !/^[A-Za-z0-9_-]{3,96}$/.test(latest.rootSelector ?? '')
+        ) {
           refuse('STALE_TARGET', 'Physical RIFT root selector/session changed');
         }
         const intent = {
-          schemaVersion: 1, kind: 'workbridge.physical-rift-reloadui-intent',
-          requestId: request.requestId, target: {
-            pid: request.pid, hwnd: request.hwnd, process: PROCESS, startedUtc: request.startedUtc,
-            sessionId: observed.sessionId, className: CLASS, title: TITLE, rootSelector: latest.rootSelector,
-          }, phase: 'started', action: '/reloadui',
+          schemaVersion: 1,
+          kind: 'workbridge.physical-rift-reloadui-intent',
+          requestId: request.requestId,
+          target: {
+            pid: request.pid,
+            hwnd: request.hwnd,
+            process: PROCESS,
+            startedUtc: request.startedUtc,
+            sessionId: observed.sessionId,
+            className: CLASS,
+            title: TITLE,
+            rootSelector: latest.rootSelector,
+          },
+          phase: 'started',
+          action: '/reloadui',
           plannedActions: request.executeOnce ? ['uia-root-focus', ...ACTION] : [...ACTION],
           startedUtc: new Date().toISOString(),
         };
@@ -398,28 +534,51 @@ export async function executePhysicalReloadOnce(request, {
         intentSha256 = intentJournal.sha256;
         actionStarted = true;
         // Only the literal, immutable three-part sequence may be supplied.
-        const response = await sender(Object.freeze({
-          pid: request.pid, hwnd: request.hwnd,
-          startedUtc: request.startedUtc, sessionId: observed.sessionId,
-          rootSelector: latest.rootSelector, allowInitialFocus: request.executeOnce === true,
-          sequence: ACTION,
-        }));
-        if (response?.submitted !== true || response?.sequenceCount !== 3 ||
-            response?.targetPid !== request.pid || response?.targetHwnd !== request.hwnd ||
-            response?.senderSessionId !== observed.sessionId ||
-            (request.executeOnce === true && response?.focusPerformed !== true)) {
+        const response = await sender(
+          Object.freeze({
+            pid: request.pid,
+            hwnd: request.hwnd,
+            startedUtc: request.startedUtc,
+            sessionId: observed.sessionId,
+            rootSelector: latest.rootSelector,
+            allowInitialFocus: request.executeOnce === true,
+            sequence: ACTION,
+          }),
+        );
+        if (
+          response?.submitted !== true ||
+          response?.sequenceCount !== 3 ||
+          response?.targetPid !== request.pid ||
+          response?.targetHwnd !== request.hwnd ||
+          response?.senderSessionId !== observed.sessionId ||
+          (request.executeOnce === true && response?.focusPerformed !== true)
+        ) {
           refuse('ACTION_RECOVERY_REQUIRED', 'Native input delivery result was uncertain');
         }
         // A sender receipt is NOT proof RIFT interpreted/reloaded; external screenshot
         // plus SavedVariables verification is a separate mandatory acceptance gate.
-        await writeExclusiveJson(path.join(root, 'physical-rift-reloadui-' + request.requestId + '.receipt.json'), {
-          schemaVersion: 1, kind: 'workbridge.physical-rift-reloadui-receipt',
-          requestId: request.requestId, pid: request.pid, hwnd: request.hwnd,
-          submittedUtc: new Date().toISOString(), submitted: true, verified: false, integratedFocusVerified: request.executeOnce === true,
-        });
+        await writeExclusiveJson(
+          path.join(root, 'physical-rift-reloadui-' + request.requestId + '.receipt.json'),
+          {
+            schemaVersion: 1,
+            kind: 'workbridge.physical-rift-reloadui-receipt',
+            requestId: request.requestId,
+            pid: request.pid,
+            hwnd: request.hwnd,
+            submittedUtc: new Date().toISOString(),
+            submitted: true,
+            verified: false,
+            integratedFocusVerified: request.executeOnce === true,
+          },
+        );
         await releaseOwnedTurn(turn.filename, turn.original, turn.journal);
-        return { ok: true, replayed: false, submitted: true,
-          verified: false, status: 'SUBMITTED_PENDING_EXTERNAL_GAME_EVIDENCE' };
+        return {
+          ok: true,
+          replayed: false,
+          submitted: true,
+          verified: false,
+          status: 'SUBMITTED_PENDING_EXTERNAL_GAME_EVIDENCE',
+        };
       } catch (error) {
         // Before an intent is created, no input was attempted: release an owned turn.
         // After intent, retain ownership AND seal a linked quarantine sidecar.
@@ -427,11 +586,16 @@ export async function executePhysicalReloadOnce(request, {
         if (intentCreated || actionStarted) {
           try {
             await writeExclusiveJson(path.join(root, 'desktop-turn-quarantine-' + turn.leaseId + '.json'), {
-              schemaVersion: 1, kind: 'workbridge.gui-turn-quarantine',
-              leaseId: turn.leaseId, requestId: request.requestId,
-              ownerStampSha256: turn.journal.sha256, intentSha256,
-              reasonCode: 'ACTION_RECOVERY_REQUIRED', processTreeSettlement: 'unknown',
-              automaticRetryAllowed: false, createdUtc: new Date().toISOString(),
+              schemaVersion: 1,
+              kind: 'workbridge.gui-turn-quarantine',
+              leaseId: turn.leaseId,
+              requestId: request.requestId,
+              ownerStampSha256: turn.journal.sha256,
+              intentSha256,
+              reasonCode: 'ACTION_RECOVERY_REQUIRED',
+              processTreeSettlement: 'unknown',
+              automaticRetryAllowed: false,
+              createdUtc: new Date().toISOString(),
             });
           } catch {
             refuse('ACTION_RECOVERY_REQUIRED', 'Quarantine seal unavailable; original GUI lock retained');
@@ -442,7 +606,8 @@ export async function executePhysicalReloadOnce(request, {
         }
         throw error;
       }
-    });
+    },
+  );
 }
 
 /**
@@ -450,17 +615,17 @@ export async function executePhysicalReloadOnce(request, {
  * inspected TOP-LEVEL RIFT window selector; it never sends keyboard/mouse input.
  * A focus attempt is journaled separately from the single /reloadui intent.
  */
-export async function executePhysicalFocusOnce(request, {
-  runner = runWinapp,
-  getProcess = getWindowsProcessIdentity,
-  root = ROOT,
-} = {}) {
+export async function executePhysicalFocusOnce(
+  request,
+  { runner = runWinapp, getProcess = getWindowsProcessIdentity, root = ROOT } = {},
+) {
   if (request?.focusOnly !== true || request.executeOnce || request.preflightOnly) {
     refuse('INVALID_OPERATION', 'Explicit --focus-only is required for this mode');
   }
   await mkdir(root, { recursive: true });
   const lockPath = path.join(root, 'desktop-input-turn.lock');
-  return await withDesktopAdmission(lockPath,
+  return await withDesktopAdmission(
+    lockPath,
     { producer: 'physical-rift-focus-only', requestId: request.requestId },
     async () => {
       await quarantineVeto(root);
@@ -469,20 +634,32 @@ export async function executePhysicalFocusOnce(request, {
       const old = await readBoundedJson(focusIntentPath);
       if (old) {
         const receipt = await readBoundedJson(focusReceiptPath);
-        if (old.requestId === request.requestId && receipt?.focused === true &&
-            receipt.requestId === request.requestId) {
-          return { ok: true, replayed: true, focused: true,
-            inputSubmitted: false, status: 'PREVIOUS_FOCUS_DO_NOT_REPEAT' };
+        if (
+          old.requestId === request.requestId &&
+          receipt?.focused === true &&
+          receipt.requestId === request.requestId
+        ) {
+          return {
+            ok: true,
+            replayed: true,
+            focused: true,
+            inputSubmitted: false,
+            status: 'PREVIOUS_FOCUS_DO_NOT_REPEAT',
+          };
         }
         refuse('ACTION_RECOVERY_REQUIRED', 'Existing focus attempt is uncertain; no automatic replay');
       }
       const observed = await inspectPhysicalRift(request, { runner, getProcess, requireForeground: false });
       if (observed.foreground) {
-        return { ok: true, alreadyForeground: true, focused: true,
-          inputSubmitted: false, status: 'ALREADY_FOREGROUND_NO_ACTION' };
+        return {
+          ok: true,
+          alreadyForeground: true,
+          focused: true,
+          inputSubmitted: false,
+          status: 'ALREADY_FOREGROUND_NO_ACTION',
+        };
       }
-      if (typeof observed.rootSelector !== 'string' ||
-          !/^[A-Za-z0-9_-]{3,96}$/.test(observed.rootSelector)) {
+      if (typeof observed.rootSelector !== 'string' || !/^[A-Za-z0-9_-]{3,96}$/.test(observed.rootSelector)) {
         refuse('FOCUS_SELECTOR_UNAVAILABLE', 'Fresh RIFT top-level UIA selector was not verified');
       }
       const turn = await createTurn(root, request, observed, 'physical-rift-focus-only');
@@ -491,52 +668,81 @@ export async function executePhysicalFocusOnce(request, {
       try {
         await quarantineVeto(root);
         const fresh = await inspectPhysicalRift(request, { runner, getProcess, requireForeground: false });
-        if (fresh.rootSelector !== observed.rootSelector ||
-            fresh.sessionId !== observed.sessionId ||
-            fresh.foreground !== false) {
+        if (
+          fresh.rootSelector !== observed.rootSelector ||
+          fresh.sessionId !== observed.sessionId ||
+          fresh.foreground !== false
+        ) {
           refuse('STALE_TARGET', 'RIFT selector/session/foreground changed before focus');
         }
         const intent = {
-          schemaVersion: 1, kind: 'workbridge.physical-rift-focus-only-intent',
-          requestId: request.requestId, leaseId: turn.leaseId,
-          target: { pid: request.pid, hwnd: request.hwnd,
-            process: PROCESS, startedUtc: request.startedUtc, selector: fresh.rootSelector },
-          action: 'uia-root-focus-only', startedUtc: new Date().toISOString(),
+          schemaVersion: 1,
+          kind: 'workbridge.physical-rift-focus-only-intent',
+          requestId: request.requestId,
+          leaseId: turn.leaseId,
+          target: {
+            pid: request.pid,
+            hwnd: request.hwnd,
+            process: PROCESS,
+            startedUtc: request.startedUtc,
+            selector: fresh.rootSelector,
+          },
+          action: 'uia-root-focus-only',
+          startedUtc: new Date().toISOString(),
         };
         // The focus attempt becomes uncertain only AFTER its durable intent.
         const journal = await writeExclusiveJson(focusIntentPath, intent);
         intentCreated = true;
         intentSha256 = journal.sha256;
         // This is the ONLY GUI action in focus mode; there are no key events.
-        const response = parseJson(await runner([
-          'ui', 'focus', fresh.rootSelector, '-w', String(request.hwnd), '--json',
-        ]), 'WinApp focus response');
+        const response = parseJson(
+          await runner(['ui', 'focus', fresh.rootSelector, '-w', String(request.hwnd), '--json']),
+          'WinApp focus response',
+        );
         if (response?.hwnd !== undefined && Number(response.hwnd) !== request.hwnd) {
           refuse('ACTION_RECOVERY_REQUIRED', 'WinApp focused a window other than physical RIFT');
         }
         const post = await inspectPhysicalRift(request, { runner, getProcess, requireForeground: true });
-        if (post.sessionId !== observed.sessionId ||
-            post.rootSelector !== observed.rootSelector || post.foreground !== true) {
+        if (
+          post.sessionId !== observed.sessionId ||
+          post.rootSelector !== observed.rootSelector ||
+          post.foreground !== true
+        ) {
           refuse('ACTION_RECOVERY_REQUIRED', 'RIFT did not become foreground with identical identity');
         }
         await writeExclusiveJson(focusReceiptPath, {
-          schemaVersion: 1, kind: 'workbridge.physical-rift-focus-only-receipt',
-          requestId: request.requestId, leaseId: turn.leaseId,
-          pid: request.pid, hwnd: request.hwnd, focused: true,
-          inputSubmitted: false, verifiedUtc: new Date().toISOString(),
+          schemaVersion: 1,
+          kind: 'workbridge.physical-rift-focus-only-receipt',
+          requestId: request.requestId,
+          leaseId: turn.leaseId,
+          pid: request.pid,
+          hwnd: request.hwnd,
+          focused: true,
+          inputSubmitted: false,
+          verifiedUtc: new Date().toISOString(),
         });
         await releaseOwnedTurn(turn.filename, turn.original, turn.journal);
-        return { ok: true, replayed: false, focused: true,
-          inputSubmitted: false, status: 'FOREGROUND_VERIFIED' };
+        return {
+          ok: true,
+          replayed: false,
+          focused: true,
+          inputSubmitted: false,
+          status: 'FOREGROUND_VERIFIED',
+        };
       } catch (error) {
         if (intentCreated) {
           try {
             await writeExclusiveJson(path.join(root, 'desktop-turn-quarantine-' + turn.leaseId + '.json'), {
-              schemaVersion: 1, kind: 'workbridge.gui-turn-quarantine',
-              leaseId: turn.leaseId, requestId: request.requestId,
-              ownerStampSha256: turn.journal.sha256, intentSha256,
-              reasonCode: 'FOCUS_ACTION_RECOVERY_REQUIRED', processTreeSettlement: 'unknown',
-              automaticRetryAllowed: false, createdUtc: new Date().toISOString(),
+              schemaVersion: 1,
+              kind: 'workbridge.gui-turn-quarantine',
+              leaseId: turn.leaseId,
+              requestId: request.requestId,
+              ownerStampSha256: turn.journal.sha256,
+              intentSha256,
+              reasonCode: 'FOCUS_ACTION_RECOVERY_REQUIRED',
+              processTreeSettlement: 'unknown',
+              automaticRetryAllowed: false,
+              createdUtc: new Date().toISOString(),
             });
           } catch {
             refuse('ACTION_RECOVERY_REQUIRED', 'Focus quarantine seal unavailable; GUI lock retained');
@@ -546,7 +752,8 @@ export async function executePhysicalFocusOnce(request, {
         }
         throw error;
       }
-    });
+    },
+  );
 }
 
 /**
@@ -585,57 +792,77 @@ export function createGuardedWinappSender({
     imageSha256: chatClosedEvidence.imageSha256,
   });
   return async function sendOneReload(input) {
-    if (!input || !Array.isArray(input.sequence) ||
-        input.sequence.length !== ACTION.length ||
-        input.sequence.some((key, index) => key !== ACTION[index])) {
+    if (
+      !input ||
+      !Array.isArray(input.sequence) ||
+      input.sequence.length !== ACTION.length ||
+      input.sequence.some((key, index) => key !== ACTION[index])
+    ) {
       refuse('INVALID_ACTION_SEQUENCE', 'Only one literal Enter /reloadui Enter sequence is permitted');
     }
     const target = { pid: input.pid, hwnd: input.hwnd, startedUtc: input.startedUtc };
     let sessionId = null;
     let firstKeyStartedAt = null;
     for (let phase = 0; phase < ACTION.length; phase++) {
-      if (firstKeyStartedAt !== null && (now() - firstKeyStartedAt < 0 || now() - firstKeyStartedAt > 60000)) {
+      if (
+        firstKeyStartedAt !== null &&
+        (now() - firstKeyStartedAt < 0 || now() - firstKeyStartedAt > 60000)
+      ) {
         refuse('INPUT_TURN_EXPIRED', 'A keyboard phase exceeded the bounded 60-second input turn');
       }
       const current = await inspectPhysicalRift(target, {
-        runner, getProcess,
+        runner,
+        getProcess,
         requireForeground: !(phase === 0 && input.allowInitialFocus === true),
       });
-      if (current.sessionId !== input.sessionId ||
-          (sessionId !== null && current.sessionId !== sessionId)) {
+      if (current.sessionId !== input.sessionId || (sessionId !== null && current.sessionId !== sessionId)) {
         refuse('SESSION_MISMATCH', 'Physical game or input session changed before a key phase');
       }
       sessionId = current.sessionId;
       // The same pre-lock screenshot only proves chat was initially closed/empty.
       // No nested capture/control call or invented per-phase chat-state assertion.
       const age = now() - Date.parse(evidence.capturedUtc ?? '');
-      if (evidence.confirmed !== true || evidence.state !== 'chat-closed-empty' ||
-          evidence.pid !== input.pid || evidence.hwnd !== input.hwnd ||
-          evidence.startedUtc !== input.startedUtc || evidence.sessionId !== input.sessionId ||
-          (phase === 0 && (!Number.isFinite(age) || age < -1000 || age > 60000)) ||
-          !/^[a-f0-9]{64}$/i.test(evidence.imageSha256 ?? '')) {
+      if (
+        evidence.confirmed !== true ||
+        evidence.state !== 'chat-closed-empty' ||
+        evidence.pid !== input.pid ||
+        evidence.hwnd !== input.hwnd ||
+        evidence.startedUtc !== input.startedUtc ||
+        evidence.sessionId !== input.sessionId ||
+        (phase === 0 && (!Number.isFinite(age) || age < -1000 || age > 60000)) ||
+        !/^[a-f0-9]{64}$/i.test(evidence.imageSha256 ?? '')
+      ) {
         refuse('CHAT_STATE_UNVERIFIED', 'Initial chat-closed screenshot proof is missing/stale');
       }
       // Exactly one UIA focus after durable intent in this same exclusive lease.
       // No full UIA inspection or external tool roundtrip after focus, and
       // never refocus if any keyboard event may already have been delivered.
       if (phase === 0 && input.allowInitialFocus === true) {
-        if (typeof input.rootSelector !== 'string' ||
-            !/^[A-Za-z0-9_-]{3,96}$/.test(input.rootSelector) ||
-            current.rootSelector !== input.rootSelector) {
+        if (
+          typeof input.rootSelector !== 'string' ||
+          !/^[A-Za-z0-9_-]{3,96}$/.test(input.rootSelector) ||
+          current.rootSelector !== input.rootSelector
+        ) {
           refuse('FOCUS_SELECTOR_UNAVAILABLE', 'Physical RIFT root changed before focus');
         }
-        const focusReply = parseJson(await runner([
-          'ui', 'focus', current.rootSelector, '-w', String(input.hwnd), '--json',
-        ]), 'Integrated native UIA focus');
-        if (focusReply?.ok === false || focusReply?.success === false || focusReply?.error || (focusReply?.hwnd !== undefined && Number(focusReply.hwnd) !== input.hwnd)) {
+        const focusReply = parseJson(
+          await runner(['ui', 'focus', current.rootSelector, '-w', String(input.hwnd), '--json']),
+          'Integrated native UIA focus',
+        );
+        if (
+          focusReply?.ok === false ||
+          focusReply?.success === false ||
+          focusReply?.error ||
+          (focusReply?.hwnd !== undefined && Number(focusReply.hwnd) !== input.hwnd)
+        ) {
           refuse('ACTION_RECOVERY_REQUIRED', 'Native focus targeted unexpected HWND');
         }
       }
       // Verify exact foreground HWND + process/session immediately before key.
-      const justBefore = parseJson(await runner([
-        'ui', 'list-windows', '-a', String(input.pid), '--json',
-      ]), 'Immediate foreground check');
+      const justBefore = parseJson(
+        await runner(['ui', 'list-windows', '-a', String(input.pid), '--json']),
+        'Immediate foreground check',
+      );
       assertPhysicalRiftWindow({ windows: justBefore }, target);
       const processBeforeKey = await getProcess(input.pid);
       assertProcessIdentity(processBeforeKey, target);
@@ -644,24 +871,33 @@ export function createGuardedWinappSender({
       }
       const literal = phase === 1;
       const keys = literal ? ACTION[phase] : 'enter';
-      const args = ['ui', 'send-keys', keys, '-w', String(input.hwnd),
-        '--via', 'send-input'];
+      const args = ['ui', 'send-keys', keys, '-w', String(input.hwnd), '--via', 'send-input'];
       if (literal) args.push('--verbatim');
       args.push('--json');
       // Guard a slow focus/identity check: evidence remains fresh at first key.
       const ageBeforeFirstKey = now() - Date.parse(evidence.capturedUtc ?? '');
-      if (phase === 0 && (!Number.isFinite(ageBeforeFirstKey) || ageBeforeFirstKey < -1000 || ageBeforeFirstKey > 60000)) {
+      if (
+        phase === 0 &&
+        (!Number.isFinite(ageBeforeFirstKey) || ageBeforeFirstKey < -1000 || ageBeforeFirstKey > 60000)
+      ) {
         refuse('CHAT_STATE_UNVERIFIED', 'Chat-closed evidence expired before the first physical RIFT key');
       }
       if (firstKeyStartedAt === null) firstKeyStartedAt = now();
       const reply = parseJson(await runner(args), 'WinApp send-input response');
-      if (reply?.via !== 'send-input' || reply?.keys !== keys ||
-          Number(reply?.hwnd) !== input.hwnd ||
-          reply.actionCount !== 1 ||
-          !Array.isArray(reply?.warnings) || reply.warnings.length !== 0 ||
-          (reply.target !== undefined && reply.target !== null &&
-            reply.target !== '' && reply.target !== 'RIFT' && reply.target !== 'Window' &&
-             reply.target !== current.rootSelector)) {
+      if (
+        reply?.via !== 'send-input' ||
+        reply?.keys !== keys ||
+        Number(reply?.hwnd) !== input.hwnd ||
+        reply.actionCount !== 1 ||
+        !Array.isArray(reply?.warnings) ||
+        reply.warnings.length !== 0 ||
+        (reply.target !== undefined &&
+          reply.target !== null &&
+          reply.target !== '' &&
+          reply.target !== 'RIFT' &&
+          reply.target !== 'Window' &&
+          reply.target !== current.rootSelector)
+      ) {
         refuse('ACTION_RECOVERY_REQUIRED', 'Native keyboard delivery was not independently attributable');
       }
       // WinApp completion can precede the last custom-chat KeyPress event by
@@ -669,8 +905,13 @@ export function createGuardedWinappSender({
       // This does not resend keys; the next phase rechecks the target first.
       if (phase === 1) await settle(500);
     }
-    return { submitted: true, sequenceCount: ACTION.length,
-      targetPid: input.pid, targetHwnd: input.hwnd, senderSessionId: sessionId, focusPerformed: input.allowInitialFocus === true,
+    return {
+      submitted: true,
+      sequenceCount: ACTION.length,
+      targetPid: input.pid,
+      targetHwnd: input.hwnd,
+      senderSessionId: sessionId,
+      focusPerformed: input.allowInitialFocus === true,
     };
   };
 }
@@ -699,12 +940,24 @@ async function main() {
       refuse('MODE_REQUIRED', 'Explicit --preflight-only, --focus-only or --execute-once required');
     }
     const observed = await inspectPhysicalRift(request);
-    console.log(JSON.stringify({ ok: true, readOnly: true, status: 'PREFLIGHT_ONLY',
-      target: observed, inputSubmitted: false }));
+    console.log(
+      JSON.stringify({
+        ok: true,
+        readOnly: true,
+        status: 'PREFLIGHT_ONLY',
+        target: observed,
+        inputSubmitted: false,
+      }),
+    );
   } catch (error) {
-    console.log(JSON.stringify({ ok: false,
-      code: error?.code ?? 'RIFT_OPERATION_FAILED', message: error?.message ?? 'Unknown failure',
-      inputSubmitted: liveAttemptStarted ? 'UNKNOWN_RECONCILE_INTENT' : false }));
+    console.log(
+      JSON.stringify({
+        ok: false,
+        code: error?.code ?? 'RIFT_OPERATION_FAILED',
+        message: error?.message ?? 'Unknown failure',
+        inputSubmitted: liveAttemptStarted ? 'UNKNOWN_RECONCILE_INTENT' : false,
+      }),
+    );
     process.exitCode = 1;
   }
 }

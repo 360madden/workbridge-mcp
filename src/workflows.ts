@@ -1,7 +1,7 @@
 import { mkdir, open, lstat } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { atomicWrite, digest, Serial } from './changes.js';
+import { atomicReplaceJournal, atomicWrite, digest, Serial } from './changes.js';
 import { BridgeError, errorDetails } from './core.js';
 import { fileHash, fingerprint } from './text.js';
 import { historyPage } from './history.js';
@@ -121,6 +121,7 @@ const jobId = (workflowId: string, step: number, attempt: number) =>
 /** Explicit advancement over existing patch/job owners; no detached scheduling or automatic retries. */
 export class Workflows {
   readonly serial = new Serial();
+  private readonly savedHashes = new WeakMap<RecordData, string>();
   constructor(
     private workspace: Workspace,
     private directory: string,
@@ -175,6 +176,7 @@ export class Workflows {
           'WORKFLOW_WORKSPACE_MISMATCH',
           'Workflow belongs to a different primary workspace root.',
         );
+      this.savedHashes.set(record, digest(bytes.subarray(0, length)));
       return record;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
@@ -207,7 +209,14 @@ export class Workflows {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || !exclusive) throw error;
     }
-    await atomicWrite(file, text, exclusive);
+    if (exclusive) await atomicWrite(file, text, true);
+    else {
+      const expected = this.savedHashes.get(record);
+      if (expected === undefined)
+        throw new BridgeError('JOURNAL_SAVE_CONFLICT', 'Workflow predecessor was not verified.');
+      await atomicReplaceJournal(file, text, expected, 128 * 1024);
+    }
+    this.savedHashes.set(record, digest(text));
   }
   private async target(project: string, file: string) {
     const target = await this.workspace.resolveForCreate(file);

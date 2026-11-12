@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "recordedUtc": "2026-11-09T05:19:24Z",
+  "userTimezone": "America/New_York",
+  "machine": "LEGION",
+  "repository": "C:\\work\\workbridge-mcp",
+  "status": "environment_fix_verified_release_blocked_state_publication",
+  "sourceMilestoneCommit": "4b200a1ee1f598267826d1025b3f881dee61d635",
+  "journalReplacementCheckpoint": {
+    "recordedUtc": "2026-11-09T06:53:00Z",
+    "commit": "d5faa5aefd1eb06e37fe3213e6a9280243469a78",
+    "guardedJournalSaveOnly": true,
+    "windowsNativeRenameRetryAttemptsMaximum": 10,
+    "newerRecordConflictCode": "JOURNAL_SAVE_CONFLICT",
+    "genericAtomicWriteUnchanged": true,
+    "windowsHandleReproductionPassed": true,
+    "specificEarlierLockHolder": "unproven",
+    "typescriptAndFormattingPassed": true,
+    "newDeterministicTests": {"passed": 4, "failed": 0},
+    "existingPatchSuiteLastAttempt": {"passed": 25, "failed": 0, "priorIntermittentFailures": 2},
+    "directWorkflowsAndRecovery": {"passed": 47, "failed": 1, "failedCause": "PATCH_BLOCKED/EPERM", "failingCaseIsolatedRetestPassed": true},
+    "cliHarness": "incomplete; synthetic workflow/settlement CLI verification not established",
+    "fullReleaseValidated": false,
+    "liveRuntimeUpdated": false,
+    "newLongValidationApproved": false,
+    "gitPushPerformed": false
+  },
+  "focusedContinuation": {
+    "recordedUtc": "2026-11-09T08:31:00Z",
+    "verifiedMachine": "LEGION",
+    "machineCheckJob": "legion-journal-phase2-hostname-20261109-01",
+    "activeOwnerPidUnchanged": 23232,
+    "traceCommit": "4e35da8c1bce272d9dee6c720c57d4f54dc77e97",
+    "isolatedBuildRoot": ".tools/journal-verify-20261109-01",
+    "missingCommandHostRestoredOnlyToIsolatedDist": true,
+    "commandHostSha256": "b9754c9fe95ac252b8b24bf2304c10a83a3e20b75456da73b0724a5a845b0147",
+    "correctedHarnessSmoke": {"passed": 1, "failed": 0},
+    "initialSerialCli": {"passed": 14, "failed": 2, "settlementPassed": 8, "workflowPassed": 6, "error": "PATCH_BLOCKED/EPERM"},
+    "failingTwoCasesIsolatedRetest": {"passed": 2, "failed": 0},
+    "nativeTraceSanity": {"passed": true, "code": "EPERM", "syscall": "rename", "leaf": "record.json"},
+    "tracedSerialCli": {"passed": 16, "failed": 0, "skipped": 0, "durationSeconds": 76.745},
+    "tracedDirectWorkflowsAndRecovery": {"passed": 48, "failed": 0, "skipped": 0, "durationSeconds": 16.724},
+    "postRepairIntermittentFailureDestination": "unproven",
+    "earlierLockHolder": "unproven",
+    "completeReleaseValidated": false,
+    "liveRuntimeUpdated": false,
+    "newLongValidationApproved": false,
+    "gitPushPerformed": false
+  },
+  "boundedValidationSourceCommit": "c7a87c1671085b3c909d2a8e72fbc65bf5d0e83a",
+  "toolingCheckpoint": "docs/LEGION-TOOLS-SETUP-2026-11-08.md",
+  "authorization": {
+    "longValidationTasksApproved": 1,
+    "longValidationTasksStarted": 1,
+    "longValidationTaskRemoved": true,
+    "anotherLongTaskApproved": false,
+    "workbridgeRestart": "conditional on every release gate passing and an all-client quiet window",
+    "riftRestart": false,
+    "windowsRestart": false,
+    "bridgeCommandLimitSeconds": 600
+  },
+  "activeOwner": {
+    "pid": 23232,
+    "instanceId": "dca381aa-a8f1-4eda-9777-e6d4732610f7",
+    "instanceStartedUtc": "2026-11-08T10:45:32.775Z",
+    "processStartedUtc": "2026-11-08T10:45:28.3687454Z",
+    "serverSha256": "18dc464cc84e07e21dcbe9a33c9fe1a4a3ddab2159ff2ca531e514e1dd143207",
+    "riftPid": 21140,
+    "riftStartedUtc": "2026-11-08T10:52:35.8105227Z",
+    "restarted": false
+  },
+  "fullValidation": {
+    "releaseId": "legion-desktop-runtime-20261108-serial-01",
+    "profile": "serial-files",
+    "fileConcurrency": 1,
+    "result": "failed",
+    "tests": 1151,
+    "passed": 1137,
+    "failed": 11,
+    "skipped": 3,
+    "cancelled": 0,
+    "suiteDurationSeconds": 914.8562891,
+    "wrapperDurationSeconds": 973.017,
+    "taskName": "Workbridge Validation legion-20261108-bounded01",
+    "taskPath": "\\",
+    "taskResult": 1,
+    "softLimitSeconds": 1140,
+    "hardLimitSeconds": 1200,
+    "passedGates": [
+      "install",
+      "desktop-prebuild",
+      "desktop-prestage"
+    ],
+    "failedGate": "tests",
+    "notRun": [
+      "startup",
+      "updater",
+      "format",
+      "generic",
+      "desktop-stage",
+      "acceptance",
+      "desktop-closure"
+    ],
+    "validatedReceiptPresent": false,
+    "cleanupJob": "legion-bounded-task-cleanup-20261108-01",
+    "cleanupObservedUtc": "2026-11-09T04:51:02.7476806Z",
+    "wrapperPid": 35932,
+    "childPid": 12608,
+    "wrapperAndChildGoneBeforeRemoval": true,
+    "completionSha256": "82b1cb3604b1f71e525804f1e8e6dc872f4bb5e964ae4ccbcfb99a13178ac689",
+    "testsLogSha256": "28a001fb47f66b02c28a91caac1b95d7dd4bd5e53f6a0940133dd3cae3b93934"
+  },
+  "environmentFix": {
+    "cause": "PS7 -> Node -> Windows PowerShell5.1 inherits incompatible PS7 modules; Get-FileHash unavailable, producing eight AUDIT_FAILED cases.",
+    "change": "Opt-in native launch-boundary module isolation with absolute Node and official npm CLI; exact finally restoration; absent DOTNET_ROOT restored with NullString.",
+    "sourceFiles": [
+      {
+        "path": "scripts/New-WorkbridgeRelease.ps1",
+        "sha256": "95df855c5deb0b3cbe65174a84fd57df101560558a3240eca1899971cfebc7a0"
+      },
+      {
+        "path": "test/release-builder-environment.test.mjs",
+        "sha256": "33f884b207668de97846b1029d1bf9598562f3617ab97a2dd245d633ebad439a"
+      }
+    ],
+    "focused": {
+      "jobId": "legion-modulepath-native-gate-focused-20261109-0522-01",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "realPrerequisitesAndUnchangedAudit": {
+      "jobId": "legion-modulepath-unchanged-audit-20261109-02",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "testDurationSeconds": 13.3663269,
+      "processValuesExactlyRestored": [
+        "Path",
+        "DOTNET_ROOT",
+        "PSModulePath"
+      ],
+      "logSha256": "6574e80ba48b4889bdfa584aeb1a03750658294cb85612003c766b5f9dbe4b31"
+    },
+    "registeredUserMachineEnvironmentUnchanged": true,
+    "registryVerificationJob": "legion-modulepath-registry-verify-20261109-01",
+    "formatDiffJob": "legion-modulepath-final-format-20261109-01",
+    "independentReview": "approved source checkpoint only",
+    "rejectedPrototypes": [
+      "one-time parent clear was repopulated during real prerequisites",
+      "local LASTEXITCODE shadow prevented native exit observation"
+    ]
+  },
+  "filesystemDiagnostic": {
+    "sourceCommit": "c7a87c1671085b3c909d2a8e72fbc65bf5d0e83a",
+    "jobId": "legion-three-fsdiag-once-20261109-01",
+    "executionCount": 1,
+    "outerStatus": "timed_out",
+    "timeoutSeconds": 300,
+    "testPhaseExitCode": 1,
+    "testPhaseDurationSeconds": 78.086,
+    "tests": 30,
+    "passed": 27,
+    "failed": 3,
+    "skipped": 0,
+    "fileResults": [
+      {
+        "file": "job-capacity.test.mjs",
+        "passed": 14,
+        "failed": 0
+      },
+      {
+        "file": "job-settlement-cli.test.mjs",
+        "passed": 5,
+        "failed": 3
+      },
+      {
+        "file": "workflow-cli.test.mjs",
+        "passed": 8,
+        "failed": 0
+      }
+    ],
+    "nativeErrors": {
+      "count": 5,
+      "operation": "rename",
+      "code": "EPERM",
+      "errno": -4048,
+      "prefix": "wb-settlement-cli-",
+      "targets": [
+        {
+          "path": "State/workflows/wf.json",
+          "count": 1
+        },
+        {
+          "path": "State/patches/patch/record.json",
+          "count": 4
+        }
+      ],
+      "lockHolder": "unproven",
+      "capacitySyntheticEioIncluded": false
+    },
+    "trace": {
+      "recordedProcessesWithExitSummary": 40,
+      "renameCalls": 298,
+      "openCalls": 1741,
+      "droppedErrors": 0,
+      "logWriteFailures": 0,
+      "observedTruncation": false,
+      "perPrefixCallCountsAvailable": false,
+      "completeDescendantCoverageProven": false
+    },
+    "selectedSourceHashesUnchanged": true,
+    "isolatedDistHashesUnchanged": true,
+    "ordinaryResultsReceiptPresent": false,
+    "postmortemRelativePath": "fsdiag-three-20261109-0003/results-postmortem.json",
+    "postmortemSha256": "d73d90d9167f06a67b671c8a5176a7da4474ef7eca27e993169ca321488c2e6d",
+    "testsLogSha256": "fd9bce47cbba7ae747d5415a697a923616547ad88700226f583abd3ef84939e2",
+    "settlement": {
+      "testNativeExitRecorded": true,
+      "pidBirthPairsRecorded": 0,
+      "wholeTreeIndependentlyVerified": false,
+      "rootScopedProcessMatches": 0,
+      "rootCheckJob": "legion-final-preservation-check-20261109-01",
+      "rootCheckUtc": "2026-11-09T05:16:35.0921537Z"
+    }
+  },
+  "priorEvidence": {
+    "directory": "C:\\work\\workbridge-diagnostics\\legion-desktop-20261108-2213",
+    "parallelResult": {
+      "tests": 1142,
+      "passed": 1128,
+      "failed": 11,
+      "skipped": 3,
+      "sha256": "529a08e9cbc179e7200fe7a5d18a0c707b1e5b366ea8f8233b0a2e1c64378b6f"
+    },
+    "isolatedEarlierTraceDidNotReproduce": true
+  },
+  "evidenceRoot": "C:\\work\\workbridge-diagnostics\\legion-validation-20261108-bounded01",
+  "sourceArchiveSha256": "96f1bc735607117042c75dabd6214a38eb89139f5fef8625a3e8453cee95a813",
+  "provenanceSha256": "e496f784237c7dd58dd4599adb79387e174047bfe35443ac0b281709e562fbb7",
+  "preservation": {
+    "unrelatedFiles": [
+      {
+        "path": "scripts/freebuff-conpty-probe.py",
+        "sha256": "c29fbfd898c5fe54e86e34403a79ef4d1107761f4828deed153be4be3de3c07f"
+      },
+      {
+        "path": "LEGION-COPY-MANIFEST.json",
+        "sha256": "1021d2ae132d80fd477278311e9985ac0a42b34de78e6a178cebf1903be93bf1"
+      }
+    ],
+    "originalLauncherRelativePath": "launcher-before/scripts/Start-BackgroundTunnel.ps1",
+    "originalLauncherArchiveSha256": "0f006dbe489dcdae6870b1aa8681a0015d86e8fef0b351b907a7082f2627f434",
+    "runtimeRollbackRestoresLauncher": false
+  },
+  "deployment": {
+    "applyInvoked": false,
+    "newValidatedRelease": false,
+    "restarted": false,
+    "liveAdmissionLockProven": false,
+    "allClientQuietWindowRequired": true,
+    "assertionsOrDeadlinesRelaxed": false,
+    "blanketRetriesAdded": false,
+    "aclsChanged": false,
+    "pushed": false
+  },
+  "priorities": [
+    "Diagnose/fix atomic state-record replacement using captured native errors without guessing lock holder or relaxing guarded writes.",
+    "After focused causal verification, request a new complete bounded validation from newly committed source; never reuse the failed candidate.",
+    "Only with every gate passed and a confirmed quiet window, perform WB-001 Workbridge-only update and fresh hosted LEGION/desktop acceptance."
+  ]
+}

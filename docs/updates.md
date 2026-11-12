@@ -10,6 +10,26 @@ From a trusted Workbridge source directory in PowerShell:
 .\scripts\New-WorkbridgeRelease.ps1 -ReleaseId 'next-release' -WorkspaceRoot 'C:\work'
 ```
 
+If developer tools were just installed but this shell or Workbridge owner predates the install, explicitly opt into a fresh registered tool environment:
+
+```powershell
+.\scripts\New-WorkbridgeRelease.ps1 -ReleaseId 'next-release-fresh-env' -WorkspaceRoot 'C:\work' -RefreshUserEnvironment
+```
+
+The switch refreshes the builder process's `PATH` and `DOTNET_ROOT` from registered machine/user values and checks required tool versions before creating a payload. Refreshed native release commands resolve their executable, arguments, and log path before temporarily removing inherited `PSModulePath` at the child-launch boundary; that variable is restored immediately afterward, including absent versus present-empty values. This prevents a Node/npm intermediary from passing PowerShell 7 modules to Windows PowerShell 5.1. A one-time removal before prerequisite checks is insufficient because PowerShell can reconstruct the variable during command discovery. See Microsoft's [PowerShell module-path guidance](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_psmodulepath?view=powershell-7.6).
+
+All changes are process-local, with original values restored on success or failure; no user/machine registry setting or running owner's environment is modified. Omit the switch to preserve a deliberate custom/virtual-environment shell. The dedicated background launcher refreshes `PATH` and `DOTNET_ROOT` at its next startup; the interactive `Start-Tunnel.ps1` launcher is unchanged. Launcher source edits are separate from WB-001 runtime rollback: retain their before-file hash and guarded patch/commit recovery until hosted acceptance passes.
+
+For a resource-constrained validation host, `-SerialTests` explicitly selects `npm run test:serial`: the same build and complete test-file glob, with `--test-concurrency=1`. Default `npm test` remains unchanged. This does not remove assertions, lengthen test deadlines, or disable concurrency inside individual tests. The successful receipt records `testProfile`; a serial pass does not explain or invalidate retained failures from a parallel run.
+
+```powershell
+.\scripts\New-WorkbridgeRelease.ps1 -ReleaseId 'next-release-serial' -WorkspaceRoot 'C:\work' -RefreshUserEnvironment -SerialTests
+```
+
+For an explicitly approved long validation, `scripts/Invoke-BoundedReleaseValidation.ps1` can supervise this builder from a fresh committed-source archive in a temporary Interactive/Limited Windows task. Keep the task on-demand with no triggers or retries, a 20-minute execution limit, and a unique name; never overwrite an existing task. The runner uses a shorter timeout and a private kill-on-close Job Object to contain descendants. It records source identity, bounded output and completion evidence outside the archive. This is validation only: it does not deploy, restart services, relax the bridge's 600-second command limit, or authorize a release with failed checks. Remove only the owned temporary task after independently confirming settlement; retain its evidence.
+
+These Windows mechanisms are documented by Microsoft: [Task Scheduler execution limits](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtasksettingsset) and [Job Object process-tree lifetime](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects).
+
 This copies the source into a new `.local\releases\next-release\payload`, runs `npm ci` from the pinned lockfile, builds and runs the integration tests, runs Windows startup and updater tests, checks formatting, runs self-contained disposable acceptance, and checks actual stdio MCP initialization, version, its expected tool catalog (33 tools at 0.4.0; 32 at 0.3.0 for rollback), and `workspace_info`. Building 0.4.0 also compiles the Windows command host using the built-in .NET Framework compiler. Commands write separate logs outside the payload. The tunnel API key is removed from the validation environment. No running service is stopped.
 
 Only a successful run creates `validated.json`, bound to the SHA256 manifest of every payload file. A failed check leaves its logs and produces no valid receipt. Use a new release ID to retry; existing release folders are never overwritten. Dependencies and validation scripts are trusted project code and can use the network and filesystem.
