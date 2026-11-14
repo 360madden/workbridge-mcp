@@ -36,6 +36,15 @@ There is still no purge mutation command. Next is a reviewed per-entry deletion
 ledger with partial-purge recovery, fresh retained-copy/reference checks and
 disposable Windows acceptance; actual deletion remains a separate reviewed action.
 
+The per-entry native purge mechanism and Node journal/provider checkpoint now
+passes 57 focused tests, including four disposable real-provider/native cases.
+It enforces seven full days, immutable approval bindings, fixed batch journals,
+identity checks and ordinary restore exclusion once purge starts. Production
+surviving-copy/reference proof, reviewed approval preparation and outer CLI
+integration are still open; synthetic fixture proof is not production acceptance.
+No real retained data has been purged. See the mechanism checkpoint in the
+[retention plan](storage-retention-plan.md).
+
 ## Current checkpoint — 2026-11-01
 
 **Current deployed and committed baseline: Workbridge 0.16.4-dev / 36 command-job slots / 36 coordinated-worker assignments.** The sealed release passed nine WB-001 gates and 1,037 tests (zero failures; three skips). The healthy hosted instance and its capacity were independently verified, and the source, scripts, tests and documentation were reconciled into selected-file Git commits on `main`. The previous 0.16.3-dev/six-slot architecture is retired from active use, while Git and release history are retained. See [36-slot release and adoption evidence](workbridge-36-capacity-20261101.md). Browser-session helpers and tests of 36 independent AI reasoning workers remain separate future work.

@@ -474,3 +474,69 @@ test('timestamped v2 phases support quarantine, status and restore', async (t) =
   assert.equal((await restore(f.restoreArgs, deps)).state, 'restored');
   assert.equal((await retentionStatus(f.statusArgs, deps)).state, 'restored');
 });
+
+test('purge control appearing at lease acquisition excludes ordinary restore and quarantine', async (t) => {
+  const f = await fixture(t);
+  await quarantine(f.request, f.deps);
+  const dir = path.dirname(f.destination);
+  const deps = {
+    ...f.deps,
+    withMaintenance: (ctx, callback) =>
+      f.deps.withMaintenance(ctx, async (guard) => {
+        // An interrupted purge could have won the same lock after restore's preflight.
+        await writeFile(path.join(dir, 'purging.json'), '{', { flag: 'wx' });
+        return callback(guard);
+      }),
+  };
+  await assert.rejects(restore(f.restoreArgs, deps), /PURGE_JOURNAL_PRESENT/);
+  await assert.rejects(quarantine(f.request, f.deps), /PURGE_JOURNAL_PRESENT/);
+  const snapshot = await retentionStatus(f.statusArgs, f.deps);
+  assert.equal(snapshot.state, 'purge-controlled');
+  assert.equal(snapshot.purgeJournal, 'purging-marker-present');
+  assert.equal(snapshot.purgeLedgerVerified, false);
+  assert.equal((await observed(f.source)).exists, false);
+  assert.equal((await observed(path.join(dir, 'restoring.json'))).exists, false);
+  assert.equal(await readFile(path.join(f.destination, 'sentinel'), 'utf8'), 'preserve the original bytes');
+
+  await writeFile(path.join(dir, 'purge-batch-00000.intent.json'), '{}');
+  assert.equal((await retentionStatus(f.statusArgs, f.deps)).purgeJournal, 'purge-batch-marker-present');
+  await writeFile(path.join(dir, 'purged.json'), '{}');
+  assert.equal((await retentionStatus(f.statusArgs, f.deps)).state, 'conflict');
+  await rename(f.destination, path.join(f.root, 'fixture-saved-payload'));
+  const terminal = await retentionStatus(f.statusArgs, f.deps);
+  assert.equal(terminal.state, 'purge-controlled');
+  assert.equal(terminal.purgeJournal, 'purged-marker-present');
+  assert.equal(terminal.purgeLedgerVerified, false);
+  await assert.rejects(restore(f.restoreArgs, f.deps), /PURGE_JOURNAL_PRESENT/);
+});
+
+test('orphan, wrong-type and unknown purge markers fail closed', async (t) => {
+  const f = await fixture(t);
+  await quarantine(f.request, f.deps);
+  const dir = path.dirname(f.destination);
+  for (const name of [
+    'purge-batch-00000.done.json',
+    'purged.json',
+    'purge-unrecognized.json',
+    'purging.json',
+  ]) {
+    const marker = path.join(dir, name);
+    if (name === 'purging.json') await mkdir(marker);
+    else await writeFile(marker, '{}');
+    const snapshot = await retentionStatus(f.statusArgs, f.deps);
+    assert.equal(snapshot.state, 'conflict');
+    assert.equal(snapshot.purgeJournal, 'conflicting-markers');
+    await assert.rejects(restore(f.restoreArgs, f.deps), /PURGE_JOURNAL_PRESENT/);
+    await rename(marker, path.join(f.root, name));
+  }
+});
+
+test('reviewed purge drafts alone still permit restore before destructive intent', async (t) => {
+  const f = await fixture(t);
+  await quarantine(f.request, f.deps);
+  const dir = path.dirname(f.destination);
+  for (const name of ['purge-manifest.json', 'purge-approval.json'])
+    await writeFile(path.join(dir, name), '{}');
+  assert.equal((await retentionStatus(f.statusArgs, f.deps)).state, 'quarantined');
+  assert.equal((await restore(f.restoreArgs, f.deps)).state, 'restored');
+});

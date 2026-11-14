@@ -436,3 +436,41 @@ entries must survive and cause conflict. Directory pins do not freeze child
 creation, as a disposable Windows probe demonstrated. No generic pathname-based
 recursive deletion or weaker whole-tree snapshot claim is an acceptable fallback.
 No real retained data was deleted and no disk space has been reclaimed.
+
+## Journaled purge mechanism checkpoint (production proof integration pending)
+
+The separate `Storage-RetentionPurge.ps1` helper, Node lease provider and journal
+core now implement bounded deletion against a reviewed immutable per-entry
+manifest. The native lease pins the operation parents, approval and manifest,
+checks original-source absence, requires a v2 quarantine receipt at least seven
+full days old, and refuses legacy, future or malformed times. Grace is checked
+again before each batch. Unknown purge-namespace records refuse execution.
+
+Deletion uses verified entry handles in reverse manifest order, at most 32
+entries per batch. Fixed-schema intent/done/final records are published without
+replacement under the same lease. Replay permits only the committed absent
+prefix and a contiguous absent prefix within the one recorded in-flight batch.
+New names, replaced identities, modified data, links, streams or unexpected
+absence stop the operation. The provider executes the exact SHA-256-verified
+helper bytes while holding its source open against write/delete sharing.
+
+The core requires fresh reference and retained-copy proof at entry, before each
+new intent, immediately before deletion and before final publication. V1 purge
+approval fingerprints must match exactly; unrelated update-history drift can
+therefore stop a partial run and needs explicit reconciliation. No implicit
+baseline replacement or relaxed reference comparison is implemented. Ordinary
+quarantine/restore refuses destructive purge markers under the shared lease;
+its status labels observed markers without claiming a verified final ledger.
+
+The focused checkpoint passed 57 tests on AMD-DESKTOP, including four real
+provider/native NTFS end-to-end cases. The partial-prefix case simulates an
+interruption; it is not a native-process kill during deletion or a power-loss
+test. Other fixtures exercise missing/future/recent timestamps, unknown markers,
+identity conflicts and recoverable journal boundaries.
+
+This is a pre-production mechanism. End-to-end fixtures supply synthetic safety
+proofs. The production surviving-copy verifier, reviewed approval preparation and
+outer purge CLI remain in progress. The ordinary CLI still exposes only
+read-only `purge-check`; do not invoke the native helper on retained data as a
+substitute for those missing gates. No real quarantine or purge, service update,
+or disk-space reclamation has occurred.

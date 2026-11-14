@@ -1,6 +1,7 @@
 import path from 'node:path';
 import os from 'node:os';
 import { createHash } from 'node:crypto';
+import { lstat, opendir } from 'node:fs/promises';
 import { loadBoundedJson } from './storage-retention-references.mjs';
 import { windowsMetadata } from './preview-storage-retention.mjs';
 
@@ -141,6 +142,36 @@ export function validPhaseUtc(value) {
   const millis = Date.parse(value);
   return Number.isFinite(millis) && new Date(millis).toISOString() === value;
 }
+// The purge engine owns record validation. This engine only needs to observe
+// when the operation has crossed from review into the destructive journal.
+async function observePurgeJournal(dir) {
+  const before = await lstat(dir, { bigint: true });
+  if (!before.isDirectory() || before.isSymbolicLink()) throw fail('UNSAFE_JOURNAL_DIRECTORY');
+  let count = 0;
+  let started = false;
+  let batch = false;
+  let final = false;
+  let unexpected = false;
+  for await (const entry of await opendir(dir)) {
+    if (++count > 2048) throw fail('JOURNAL_DIRECTORY_LIMIT');
+    if (!/^purg(?:e|ing)/i.test(entry.name)) continue;
+    if (!entry.isFile()) unexpected = true;
+    else if (entry.name === 'purging.json') started = true;
+    else if (entry.name === 'purged.json') final = true;
+    else if (/^purge-batch-\d{5}\.(intent|done)\.json$/.test(entry.name)) batch = true;
+    else if (!['purge-manifest.json', 'purge-approval.json'].includes(entry.name)) unexpected = true;
+  }
+  const after = await lstat(dir, { bigint: true });
+  if (before.dev !== after.dev || before.ino !== after.ino || before.ctimeNs !== after.ctimeNs)
+    throw fail('JOURNAL_DIRECTORY_CHANGED');
+  if (unexpected || (!started && (batch || final)) || (final && !batch)) return 'conflicting-markers';
+  if (final) return 'purged-marker-present';
+  if (batch) return 'purge-batch-marker-present';
+  return started ? 'purging-marker-present' : null;
+}
+function requireNoPurge(observed) {
+  if (observed) throw fail('PURGE_JOURNAL_PRESENT');
+}
 export async function loadRetentionJournal(installRoot, operationId) {
   if (typeof installRoot !== 'string' || !path.isAbsolute(installRoot) || !validId(operationId))
     throw fail('INVALID_ARGUMENTS');
@@ -181,12 +212,14 @@ export async function loadRetentionJournal(installRoot, operationId) {
     }
     if ((phases.restoring && !phases.quarantined) || (phases.restored && !phases.restoring))
       throw fail('INVALID_JOURNAL');
-    return { intent, ctx, phases, markers, bindings };
+    const purgeJournal = await observePurgeJournal(dir);
+    return { intent, ctx, phases, markers, bindings: { ...bindings, purgeJournal }, purgeJournal };
   } finally {
     metadata.close();
   }
 }
 async function publishPhase(guard, ctx, hash, name) {
+  requireNoPurge(await observePurgeJournal(ctx.operationDir));
   await guard.publishPhase({ phase: name, planSha256: hash });
   const journal = await loadRetentionJournal(ctx.installRoot, ctx.operationId);
   if (journal.intent.planSha256 !== hash || journal.phases[name] !== true) throw fail('INVALID_JOURNAL');
@@ -204,6 +237,26 @@ export function classifyRetentionJournal(journal, locations) {
     throw fail('LOCATION_PROOF_UNAVAILABLE');
   const sourceMatch = source.exists && sameId(source.identity, intent.plan.sourceIdentity);
   const destinationMatch = destination.exists && sameId(destination.identity, intent.plan.sourceIdentity);
+  if (journal.purgeJournal) {
+    const conflict =
+      journal.purgeJournal === 'conflicting-markers' ||
+      !phases.quarantined ||
+      phases.restoring ||
+      source.exists ||
+      (destination.exists && !destinationMatch) ||
+      (journal.purgeJournal === 'purging-marker-present' && !destination.exists) ||
+      (journal.purgeJournal === 'purged-marker-present' && destination.exists);
+    return {
+      operationId: intent.operationId,
+      planSha256: intent.planSha256,
+      state: conflict ? 'conflict' : 'purge-controlled',
+      purgeJournal: journal.purgeJournal,
+      purgeLedgerVerified: false,
+      pendingCommit: false,
+      source,
+      destination,
+    };
+  }
   let state = 'conflict',
     pendingCommit = false;
   if (sourceMatch && !destination.exists) {
@@ -265,6 +318,7 @@ export async function quarantine(
   return deps.withMaintenance(ctx, async (guard) => {
     await guardCheck(guard);
     let journal = await loadRetentionJournal(installRoot, operationId);
+    requireNoPurge(journal.purgeJournal);
     if (journal.intent.planSha256 !== hash || journal.phases.restoring) throw fail('OPERATION_CONFLICT');
     let state = classifyRetentionJournal(journal, await guard.inspect());
     if (state.state === 'conflict') throw fail('LOCATION_CONFLICT');
@@ -276,6 +330,7 @@ export async function quarantine(
       state = classifyRetentionJournal(journal, await guard.inspect());
       if (state.state !== 'prepared') throw fail('LOCATION_CONFLICT');
       await runFault(deps, 'after-intent-before-rename');
+      requireNoPurge(await observePurgeJournal(ctx.operationDir));
       await guard.moveNoReplace({ from: 'source', expectedIdentity: plan.sourceIdentity });
       await runFault(deps, 'after-rename-before-commit');
       state = classifyRetentionJournal(journal, await guard.inspect());
@@ -301,6 +356,7 @@ export async function restore(
   return deps.withMaintenance(prior.ctx, async (guard) => {
     await guardCheck(guard);
     let journal = await loadRetentionJournal(installRoot, operationId);
+    requireNoPurge(journal.purgeJournal);
     if (journal.intent.planSha256 !== expectedPlanSha256) throw fail('OPERATION_CONFLICT');
     let state = classifyRetentionJournal(journal, await guard.inspect());
     if (state.state === 'conflict' || state.state === 'prepared' || !journal.phases.quarantined)
@@ -328,6 +384,7 @@ export async function restore(
         if (state.state !== 'restoring' || !state.destination.exists) throw fail('LOCATION_CONFLICT');
       }
       await runFault(deps, 'after-restore-intent-before-rename');
+      requireNoPurge(await observePurgeJournal(prior.ctx.operationDir));
       await guard.moveNoReplace({
         from: 'destination',
         expectedIdentity: journal.intent.plan.sourceIdentity,
