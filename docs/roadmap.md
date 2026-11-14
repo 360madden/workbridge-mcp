@@ -13,6 +13,15 @@ nested inside `.local/wb001-gui-src-20261105c`, and durable job IDs prevent repe
 side effects; neither staging roots nor old job JSON may be deleted by age alone.
 No retained data has been removed or service changed in this workstream.
 
+The next read-only slice resolves 32 operation directories and the 30-generation
+installed marker chain, binds the active nested release seal, and compares a
+selected candidate/displaced runtime with retained manifest bytes. A bounded
+real comparison verified 5,730 files across a displaced runtime and its backup
+(148,056,112 bytes hashed; 74,028,056 duplicate logical bytes observed). Two
+missing journals keep overall reference closure incomplete and their operations
+protected. No result is mutation eligible. Next: journaled quarantine/restore
+with disposable acceptance, then a separately reviewed real maintenance action.
+
 ## Current checkpoint — 2026-11-01
 
 **Current deployed and committed baseline: Workbridge 0.16.4-dev / 36 command-job slots / 36 coordinated-worker assignments.** The sealed release passed nine WB-001 gates and 1,037 tests (zero failures; three skips). The healthy hosted instance and its capacity were independently verified, and the source, scripts, tests and documentation were reconciled into selected-file Git commits on `main`. The previous 0.16.3-dev/six-slot architecture is retired from active use, while Git and release history are retained. See [36-slot release and adoption evidence](workbridge-36-capacity-20261101.md). Browser-session helpers and tests of 36 independent AI reasoning workers remain separate future work.

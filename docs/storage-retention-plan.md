@@ -250,6 +250,60 @@ An actual ten-second CLI run exited `1`, reported `complete=false` and
 discovered 128 resource rows across categories, including all three staging
 roots and their nested release groups before sizing exhausted the budget.
 Those bytes are a partial lower bound, not the full census above. This verifies
-the bounded read-only behavior; reference closure, duplicate proof, quarantine,
-restore and purge are still upcoming work. No retained data was deleted and the
+the bounded read-only behavior. At that checkpoint, reference closure, duplicate
+proof, quarantine, restore and purge were still upcoming work. No retained data was deleted and the
 live service was unchanged.
+
+## Reference and duplicate preview
+
+`scripts/preview-runtime-retention.mjs` now connects the reference graph to
+bounded, current-content comparison of a selected completed operation:
+
+```powershell
+node scripts/preview-runtime-retention.mjs --install-root C:\work\workbridge-mcp
+node scripts/preview-runtime-retention.mjs --install-root C:\work\workbridge-mcp --operation artifact-verify-update-20261031-01 --kind displaced --max-scan-ms 60000
+```
+
+`--kind candidate` compares against the runtime subset of an internal sealed
+release, checking the named validation gates and manifest binding first.
+`--kind displaced` compares the operation's single GUID-named displaced tree
+against its preserved backup runtime and manifest. Multiple or unknown displaced
+layouts remain refused. Both actual trees must match every manifest file and
+contain no unexpected runtime entries. Both copies are streamed through SHA-256.
+The selected metadata is re-read afterward; changes invalidate the comparison.
+No request provides an arbitrary deletion path, and every result remains
+`mutationEligible:false`.
+
+The graph discovers 32 operation directories and traverses all 30 installed
+predecessor identities. At `cap12-activate-20261031-01`, the recorded previous
+runtime version differs from its predecessor marker version; this is reported
+as a caveat and does not certify exact-version rollback. Two missing journals
+leave the overall graph incomplete while preserving those entire operations.
+Independent hash evidence for another completed operation remains reportable.
+The active internal release seal binds the manifest bytes to the installed
+marker, request, journal and passed named validation gates. Its status is
+`manifest-bound` with `payloadVerified:false`; this is not a fresh runtime or
+whole-release acceptance check. Selected active metadata is re-read at the end.
+Exit `1` therefore can include a successful duplicate comparison alongside
+unresolved graph blockers. Inspect both fields; it never means deletion ready.
+
+An initial real comparison reached its 60-second budget without finishing and
+correctly withheld proof. A proof-local Windows metadata cache, keyed by full
+file identity and nanosecond timestamps, reduced repeated checks while retaining
+fresh stat/handle checks and hashing both trees. The bounded rerun verified
+5,730 files and 148,056,112 bytes across the two copies in 32.4 seconds. That
+establishes observed equality of a 74,028,056-byte displaced runtime and its
+preserved backup during that non-atomic scan. It does not qualify the operation
+for age-based retention or deletion. No disk space was reclaimed.
+
+After final ancestor-identity hardening, a separate candidate-to-sealed-release
+comparison verified 5,730 files and 148,058,650 bytes across both copies in
+30.0 seconds. The active seal was manifest-bound, the 30-operation lineage was
+complete and the same two missing journals kept the overall result incomplete.
+The combined preview/reference/duplicate suite passed **60 tests with one
+host-privilege skip**. The ancestor replacement regression uses an injected file
+identity change; Windows refused the attempted physical reparent fixture.
+
+The next implementation is journaled quarantine/restore of explicitly reviewed
+resource units, with fresh reference and identity checks under coordinated
+maintenance. Purge and job-output compaction remain later gates.

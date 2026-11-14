@@ -57,7 +57,7 @@ async function verifyDirectoryChain(dir, verifyAttributes = async () => {}) {
   }
 }
 
-function windowsMetadata() {
+export function windowsMetadata() {
   if (process.platform !== 'win32') return { check: async () => {}, close: () => {} };
   // Fixed executable and script; user paths go only through JSON stdin.
   const executable = path.join(
