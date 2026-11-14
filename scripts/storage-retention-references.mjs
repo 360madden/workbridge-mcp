@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { windowsMetadata as sharedWindowsMetadata } from './preview-storage-retention.mjs';
+import { classifyControllerPreflight } from './storage-retention-controller-preflight.mjs';
 
 export const referenceLimits = Object.freeze({
   maxOperations: 1000,
@@ -100,7 +101,7 @@ async function checkChain(chain, budget, metadata) {
 function binding(file, result) {
   return { path: file, sha256: result.sha256, identity: result.identity };
 }
-export async function loadBoundedJson(file, options = {}) {
+export async function loadBoundedBytes(file, options = {}) {
   const maxBytes = options.maxBytes ?? referenceLimits.maxJsonBytes;
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > referenceLimits.maxJsonBytes)
     throw fail('INVALID_REFERENCE_LIMIT');
@@ -148,16 +149,8 @@ export async function loadBoundedJson(file, options = {}) {
       stamp(after) !== stamp(current)
     )
       throw fail('REFERENCE_CHANGED');
-    let value;
-    try {
-      value = JSON.parse(
-        new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, count)).replace(/^\uFEFF/, ''),
-      );
-    } catch {
-      throw fail('INVALID_REFERENCE_JSON');
-    }
     return {
-      value,
+      bytes: bytes.subarray(0, count),
       sha256: createHash('sha256').update(bytes.subarray(0, count)).digest('hex').toUpperCase(),
       identity: Object.fromEntries(
         ['dev', 'ino', 'size', 'mtimeNs', 'ctimeNs', 'nlink'].map((key) => [key, String(opened[key])]),
@@ -167,6 +160,16 @@ export async function loadBoundedJson(file, options = {}) {
     await handle?.close();
     if (owned) metadata.close();
   }
+}
+export async function loadBoundedJson(file, options = {}) {
+  const { bytes, ...binding } = await loadBoundedBytes(file, options);
+  let value;
+  try {
+    value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/, ''));
+  } catch {
+    throw fail('INVALID_REFERENCE_JSON');
+  }
+  return { value, ...binding };
 }
 const validMarker = (v, sentinel = false) =>
   object(v) &&
@@ -200,6 +203,47 @@ export async function inspectRetentionReferences({ installRoot, limits = {} } = 
   };
   const read = async (file) =>
     loadBoundedJson(file, { installRoot, maxBytes: effective.maxJsonBytes, budget, metadata });
+  const historicalIo = (root) => ({
+    readFile: (relative) =>
+      loadBoundedBytes(path.join(root, relative), { installRoot, maxBytes: 131072, budget, metadata }),
+    async readDirectory(relative) {
+      const dir = path.join(root, relative);
+      const ancestors = await directoryChain(dir, budget, metadata);
+      const before = await lstat(dir, { bigint: true });
+      const entries = [];
+      const handle = await opendir(dir);
+      try {
+        for await (const entry of handle) {
+          budget.check();
+          if (entries.length >= 16) throw fail('PREFLIGHT_DIRECTORY_LIMIT');
+          entries.push({
+            name: entry.name,
+            type: entry.isSymbolicLink()
+              ? 'link'
+              : entry.isDirectory()
+                ? 'directory'
+                : entry.isFile()
+                  ? 'file'
+                  : 'other',
+          });
+        }
+      } finally {
+        await handle.close().catch(() => {});
+      }
+      entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      await checkChain(ancestors, budget, metadata);
+      const after = await lstat(dir, { bigint: true });
+      if (!after.isDirectory() || after.isSymbolicLink() || stamp(before) !== stamp(after))
+        throw fail('PREFLIGHT_DIRECTORY_CHANGED');
+      return {
+        identity: Object.fromEntries(
+          ['dev', 'ino', 'size', 'mtimeNs', 'ctimeNs', 'nlink'].map((k) => [k, String(after[k])]),
+        ),
+        entries,
+      };
+    },
+  });
+  const historical = [];
   const block = (code, operationId) => {
     result.complete = false;
     result.blockers.push({ code, ...(operationId ? { operationId } : {}) });
@@ -330,6 +374,7 @@ export async function inspectRetentionReferences({ installRoot, limits = {} } = 
               !journal.version ||
               typeof journal.previousVersion !== 'string' ||
               typeof journal.phase !== 'string' ||
+              journal.phase === 'controller_preflight_refused' ||
               !(journal.previousRelease === null || validMarker(journal.previousRelease, true))
             )
               throw fail('INVALID_OPERATION_JOURNAL');
@@ -357,7 +402,30 @@ export async function inspectRetentionReferences({ installRoot, limits = {} } = 
             if (journal.previousRelease && journal.previousVersion !== journal.previousRelease.version)
               op.caveats.push('previous-runtime-marker-version-diverged');
           } catch (error) {
-            opBlock(error.code || 'UNREADABLE_OPERATION_JOURNAL');
+            const journalFile = path.join(root, 'journal.json');
+            const missingJournal =
+              error.code === 'ENOENT' &&
+              typeof error.path === 'string' &&
+              normalize(error.path) === normalize(journalFile);
+            let evidence = null;
+            if (missingJournal && op.blockers.length === 0 && request?.action === 'Apply') {
+              try {
+                evidence = await classifyControllerPreflight(op.id, historicalIo(root));
+              } catch (e) {
+                if (['REFERENCE_TIME_LIMIT', 'REFERENCE_READ_LIMIT'].includes(e.code)) throw e;
+              }
+            }
+            const expectedRequest = evidence?.files?.['request.json'];
+            if (
+              evidence &&
+              expectedRequest?.sha256 === op.requestBinding?.sha256?.toLowerCase() &&
+              JSON.stringify(expectedRequest.identity) === JSON.stringify(op.requestBinding.identity)
+            ) {
+              op.phase = 'controller_preflight_refused';
+              op.preflightEvidence = evidence;
+              op.caveats.push('observed-invocation-only', 'earlier-history-unproven');
+              historical.push({ op, root, evidence });
+            } else opBlock(error.code || 'UNREADABLE_OPERATION_JOURNAL');
           }
           if (op.blockers.length === 0 && op.phase === 'completed')
             op.comparisonScopes = [...(op.release?.scope === 'internal' ? ['candidate'] : []), 'displaced'];
@@ -511,6 +579,17 @@ export async function inspectRetentionReferences({ installRoot, limits = {} } = 
       if (activeSeal) result.installed.sealBinding = activeSeal;
     } catch (error) {
       block(error.code || 'ACTIVE_METADATA_CHANGED');
+    }
+    // Catalog directory timestamps alone cannot detect edits inside an operation.
+    for (const item of historical) {
+      try {
+        const current = await classifyControllerPreflight(item.op.id, historicalIo(item.root));
+        if (JSON.stringify(current) !== JSON.stringify(item.evidence))
+          throw fail('PREFLIGHT_EVIDENCE_CHANGED');
+      } catch (error) {
+        item.op.blockers.push(error.code || 'PREFLIGHT_EVIDENCE_CHANGED');
+        block(error.code || 'PREFLIGHT_EVIDENCE_CHANGED', item.op.id);
+      }
     }
     result.operations.sort((a, b) => a.id.localeCompare(b.id));
   } catch (error) {

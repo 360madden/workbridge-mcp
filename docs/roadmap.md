@@ -43,8 +43,10 @@ It enforces seven full days, immutable approval bindings, fixed batch journals,
 identity checks and ordinary restore exclusion once purge starts. The subsequent
 production surviving-copy verifier and approval/outer CLI integration passed two
 actual NTFS fixtures using real plan/reference/native evidence. No real retained
-data has been purged. Next resolve historical missing-journal reference blockers,
-then prepare a concrete real-target review before any permanent cleanup. Job
+data has been purged. The two historical missing-journal blockers now have a
+reviewed, exact-evidence controller-refusal classification; a read-only scan
+closed the graph while retaining their protections and empty comparison scopes.
+Next prepare a concrete real-target review before any permanent cleanup. Job
 compaction and scheduling remain later. See the mechanism checkpoint in the
 [retention plan](storage-retention-plan.md).
 

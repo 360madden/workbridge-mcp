@@ -140,7 +140,13 @@ async function build(options, deps) {
       !Array.isArray(graph.operations) ||
       graph.operations.some(
         (operation) =>
-          !['completed', 'rolled_back', 'failed_rolled_back', 'preflight_failed'].includes(operation.phase),
+          ![
+            'completed',
+            'rolled_back',
+            'failed_rolled_back',
+            'preflight_failed',
+            'controller_preflight_refused',
+          ].includes(operation.phase),
       )
     )
       throw fail('UNRESOLVED_UPDATER_OPERATION');

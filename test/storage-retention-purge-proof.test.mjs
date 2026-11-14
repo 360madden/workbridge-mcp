@@ -143,6 +143,18 @@ for (const kind of ['candidate', 'displaced'])
     assert.match(proof.retainedProofSha256, /^[a-f0-9]{64}$/);
     assert.notEqual(proof.referencesSha256, f.ctx.plan.referencesSha256);
   });
+
+test('an observed controller refusal is terminal only for unrelated operations', async () => {
+  const f = fixture();
+  f.graph.operations.push({
+    id: 'refused-other',
+    phase: 'controller_preflight_refused',
+    comparisonScopes: [],
+  });
+  assert.match((await createPurgeSafetyProof(f.ctx, f.binding, f.deps)).referencesSha256, /^[a-f0-9]{64}$/);
+  f.graph.operations.find((op) => op.id === 'old').phase = 'controller_preflight_refused';
+  await assert.rejects(createPurgeSafetyProof(f.ctx, f.binding, f.deps), /OPERATION_NOT_COMPARABLE/);
+});
 test('rejects even a missing previously deleted file in original manifest projection', async () => {
   const f = fixture();
   f.binding.manifest.entries = f.binding.manifest.entries.filter((e) => e.path !== 'dist/a');

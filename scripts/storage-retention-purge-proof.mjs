@@ -79,7 +79,14 @@ function eligibleGraph(graph, ctx) {
     !samePath(graph.installRoot, plan.installRoot) ||
     !Array.isArray(graph.operations) ||
     graph.operations.some(
-      (o) => !['completed', 'rolled_back', 'failed_rolled_back', 'preflight_failed'].includes(o.phase),
+      (o) =>
+        ![
+          'completed',
+          'rolled_back',
+          'failed_rolled_back',
+          'preflight_failed',
+          'controller_preflight_refused',
+        ].includes(o.phase),
     ) ||
     !graph.installed?.operationId ||
     graph.installed.sealBinding?.status !== 'manifest-bound' ||

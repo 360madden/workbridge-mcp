@@ -354,11 +354,25 @@ test('any unresolved updater operation blocks planning before selected hashing; 
     assert.equal((await createRetentionPlan(f.options, f.deps)).code, 'UNRESOLVED_UPDATER_OPERATION');
     assert.deepEqual(calls, [{ installRoot: f.root }]);
   }
-  for (const phase of ['completed', 'rolled_back', 'failed_rolled_back', 'preflight_failed']) {
+  for (const phase of [
+    'completed',
+    'rolled_back',
+    'failed_rolled_back',
+    'preflight_failed',
+    'controller_preflight_refused',
+  ]) {
     const f = fixture();
     f.preview.references.operations.push({ id: 'other', phase });
     assert.equal((await createRetentionPlan(f.options, f.deps)).schema, 'workbridge-retention-plan/1');
   }
+});
+
+test('observed controller refusal cannot itself be selected for retention', async () => {
+  const f = fixture();
+  const op = f.preview.references.operations.find((row) => row.id === 'old');
+  op.phase = 'controller_preflight_refused';
+  op.comparisonScopes = [];
+  assert.equal((await createRetentionPlan(f.options, f.deps)).code, 'OPERATION_NOT_COMPARABLE');
 });
 
 test('a typed node-executable reference inside a selected copy blocks planning', async () => {

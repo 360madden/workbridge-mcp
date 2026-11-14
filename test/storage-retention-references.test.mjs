@@ -103,6 +103,15 @@ test('unknown journal retains operation and safely keyed internal release refere
   assert.ok(graph.protectedPaths.includes(graph.operations[0].release.path));
   assert.deepEqual(graph.operations[0].comparisonScopes, []);
 });
+test('a normal journal cannot impersonate the reserved controller preflight disposition', async (t) => {
+  const f = await fixture(t);
+  await f.operation('old', null, { journal: { phase: 'controller_preflight_refused' } });
+  await f.save('.local/installed-release.json', f.marker('old'));
+  const graph = await inspectRetentionReferences({ installRoot: f.root });
+  assert.equal(graph.complete, false);
+  assert.ok(graph.blockers.some((row) => row.code === 'INVALID_OPERATION_JOURNAL'));
+  assert.notEqual(graph.operations[0].phase, 'controller_preflight_refused');
+});
 test('external release is recorded without traversal and only displaced comparison remains', async (t) => {
   const f = await fixture(t);
   const external = path.join(path.dirname(f.root), 'never-follow-this-release');

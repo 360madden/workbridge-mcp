@@ -509,5 +509,27 @@ copies. These fixtures deliberately created old v2 receipts and moved generated
 temporary payloads; there is no production clock override. Focused proof/core
 checks also passed. Neither source tests nor a successful fixture authorize real
 deletion. Actual maintenance still requires a reviewed target and explicit
-confirmation. The live graph's historical missing-journal blockers remain to be
-resolved; job compaction and scheduling are later work.
+confirmation. The two historical missing-journal cases are handled by the narrow
+evidence classification below; job compaction and scheduling are later work.
+
+## Historical controller refusals
+
+The reference scanner recognizes exactly two reviewed AMD-DESKTOP invocations:
+`agent12-activate-20261031-01` and `gui006-activate-20261026-01`. Their retained
+controllers reported an initial health-probe failure before invoking deployment.
+A versioned catalog binds the exact request, error, probe, controller and service
+task bytes, expected directory contents and fresh filesystem identities. The
+scanner checks those contents again after reading the evidence. Changed, linked,
+missing or additional evidence keeps the graph incomplete.
+
+The resulting `controller_preflight_refused` disposition describes the observed
+invocation only; earlier history remains unproven. No journal is synthesized.
+These operations have null journal bindings and no comparison scope, and their
+operation, release and executable references remain protected. Ordinary journals
+cannot claim this reserved disposition. An installed or predecessor edge that
+requires either absent journal still refuses closure.
+
+The classifier/reference suite passed 24 tests, and a fresh read-only scan
+reported a complete reference graph and installed chain with both operations'
+protections retained. This permits evaluating unrelated old candidate/displaced
+copies; it does not authorize moving or deleting either historical operation.
