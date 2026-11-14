@@ -468,9 +468,46 @@ interruption; it is not a native-process kill during deletion or a power-loss
 test. Other fixtures exercise missing/future/recent timestamps, unknown markers,
 identity conflicts and recoverable journal boundaries.
 
-This is a pre-production mechanism. End-to-end fixtures supply synthetic safety
-proofs. The production surviving-copy verifier, reviewed approval preparation and
-outer purge CLI remain in progress. The ordinary CLI still exposes only
-read-only `purge-check`; do not invoke the native helper on retained data as a
-substitute for those missing gates. No real quarantine or purge, service update,
-or disk-space reclamation has occurred.
+The mechanism checkpoint above used synthetic safety proofs. The subsequent
+production-proof and CLI integration is recorded below. No real quarantine or
+purge, service update, or disk-space reclamation has occurred.
+
+## Reviewed preparation and production proof CLI
+
+`purge-prepare` now takes a single maintenance lease, inventories the complete
+quarantine, verifies the entire original surviving copy and current closed
+reference graph, then publishes a fixed manifest followed by its approval draft.
+The helper independently reconstructs canonical bytes and confirms the reviewed
+hashes before no-replace publication. Identical preparation can be retried;
+manifest-only publication can resume, and mismatched or approval-only states
+refuse. Preparation does not delete or move the payload, and restore remains
+available until a destructive purge marker is published.
+
+```powershell
+node scripts/storage-retention.mjs purge-prepare --install-root C:\work\workbridge-mcp --operation-id GC_OPERATION --maintenance-confirmed
+```
+
+Review the returned operation, exact digests, entry count, logical bytes and
+proof before invoking the separate permanent deletion command:
+
+```powershell
+node scripts/storage-retention.mjs purge --install-root C:\work\workbridge-mcp --operation-id GC_OPERATION --expect-purge-sha256 REVIEWED_LOWERCASE_DIGEST --confirm-permanently-delete GC_OPERATION --maintenance-confirmed
+```
+
+The full surviving-copy proof uses the original immutable file inventory and
+updater manifest even after entries have disappeared from the quarantine. It
+reuses the existing duplicate verifier's file/metadata checks and fingerprint
+calculation, with a single surviving tree. The native core receives a clone of
+the validated original inventory and revalidates production proof before further
+deletion and final publication. It never substitutes a different surviving copy
+or silently accepts changed approval fingerprints.
+
+Two actual NTFS outer-operation fixtures passed using real retention plans,
+reference graphs, native inventories and surviving-copy verification: candidate
+interruption/recovery and displaced-copy purge. Both retained their surviving
+copies. These fixtures deliberately created old v2 receipts and moved generated
+temporary payloads; there is no production clock override. Focused proof/core
+checks also passed. Neither source tests nor a successful fixture authorize real
+deletion. Actual maintenance still requires a reviewed target and explicit
+confirmation. The live graph's historical missing-journal blockers remain to be
+resolved; job compaction and scheduling are later work.

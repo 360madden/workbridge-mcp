@@ -32,17 +32,20 @@ Purge prerequisites now include timestamped v2 phase receipts, legacy restore
 compatibility, a seven-day read-only `purge-check`, and a bounded native inventory
 that refuses named streams (including directory streams), links and unsupported
 attributes. The adapter validates the root identity and canonicalizes entries.
-There is still no purge mutation command. Next is a reviewed per-entry deletion
-ledger with partial-purge recovery, fresh retained-copy/reference checks and
-disposable Windows acceptance; actual deletion remains a separate reviewed action.
+The CLI now has review-only `purge-prepare` and separately digest/operation-
+confirmed `purge`, with a per-entry deletion ledger, partial-purge recovery,
+fresh surviving-copy/reference checks and disposable Windows acceptance. Actual
+deletion remains a separate reviewed action.
 
 The per-entry native purge mechanism and Node journal/provider checkpoint now
 passes 57 focused tests, including four disposable real-provider/native cases.
 It enforces seven full days, immutable approval bindings, fixed batch journals,
-identity checks and ordinary restore exclusion once purge starts. Production
-surviving-copy/reference proof, reviewed approval preparation and outer CLI
-integration are still open; synthetic fixture proof is not production acceptance.
-No real retained data has been purged. See the mechanism checkpoint in the
+identity checks and ordinary restore exclusion once purge starts. The subsequent
+production surviving-copy verifier and approval/outer CLI integration passed two
+actual NTFS fixtures using real plan/reference/native evidence. No real retained
+data has been purged. Next resolve historical missing-journal reference blockers,
+then prepare a concrete real-target review before any permanent cleanup. Job
+compaction and scheduling remain later. See the mechanism checkpoint in the
 [retention plan](storage-retention-plan.md).
 
 ## Current checkpoint — 2026-11-01

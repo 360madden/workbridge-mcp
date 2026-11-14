@@ -74,6 +74,28 @@ test('inspect works without confirmation and lease passes native affirmation', a
   assert.equal(fake.calls[1].includes('-MaintenanceConfirmed'), true);
 });
 
+test('purge preparation is explicitly confirmed and exposes only bounded preparation capabilities', async () => {
+  const fake = fakeSpawn();
+  const adapter = createMaintenanceAdapter({
+    maintenanceConfirmed: true,
+    testDependencies: testDeps(fake.launch),
+  });
+  await assert.rejects(
+    adapter.withPurgePreparation(ctx, async () => {}),
+    { code: 'MAINTENANCE_REQUIRED' },
+  );
+  assert.equal(fake.calls.length, 0);
+  await adapter.withPurgePreparation({ ...ctx, maintenanceConfirmed: true }, async (guard) => {
+    assert.deepEqual(Object.keys(guard).sort(), ['inspectInventory', 'publishPurgePreparation']);
+    await assert.rejects(guard.publishPurgePreparation({ planSha256: 'a'.repeat(64) }), {
+      code: 'INVALID_PREPARATION_PROOF',
+    });
+  });
+  assert.ok(fake.calls[0].includes('Prepare'));
+  assert.ok(fake.calls[0].includes('-MaintenanceConfirmed'));
+  assert.ok(fake.calls[0].includes('300'));
+});
+
 test('helper that will not exit even after kill refuses cleanup', async () => {
   const fake = fakeSpawn({ stuck: true });
   const adapter = createMaintenanceAdapter({

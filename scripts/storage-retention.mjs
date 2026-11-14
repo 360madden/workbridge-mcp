@@ -1,6 +1,7 @@
 import path from 'node:path';
-import { open } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
+import { open, readFile, stat } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { loadBoundedJson } from './storage-retention-references.mjs';
 import {
   createRetentionPlan,
@@ -12,9 +13,14 @@ import {
   quarantine,
   retentionStatus,
   restore,
+  loadRetentionJournal,
 } from './storage-retention-quarantine.mjs';
 import { createMaintenanceAdapter } from './storage-retention-maintenance.mjs';
 import { inspectPurgeGrace } from './storage-retention-purge.mjs';
+import { preparePurge } from './storage-retention-purge-prepare.mjs';
+import { runPurge } from './storage-retention-purge-journal.mjs';
+import { createPurgeProvider } from './storage-retention-purge-provider.mjs';
+import { createPurgeSafetyProof } from './storage-retention-purge-proof.mjs';
 
 const fail = (code) => Object.assign(new Error(code), { code });
 const identifier = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -26,6 +32,14 @@ export function parseArgs(args) {
     quarantine: ['--plan', '--expect-plan-sha256', '--operation-id', '--maintenance-confirmed'],
     status: ['--install-root', '--operation-id'],
     'purge-check': ['--install-root', '--operation-id'],
+    'purge-prepare': ['--install-root', '--operation-id', '--maintenance-confirmed'],
+    purge: [
+      '--install-root',
+      '--operation-id',
+      '--expect-purge-sha256',
+      '--confirm-permanently-delete',
+      '--maintenance-confirmed',
+    ],
     restore: ['--install-root', '--operation-id', '--expect-plan-sha256', '--maintenance-confirmed'],
   };
   if (!Object.hasOwn(allowed, action)) throw fail('INVALID_ACTION');
@@ -48,6 +62,10 @@ export function parseArgs(args) {
   if (result['--kind'] && !['candidate', 'displaced'].includes(result['--kind'])) throw fail('INVALID_KIND');
   if (result['--expect-plan-sha256'] && !/^[a-f0-9]{64}$/.test(result['--expect-plan-sha256']))
     throw fail('INVALID_PLAN_HASH');
+  if (result['--expect-purge-sha256'] && !/^[a-f0-9]{64}$/.test(result['--expect-purge-sha256']))
+    throw fail('INVALID_PURGE_HASH');
+  if (action === 'purge' && result['--confirm-permanently-delete'] !== result['--operation-id'])
+    throw fail('PURGE_CONFIRMATION_REQUIRED');
   return result;
 }
 
@@ -60,6 +78,53 @@ export async function runRetention(options) {
     verifyPayload: (plan, location) => verifyRetentionPayload(plan, location),
   });
   const root = options['--install-root'] ? path.resolve(options['--install-root']) : null;
+  if (options.action === 'purge-prepare')
+    return preparePurge(
+      {
+        installRoot: root,
+        operationId: options['--operation-id'],
+        maintenanceConfirmed: options['--maintenance-confirmed'] === true,
+      },
+      adapter,
+    );
+  if (options.action === 'purge') {
+    if (
+      options['--maintenance-confirmed'] !== true ||
+      options['--confirm-permanently-delete'] !== options['--operation-id']
+    )
+      throw fail('PURGE_CONFIRMATION_REQUIRED');
+    const journal = await loadRetentionJournal(root, options['--operation-id']);
+    const approval = await loadBoundedJson(path.join(journal.ctx.operationDir, 'purge-approval.json'), {
+      installRoot: root,
+      maxBytes: 65536,
+    });
+    if (
+      approval.sha256.toLowerCase() !== options['--expect-purge-sha256'] ||
+      !/^[a-f0-9]{64}$/.test(approval.value.manifestSha256 ?? '')
+    )
+      throw fail('PURGE_APPROVAL_MISMATCH');
+    const helperPath = fileURLToPath(new URL('./Storage-RetentionPurge.ps1', import.meta.url));
+    const helperStat = await stat(helperPath);
+    if (!helperStat.isFile() || helperStat.size < 1 || helperStat.size > 1024 * 1024)
+      throw fail('PURGE_HELPER_SIZE');
+    const expectedHelperSha256 = createHash('sha256')
+      .update(await readFile(helperPath))
+      .digest('hex');
+    const provider = createPurgeProvider({ revalidateSafety: createPurgeSafetyProof });
+    return runPurge(
+      {
+        ...journal.ctx,
+        planSha256: journal.intent.planSha256,
+        quarantineReceiptSha256: journal.bindings.quarantined?.sha256?.toLowerCase(),
+        maintenanceConfirmed: true,
+        confirmPermanentlyDelete: options['--confirm-permanently-delete'],
+        expectedPurgeSha256: options['--expect-purge-sha256'],
+        expectedManifestSha256: approval.value.manifestSha256,
+        expectedHelperSha256,
+      },
+      provider,
+    );
+  }
   if (options.action === 'plan') {
     const plan = await createRetentionPlan(
       { installRoot: root, updaterOperationId: options['--updater-operation'], kind: options['--kind'] },
@@ -120,7 +185,7 @@ export async function runRetention(options) {
 async function main(args) {
   if (args.length === 1 && args[0] === '--help') {
     process.stdout.write(
-      'Workbridge retention (no purge mutation):\n  plan --install-root PATH --updater-operation ID --kind candidate|displaced [--output ABSOLUTE_FILE]\n  quarantine --plan ABSOLUTE_FILE --expect-plan-sha256 SHA --operation-id GCID --maintenance-confirmed\n  status --install-root PATH --operation-id GCID\n  restore --install-root PATH --operation-id GCID --expect-plan-sha256 SHA --maintenance-confirmed\n  purge-check --install-root PATH --operation-id GCID\nPurge-check is read-only grace/location evidence, not deletion authority.\nMaintenance confirmation attests coordinated quiet clients/builders; the updater lock alone is insufficient.\nExit: 0 planned/settled/check passed, 1 refused/conflict/check incomplete, 2 invalid arguments. Quarantine reclaims zero bytes.\n',
+      'Workbridge retention:\n  plan --install-root PATH --updater-operation ID --kind candidate|displaced [--output ABSOLUTE_FILE]\n  quarantine --plan ABSOLUTE_FILE --expect-plan-sha256 SHA --operation-id GCID --maintenance-confirmed\n  status --install-root PATH --operation-id GCID\n  restore --install-root PATH --operation-id GCID --expect-plan-sha256 SHA --maintenance-confirmed\n  purge-check --install-root PATH --operation-id GCID\n  purge-prepare --install-root PATH --operation-id GCID --maintenance-confirmed\n  purge --install-root PATH --operation-id GCID --expect-purge-sha256 SHA --confirm-permanently-delete GCID --maintenance-confirmed\nPurge-check is read-only grace/location evidence. Purge-prepare publishes review records without deleting payload. Purge permanently deletes only the reviewed quarantined payload.\nMaintenance confirmation attests coordinated quiet clients/builders; the updater lock alone is insufficient.\nExit: 0 planned/settled/check passed, 1 refused/conflict/check incomplete, 2 invalid arguments. Quarantine reclaims zero bytes.\n',
     );
     return 0;
   }

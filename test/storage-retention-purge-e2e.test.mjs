@@ -11,6 +11,7 @@ import { canonicalPlanSha256 } from '../scripts/storage-retention-quarantine.mjs
 import { normalizePurgeInventory } from '../scripts/storage-retention-purge-inventory.mjs';
 import { canonicalPurgeJson, runPurge } from '../scripts/storage-retention-purge-journal.mjs';
 import { createPurgeProvider } from '../scripts/storage-retention-purge-provider.mjs';
+import { createMaintenanceAdapter } from '../scripts/storage-retention-maintenance.mjs';
 
 const exec = promisify(execFile);
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -251,5 +252,115 @@ test(
     await assert.rejects(runPurge(f.ctx, simulatedCrash), /SIMULATED_PARTIAL_BATCH/);
     assert.equal((await runPurge(f.ctx, f.provider)).status, 'purged');
     await assert.rejects(lstat(f.payload), { code: 'ENOENT' });
+  },
+);
+
+test(
+  'native preparation publishes reviewed bytes, resumes matching partial records and refuses conflicts',
+  { skip: process.platform !== 'win32', timeout: 120000 },
+  async (t) => {
+    const f = await fixture(t, 2);
+    const manifestFile = path.join(f.operationDir, 'purge-manifest.json');
+    const approvalFile = path.join(f.operationDir, 'purge-approval.json');
+    const manifestValue = JSON.parse(await readFile(manifestFile, 'utf8'));
+    manifestValue.expectedRoot = f.ctx.plan.sourceIdentity;
+    const manifestBytes = record(manifestValue);
+    const manifestSha256 = hash(manifestBytes);
+    const approvalValue = JSON.parse(await readFile(approvalFile, 'utf8'));
+    approvalValue.manifestSha256 = manifestSha256;
+    const approvalBytes = record(approvalValue);
+    const proof = {
+      planSha256: f.ctx.planSha256,
+      quarantineReceiptSha256: f.ctx.quarantineReceiptSha256,
+      manifestSha256,
+      referencesSha256: approvalValue.referencesSha256,
+      retainedProofSha256: approvalValue.retainedProofSha256,
+      expectedPurgeSha256: hash(approvalBytes),
+    };
+    await unlink(manifestFile);
+    await unlink(approvalFile);
+    const adapter = createMaintenanceAdapter({ maintenanceConfirmed: true });
+    await adapter.withPurgePreparation(f.ctx, async (guard) => {
+      const inventory = await guard.inspectInventory();
+      assert.equal(inventory.entries.length, f.count);
+      await assert.rejects(guard.publishPurgePreparation({ ...proof, planSha256: '0'.repeat(64) }), {
+        code: 'PREPARATION_PLAN_MISMATCH',
+      });
+      await assert.rejects(
+        guard.publishPurgePreparation({ ...proof, quarantineReceiptSha256: '0'.repeat(64) }),
+        {
+          code: 'PREPARATION_RECEIPT_MISMATCH',
+        },
+      );
+      await assert.rejects(guard.publishPurgePreparation({ ...proof, manifestSha256: '0'.repeat(64) }), {
+        code: 'PREPARATION_INVENTORY_CHANGED',
+      });
+      await assert.rejects(guard.publishPurgePreparation({ ...proof, expectedPurgeSha256: '0'.repeat(64) }), {
+        code: 'PREPARATION_APPROVAL_MISMATCH',
+      });
+      const prepared = await guard.publishPurgePreparation(proof);
+      assert.equal(prepared.status, 'ok');
+      assert.equal(prepared.alreadyPrepared, false);
+      assert.equal((await guard.publishPurgePreparation(proof)).alreadyPrepared, true);
+    });
+    assert.deepEqual(await readFile(manifestFile), manifestBytes);
+    assert.deepEqual(await readFile(approvalFile), approvalBytes);
+    await unlink(approvalFile);
+    await adapter.withPurgePreparation(f.ctx, async (guard) => {
+      assert.equal((await guard.publishPurgePreparation(proof)).alreadyPrepared, false);
+    });
+    assert.deepEqual(await readFile(approvalFile), approvalBytes);
+    await writeFile(manifestFile, 'conflict');
+    await assert.rejects(
+      adapter.withPurgePreparation(f.ctx, (guard) => guard.publishPurgePreparation(proof)),
+      { code: 'PREPARATION_RECORD_CONFLICT' },
+    );
+    assert.equal(await readFile(manifestFile, 'utf8'), 'conflict');
+    await unlink(manifestFile);
+    await assert.rejects(
+      adapter.withPurgePreparation(f.ctx, (guard) => guard.publishPurgePreparation(proof)),
+      { code: 'PREPARATION_APPROVAL_WITHOUT_MANIFEST' },
+    );
+    assert.deepEqual(await readFile(approvalFile), approvalBytes);
+    await writeFile(manifestFile, manifestBytes);
+    await writeFile(path.join(f.operationDir, 'purging.json'), '{}');
+    await assert.rejects(
+      adapter.withPurgePreparation(f.ctx, (guard) => guard.publishPurgePreparation(proof)),
+      { code: 'PURGE_PREPARATION_CONFLICT' },
+    );
+    assert.equal((await lstat(f.payload)).isDirectory(), true);
+  },
+);
+
+test(
+  'native preparation refuses recent and legacy receipts without publishing',
+  { skip: process.platform !== 'win32', timeout: 120000 },
+  async (t) => {
+    for (const scenario of [
+      { publishedAtUtc: new Date(Date.now() - 60000).toISOString(), reason: 'QUARANTINE_GRACE_NOT_ELAPSED' },
+      { receiptSchema: 'workbridge-retention-phase/1', reason: 'INVALID_PREPARATION_FIELDS' },
+    ]) {
+      const f = await fixture(t, 1, scenario);
+      const manifestFile = path.join(f.operationDir, 'purge-manifest.json');
+      const approvalFile = path.join(f.operationDir, 'purge-approval.json');
+      await unlink(manifestFile);
+      await unlink(approvalFile);
+      const proof = {
+        planSha256: f.ctx.planSha256,
+        quarantineReceiptSha256: f.ctx.quarantineReceiptSha256,
+        manifestSha256: 'a'.repeat(64),
+        referencesSha256: 'b'.repeat(64),
+        retainedProofSha256: 'c'.repeat(64),
+        expectedPurgeSha256: 'd'.repeat(64),
+      };
+      const adapter = createMaintenanceAdapter({ maintenanceConfirmed: true });
+      await assert.rejects(
+        adapter.withPurgePreparation(f.ctx, (guard) => guard.publishPurgePreparation(proof)),
+        { code: scenario.reason },
+      );
+      await assert.rejects(lstat(manifestFile), { code: 'ENOENT' });
+      await assert.rejects(lstat(approvalFile), { code: 'ENOENT' });
+      assert.equal((await lstat(f.payload)).isDirectory(), true);
+    }
   },
 );

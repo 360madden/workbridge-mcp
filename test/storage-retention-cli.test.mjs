@@ -8,6 +8,37 @@ import { parseArgs, runRetention } from '../scripts/storage-retention.mjs';
 import { createMaintenanceAdapter } from '../scripts/storage-retention-maintenance.mjs';
 
 const hash = (text) => createHash('sha256').update(text).digest('hex').toUpperCase();
+test('purge CLI requires matching explicit operation confirmation and reviewed digest', () => {
+  const args = [
+    'purge',
+    '--install-root',
+    os.tmpdir(),
+    '--operation-id',
+    'gc1',
+    '--expect-purge-sha256',
+    'a'.repeat(64),
+    '--confirm-permanently-delete',
+    'gc1',
+    '--maintenance-confirmed',
+  ];
+  assert.equal(parseArgs(args).action, 'purge');
+  assert.throws(() => parseArgs(args.slice(0, -1)), { code: 'MISSING_ARGUMENT' });
+  const changed = [...args];
+  changed[changed.indexOf('--confirm-permanently-delete') + 1] = 'gc2';
+  assert.throws(() => parseArgs(changed), { code: 'PURGE_CONFIRMATION_REQUIRED' });
+  assert.throws(() => parseArgs([...args, '--payload', os.tmpdir()]), { code: 'INVALID_ARGUMENTS' });
+  assert.equal(
+    parseArgs([
+      'purge-prepare',
+      '--install-root',
+      os.tmpdir(),
+      '--operation-id',
+      'gc1',
+      '--maintenance-confirmed',
+    ]).action,
+    'purge-prepare',
+  );
+});
 test('CLI refuses missing maintenance, mutation aliases, and unbounded source paths', () => {
   assert.throws(() => parseArgs(['purge', '--install-root', os.tmpdir()]));
   assert.throws(() =>

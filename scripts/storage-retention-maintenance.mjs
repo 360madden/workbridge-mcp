@@ -124,16 +124,16 @@ async function startHelper(ctx, mode, testDependencies = {}) {
     '-Kind',
     ctx.plan.kind,
     '-TimeoutSeconds',
-    '120',
+    mode === 'Prepare' ? '300' : '120',
   ];
   if (ctx.plan.kind === 'displaced') args.push('-DisplacedId', ctx.plan.displacedId);
-  if (mode === 'Lease') args.push('-MaintenanceConfirmed');
+  if (mode === 'Lease' || mode === 'Prepare') args.push('-MaintenanceConfirmed');
   const child = (testDependencies.spawn ?? spawn)(executable, args, {
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
-  const inventoryMode = mode === 'Inventory';
-  const stdoutLimit = inventoryMode ? 8 * 1024 * 1024 : 65536;
+  const inventoryMode = mode === 'Inventory' || mode === 'Prepare';
+  const stdoutLimit = mode === 'Prepare' ? 18 * 1024 * 1024 : inventoryMode ? 8 * 1024 * 1024 : 65536;
   const lineLimit = inventoryMode ? 8 * 1024 * 1024 : 8192;
   const replyTimeout = inventoryMode ? 70000 : 15000;
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
@@ -277,6 +277,41 @@ export function createMaintenanceAdapter({
       const helper = await startHelper(ctx, 'Inventory', testDependencies);
       try {
         return normalizePurgeInventory(helper.ready.inventory, ctx.plan.sourceIdentity);
+      } finally {
+        await helper.close();
+      }
+    },
+    async withPurgePreparation(ctx, callback) {
+      if (maintenanceConfirmed !== true || ctx?.maintenanceConfirmed !== true)
+        throw fail('MAINTENANCE_REQUIRED');
+      if (typeof callback !== 'function') throw fail('INVALID_MAINTENANCE_CONTEXT');
+      const helper = await startHelper(ctx, 'Prepare', testDependencies);
+      try {
+        return await callback({
+          async inspectInventory() {
+            const result = await helper.command({ command: 'inventory' });
+            if (result.source.exists || !result.destination.exists)
+              throw fail('PREPARATION_LOCATION_CONFLICT');
+            return normalizePurgeInventory(result.inventory, ctx.plan.sourceIdentity);
+          },
+          async publishPurgePreparation(proof) {
+            const keys = [
+              'planSha256',
+              'quarantineReceiptSha256',
+              'manifestSha256',
+              'referencesSha256',
+              'retainedProofSha256',
+              'expectedPurgeSha256',
+            ];
+            if (
+              !proof ||
+              Object.keys(proof).sort().join('\0') !== [...keys].sort().join('\0') ||
+              keys.some((key) => typeof proof[key] !== 'string' || !/^[a-f0-9]{64}$/.test(proof[key]))
+            )
+              throw fail('INVALID_PREPARATION_PROOF');
+            return helper.command({ command: 'prepare', ...proof });
+          },
+        });
       } finally {
         await helper.close();
       }

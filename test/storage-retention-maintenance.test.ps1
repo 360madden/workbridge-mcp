@@ -19,7 +19,7 @@ function Start-Helper([string]$mode,[string]$gc='gc1',[string]$updater='up1',[st
   $info.FileName=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
   $info.Arguments='-NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "'+$script:helper+'" -Mode '+$mode+' -InstallRoot "'+$root+'" -OperationId '+$gc+' -UpdaterOperationId '+$updater+' -Kind '+$kind+' -TimeoutSeconds '+$timeout
   if($kind -eq 'displaced') { $info.Arguments += ' -DisplacedId '+('a'*32) }
-  if($mode -eq 'Lease') { $info.Arguments += ' -MaintenanceConfirmed' }
+  if($mode -in @('Lease','Prepare')) { $info.Arguments += ' -MaintenanceConfirmed' }
   $info.UseShellExecute=$false;$info.CreateNoWindow=$true
   $info.RedirectStandardInput=$true;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
   $info.StandardOutputEncoding=[Text.UTF8Encoding]::new($false)
@@ -148,6 +148,17 @@ try {
   Assert ($back.status -eq 'ok' -and $back.source.exists -and -not $back.destination.exists) 'restore failed'
   Assert ([IO.File]::ReadAllText((Join-Path $source 'marker')) -eq 'original') 'restored bytes changed'
   Stop-Helper $lease
+  $prepareGuard=Start-Helper 'Prepare';$prepareReady=Read-Reply $prepareGuard
+  Assert ($prepareReady.status -eq 'ready') 'prepare-only guard did not start'
+  $forbiddenMove=Send $prepareGuard @{command='move';from='source';expectedIdentity=$prepareReady.source.identity}
+  $forbiddenPhase=Send $prepareGuard @{command='phase';phase='restored';planSha256=('a'*64)}
+  $prepareGuard.StandardInput.WriteLine('{"command":"inspect","command":"inspect"}');$prepareGuard.StandardInput.Flush()
+  $duplicateCommand=Read-Reply $prepareGuard
+  Assert ($forbiddenMove.status -eq 'error' -and $forbiddenMove.code -match 'INVALID_COMMAND') 'prepare guard exposed move'
+  Assert ($forbiddenPhase.status -eq 'error' -and $forbiddenPhase.code -match 'INVALID_COMMAND') 'prepare guard exposed phase'
+  Assert ($duplicateCommand.status -eq 'error' -and $duplicateCommand.code -match 'DUPLICATE_OR_INVALID_JSON_KEY') 'duplicate command key accepted'
+  Assert ([IO.File]::ReadAllText((Join-Path $source 'marker')) -eq 'original' -and -not [IO.Directory]::Exists($dest)) 'prepare guard changed payload'
+  Stop-Helper $prepareGuard
   $short=Start-Helper 'Lease' 'gc1' 'up1' 'candidate' 1
   $shortReady=Read-Reply $short;Assert ($shortReady.status -eq 'ready') 'timeout lease did not start'
   Assert ($short.WaitForExit(8000)) 'timeout did not terminate helper'

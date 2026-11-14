@@ -69,6 +69,27 @@ export async function verifyRuntimeDuplicate(
   { resourceRoot, retainedRoot, manifestFiles, limits, retainedRuntimeSubset = false } = {},
   dependencies = {},
 ) {
+  return verifyTrees(
+    { resourceRoot, retainedRoot, manifestFiles, limits, retainedRuntimeSubset },
+    dependencies,
+    false,
+  );
+}
+
+// A partial purge cannot be used as one side of a duplicate comparison. Verify
+// only the surviving tree using the same checks and fingerprint as the M3 proof.
+export async function verifyRetainedRuntime(
+  { retainedRoot, manifestFiles, limits, retainedRuntimeSubset = false } = {},
+  dependencies = {},
+) {
+  return verifyTrees({ retainedRoot, manifestFiles, limits, retainedRuntimeSubset }, dependencies, true);
+}
+
+async function verifyTrees(
+  { resourceRoot, retainedRoot, manifestFiles, limits, retainedRuntimeSubset },
+  dependencies,
+  retainedOnly,
+) {
   const result = {
     schema: 'workbridge-runtime-duplicate-proof/1',
     verifiedDuplicate: false,
@@ -91,17 +112,21 @@ export async function verifyRuntimeDuplicate(
       if (performance.now() - clock >= bound.maxScanMs) throw fail('TIME_LIMIT');
     };
     if (
-      typeof resourceRoot !== 'string' ||
+      (!retainedOnly && typeof resourceRoot !== 'string') ||
       typeof retainedRoot !== 'string' ||
-      !path.isAbsolute(resourceRoot) ||
+      (!retainedOnly && !path.isAbsolute(resourceRoot)) ||
       !path.isAbsolute(retainedRoot)
     )
       throw fail('INVALID_ROOT');
-    const roots = [path.resolve(resourceRoot), path.resolve(retainedRoot)];
-    const left = roots[0].toLowerCase(),
-      right = roots[1].toLowerCase();
-    if (left === right || left.startsWith(right + path.sep) || right.startsWith(left + path.sep))
-      throw fail('OVERLAPPING_ROOTS');
+    const roots = retainedOnly
+      ? [path.resolve(retainedRoot)]
+      : [path.resolve(resourceRoot), path.resolve(retainedRoot)];
+    if (!retainedOnly) {
+      const left = roots[0].toLowerCase(),
+        right = roots[1].toLowerCase();
+      if (left === right || left.startsWith(right + path.sep) || right.startsWith(left + path.sep))
+        throw fail('OVERLAPPING_ROOTS');
+    }
     if (!Array.isArray(manifestFiles) || manifestFiles.length < 1 || manifestFiles.length > bound.maxFiles)
       throw fail('INVALID_MANIFEST');
     const files = new Map(),
@@ -120,7 +145,10 @@ export async function verifyRuntimeDuplicate(
       const key = normalized(item.path);
       if (files.has(key)) throw fail('MANIFEST_COLLISION');
       expectedBytes += item.bytes;
-      if (!Number.isSafeInteger(expectedBytes) || expectedBytes > Math.floor(bound.maxBytes / 2))
+      if (
+        !Number.isSafeInteger(expectedBytes) ||
+        expectedBytes > Math.floor(bound.maxBytes / (retainedOnly ? 1 : 2))
+      )
         throw fail('BYTE_LIMIT');
       files.set(key, { bytes: item.bytes, sha256: item.sha256.toLowerCase() });
       const segments = key.split('/');
@@ -245,7 +273,9 @@ export async function verifyRuntimeDuplicate(
       if (found.size !== files.size || foundDirs.size !== directories.size) throw fail('MISSING_ENTRY');
       return { found, directoryStamps };
     }
-    const inventories = [await enumerate(roots[0], false), await enumerate(roots[1], retainedRuntimeSubset)];
+    const inventories = retainedOnly
+      ? [await enumerate(roots[0], retainedRuntimeSubset)]
+      : [await enumerate(roots[0], false), await enumerate(roots[1], retainedRuntimeSubset)];
     for (const inventory of inventories) {
       for (const [key, expected] of files) {
         checkTime();
@@ -330,10 +360,11 @@ export async function verifyRuntimeDuplicate(
           ),
         )
         .digest('hex');
-    result.sourceTreeSha256 = treeHash(inventories[0]);
-    result.retainedTreeSha256 = treeHash(inventories[1]);
+    if (!retainedOnly) result.sourceTreeSha256 = treeHash(inventories[0]);
+    result.retainedTreeSha256 = treeHash(inventories[retainedOnly ? 0 : 1]);
     checkTime();
-    result.verifiedDuplicate = true;
+    if (retainedOnly) result.verifiedRetained = true;
+    else result.verifiedDuplicate = true;
     result.reason = 'verified-read-only';
   } catch (error) {
     result.reason = error.code ?? 'IO_OR_METADATA_ERROR';

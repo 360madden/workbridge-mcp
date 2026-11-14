@@ -114,6 +114,31 @@ test('purge batches complete and repeat idempotently', async () => {
   assert.equal(inspectPurgeLedger(f.files, f.ctx).status, 'purged');
   assert.equal((await runPurge(f.ctx, f.deps)).alreadyPurged, true);
 });
+test('safety proof receives the validated original manifest binding', async () => {
+  const f = fixture();
+  const validProof = f.deps.revalidateSafety;
+  let calls = 0;
+  f.deps.revalidateSafety = async (ctx, binding) => {
+    calls++;
+    assert.equal(ctx, f.ctx);
+    assert.equal(binding.manifestSha256, hash(f.files['purge-manifest.json']));
+    assert.deepEqual(binding.manifest, JSON.parse(f.files['purge-manifest.json'].toString('utf8')));
+    return validProof();
+  };
+  await runPurge(f.ctx, f.deps);
+  assert.ok(calls >= 4);
+});
+test('proof callback cannot mutate the journal engine manifest', async () => {
+  const f = fixture();
+  const validProof = f.deps.revalidateSafety;
+  f.deps.revalidateSafety = async (_ctx, binding) => {
+    binding.manifest.entries.length = 0;
+    return validProof();
+  };
+  await runPurge(f.ctx, f.deps);
+  assert.equal(f.missing, 3);
+  assert.equal(inspectPurgeLedger(f.files, f.ctx).status, 'purged');
+});
 for (const crash of [
   'before-intent',
   'after-intent',

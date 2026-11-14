@@ -232,7 +232,10 @@ export async function runPurge(ctx, deps) {
       throw fail('PURGE_NATIVE_CAPABILITY_REQUIRED');
     let state = inspectPurgeLedger(await guard.readJournals(), ctx);
     const requireSafety = async () => {
-      const proof = await deps.revalidateSafety(ctx);
+      const proof = await deps.revalidateSafety(ctx, {
+        manifest: structuredClone(state.manifest),
+        manifestSha256: state.base.manifestSha256,
+      });
       if (
         proof?.referencesSha256 !== state.approval.referencesSha256 ||
         proof?.retainedProofSha256 !== state.approval.retainedProofSha256
