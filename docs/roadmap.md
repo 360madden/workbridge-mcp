@@ -1,5 +1,18 @@
 # Workbridge upgrade execution
 
+## Storage retention — November 14, 2026
+
+Active machine: **AMD-DESKTOP**. The [ranked garbage-collection plan](storage-retention-plan.md)
+prioritizes bounded read-only inventory, then reference-aware review of old
+candidate/displaced runtime copies, recoverable quarantine and explicit purge,
+followed by job-output compaction and routine retention/UI. The fresh census
+found 6.23 GiB in updater operations, including about 4.08 GiB of candidate and
+displaced copies before exclusions. This is not a reclaimable-space claim.
+Keep all 30 rollback backup runtimes initially. The installed sealed release is
+nested inside `.local/wb001-gui-src-20261105c`, and durable job IDs prevent repeated
+side effects; neither staging roots nor old job JSON may be deleted by age alone.
+No retained data has been removed or service changed in this workstream.
+
 ## Current checkpoint — 2026-11-01
 
 **Current deployed and committed baseline: Workbridge 0.16.4-dev / 36 command-job slots / 36 coordinated-worker assignments.** The sealed release passed nine WB-001 gates and 1,037 tests (zero failures; three skips). The healthy hosted instance and its capacity were independently verified, and the source, scripts, tests and documentation were reconciled into selected-file Git commits on `main`. The previous 0.16.3-dev/six-slot architecture is retired from active use, while Git and release history are retained. See [36-slot release and adoption evidence](workbridge-36-capacity-20261101.md). Browser-session helpers and tests of 36 independent AI reasoning workers remain separate future work.
