@@ -237,7 +237,7 @@ public static class RetentionMaintenanceNative {
       if(String.IsNullOrEmpty(name) || name=="." || name==".." || name.EndsWith(".") || name.EndsWith(" "))return false;
       foreach(char c in name)if(Char.IsControl(c) || "<>:\"/\\|?*".IndexOf(c)>=0)return false;
       return !System.Text.RegularExpressions.Regex.IsMatch(name,
-        @"\A(?:CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[1-9Ã‚Â¹Ã‚Â²Ã‚Â³]|LPT[1-9Ã‚Â¹Ã‚Â²Ã‚Â³])(?:\..*)?\z",
+        @"\A(?:CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[1-9\u00B9\u00B2\u00B3]|LPT[1-9\u00B9\u00B2\u00B3])(?:\..*)?\z",
         System.Text.RegularExpressions.RegexOptions.IgnoreCase|System.Text.RegularExpressions.RegexOptions.CultureInvariant);
     }
     void InventoryWalk(string file,string relative,int depth,InventoryBudget budget) {
