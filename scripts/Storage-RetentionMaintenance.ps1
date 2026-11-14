@@ -1,7 +1,7 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('Inspect','Lease')][string]$Mode,
+  [Parameter(Mandatory=$true)][ValidateSet('Inspect','Inventory','Lease')][string]$Mode,
   [Parameter(Mandatory=$true)][string]$InstallRoot,
   [Parameter(Mandatory=$true)][string]$OperationId,
   [Parameter(Mandatory=$true)][string]$UpdaterOperationId,
@@ -13,10 +13,15 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $WarningPreference='SilentlyContinue'
+[Console]::InputEncoding=[Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Diagnostics;
+using System.Globalization;
+using System.Security.Cryptography;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
@@ -24,14 +29,17 @@ public static class RetentionMaintenanceNative {
   const uint ATTR=0x80, DELETE=0x10000, READ=0x80000000, WRITE=0x40000000;
   const uint SHARE_READ=1, SHARE_WRITE=2, SHARE_DELETE=4, CREATE_NEW=1, EXISTING=3, OPEN_ALWAYS=4;
   const uint OPEN_REPARSE=0x200000, BACKUP=0x2000000, REPARSE=0x400, DIRECTORY=0x10;
-  const int StandardInfo=1, TagInfo=9, IdInfo=18, RenameInfo=10;
+  const int BasicInfo=0, StandardInfo=1, StreamInfo=7, TagInfo=9, IdInfo=18, RenameInfo=10;
   [StructLayout(LayoutKind.Sequential)] struct IoStatus { public IntPtr Status; public IntPtr Information; }
   [StructLayout(LayoutKind.Sequential)] struct FileStandard { public long AllocationSize,EndOfFile; public uint NumberOfLinks; public byte DeletePending,Directory; }
+  [StructLayout(LayoutKind.Sequential)] struct FileBasic { public long CreationTime,LastAccessTime,LastWriteTime,ChangeTime; public uint Attributes; }
   [StructLayout(LayoutKind.Sequential)] struct FileTag { public uint Attributes, Tag; }
   [StructLayout(LayoutKind.Sequential)] struct FileId { public ulong Volume; [MarshalAs(UnmanagedType.ByValArray,SizeConst=16)] public byte[] Id; }
   [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)] struct RenameHeader { public byte Replace; public IntPtr Root; public uint Length; public char Name; }
   [DllImport("kernel32.dll",EntryPoint="CreateFileW",CharSet=CharSet.Unicode,SetLastError=true)] static extern SafeFileHandle Open(string path,uint access,uint share,IntPtr sec,uint disposition,uint flags,IntPtr template);
   [DllImport("kernel32.dll",EntryPoint="GetFileInformationByHandleEx",SetLastError=true)] static extern bool GetStandard(SafeFileHandle h,int kind,out FileStandard data,uint size);
+  [DllImport("kernel32.dll",EntryPoint="GetFileInformationByHandleEx",SetLastError=true)] static extern bool GetBasic(SafeFileHandle h,int kind,out FileBasic data,uint size);
+  [DllImport("kernel32.dll",EntryPoint="GetFileInformationByHandleEx",SetLastError=true)] static extern bool GetStreams(SafeFileHandle h,int kind,IntPtr data,uint size);
   [DllImport("kernel32.dll",EntryPoint="GetFileInformationByHandleEx",SetLastError=true)] static extern bool GetTag(SafeFileHandle h,int kind,out FileTag data,uint size);
   [DllImport("kernel32.dll",EntryPoint="GetFileInformationByHandleEx",SetLastError=true)] static extern bool GetId(SafeFileHandle h,int kind,out FileId data,uint size);
   [DllImport("ntdll.dll")] static extern int NtSetInformationFile(SafeFileHandle h,out IoStatus status,IntPtr data,uint size,int kind);
@@ -151,8 +159,9 @@ public static class RetentionMaintenanceNative {
       using(var stream=new FileStream(h,FileAccess.ReadWrite,4096,false)) {
         var initial=GetIdentity(h,false); CheckOrdinarySingleLink(h);
         if(!String.Equals(initial.volume,volume,StringComparison.OrdinalIgnoreCase))throw new IOException("CROSS_VOLUME");
-        string json="{\"schema\":\"workbridge-retention-phase/1\",\"operationId\":\""+operationId+
-          "\",\"planSha256\":\""+planSha256+"\",\"phase\":\""+phase+"\"}";
+        string timestamp=DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'",CultureInfo.InvariantCulture);
+        string json="{\"schema\":\"workbridge-retention-phase/2\",\"operationId\":\""+operationId+
+          "\",\"planSha256\":\""+planSha256+"\",\"phase\":\""+phase+"\",\"publishedAtUtc\":\""+timestamp+"\"}";
         byte[] content=new UTF8Encoding(false).GetBytes(json);
         stream.Write(content,0,content.Length);stream.Flush(true);
         if(!Equal(initial,GetIdentity(h,false)))throw new IOException("PHASE_IDENTITY_CHANGED");
@@ -168,11 +177,134 @@ public static class RetentionMaintenanceNative {
       }
       return Inspect();
     }
+    public sealed class InventoryEntry {
+      public string path {get;set;} public string type {get;set;} public Identity identity {get;set;}
+      public long size {get;set;} public uint nlink {get;set;} public string sha256 {get;set;}
+    }
+    public sealed class InventoryReceipt {
+      public string schema {get;set;} public bool complete {get;set;} public bool nonAtomic {get;set;}
+      public int namedStreams {get;set;} public long totalBytes {get;set;} public InventoryEntry[] entries {get;set;}
+    }
+    sealed class InventoryBudget {
+      public readonly Stopwatch clock=Stopwatch.StartNew(); public long bytes; public long outputEstimate;
+      public readonly List<InventoryEntry> entries=new List<InventoryEntry>();
+      public readonly HashSet<string> names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      public void Time() { if(clock.ElapsedMilliseconds>=60000)throw new IOException("INVENTORY_TIME_LIMIT"); }
+      public void Add(InventoryEntry entry) {
+        Time();if(entries.Count>=20000)throw new IOException("INVENTORY_ENTRY_LIMIT");
+        if(!names.Add(entry.path))throw new IOException("INVENTORY_CASE_COLLISION");
+        outputEstimate+=400L+entry.path.Length*6L;
+        if(outputEstimate>7L*1024*1024)throw new IOException("INVENTORY_OUTPUT_LIMIT");
+        entries.Add(entry);
+      }
+    }
+    static FileBasic ReadBasic(SafeFileHandle h) {
+      FileBasic basic;if(!GetBasic(h,BasicInfo,out basic,(uint)Marshal.SizeOf(typeof(FileBasic))))throw Error("BASIC_INFO_UNAVAILABLE");
+      if((basic.Attributes & (0x200u|0x1000u|0x4000u|0x40000u|0x400000u))!=0)throw new IOException("UNSUPPORTED_ATTRIBUTES");
+      return basic;
+    }
+    static FileStandard ReadStandard(SafeFileHandle h) {
+      FileStandard standard;if(!GetStandard(h,StandardInfo,out standard,(uint)Marshal.SizeOf(typeof(FileStandard))))throw Error("FILE_STANDARD_UNAVAILABLE");
+      if(standard.DeletePending!=0 || standard.EndOfFile<0)throw new IOException("INVENTORY_OBJECT_UNAVAILABLE");
+      return standard;
+    }
+    static void CheckNoNamedStreams(SafeFileHandle h,bool directory) {
+      const int capacity=65536;IntPtr buffer=Marshal.AllocHGlobal(capacity);
+      try {
+        if(!GetStreams(h,StreamInfo,buffer,capacity)) {
+          int code=Marshal.GetLastWin32Error();
+          if(code==38 && directory)return;
+          throw new IOException("STREAM_ENUMERATION_UNAVAILABLE WIN32="+code);
+        }
+        int offset=0,count=0;bool defaultFound=false;
+        while(true) {
+          if(offset<0 || offset>capacity-24 || ++count>1024)throw new IOException("STREAM_ENUMERATION_INVALID");
+          int next=Marshal.ReadInt32(buffer,offset),length=Marshal.ReadInt32(buffer,offset+4);
+          if(length<0 || (length&1)!=0 || length>capacity-offset-24)throw new IOException("STREAM_ENUMERATION_INVALID");
+          string name=Marshal.PtrToStringUni(IntPtr.Add(buffer,offset+24),length/2);
+          if(directory || name!="::$DATA" || defaultFound)throw new IOException("NAMED_STREAM_REFUSED");
+          defaultFound=true;if(next==0)break;
+          if(next<24+length || (next&7)!=0 || next>capacity-offset-24)throw new IOException("STREAM_ENUMERATION_INVALID");
+          offset+=next;
+        }
+        if(!directory && !defaultFound)throw new IOException("STREAM_ENUMERATION_INVALID");
+      } finally { Marshal.FreeHGlobal(buffer); }
+    }
+    static bool SameBasic(FileBasic a,FileBasic b) {
+      return a.CreationTime==b.CreationTime && a.LastWriteTime==b.LastWriteTime && a.ChangeTime==b.ChangeTime && a.Attributes==b.Attributes;
+    }
+    static bool SafeInventoryName(string name) {
+      if(String.IsNullOrEmpty(name) || name=="." || name==".." || name.EndsWith(".") || name.EndsWith(" "))return false;
+      foreach(char c in name)if(Char.IsControl(c) || "<>:\"/\\|?*".IndexOf(c)>=0)return false;
+      return !System.Text.RegularExpressions.Regex.IsMatch(name,
+        @"\A(?:CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[1-9Ã‚Â¹Ã‚Â²Ã‚Â³]|LPT[1-9Ã‚Â¹Ã‚Â²Ã‚Â³])(?:\..*)?\z",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase|System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    }
+    void InventoryWalk(string file,string relative,int depth,InventoryBudget budget) {
+      budget.Time();if(depth>128 || relative.Length>4096)throw new IOException("INVENTORY_DEPTH_OR_PATH_LIMIT");
+      // This object's share lock does not freeze the directory namespace.
+      var handle=Open(file,READ,SHARE_READ,IntPtr.Zero,EXISTING,OPEN_REPARSE|BACKUP,IntPtr.Zero);
+      if(handle.IsInvalid){handle.Dispose();throw Error("INVENTORY_OPEN_FAILED");}
+      using(handle) {
+        FileTag tag;if(!GetTag(handle,TagInfo,out tag,(uint)Marshal.SizeOf(typeof(FileTag))))throw Error("IDENTITY_UNAVAILABLE");
+        bool directory=(tag.Attributes&DIRECTORY)!=0;
+        var id=GetIdentity(handle,directory);var before=ReadBasic(handle);var standard=ReadStandard(handle);
+        if(!String.Equals(id.volume,volume,StringComparison.OrdinalIgnoreCase))throw new IOException("CROSS_VOLUME");
+        if(!directory && (standard.Directory!=0 || standard.NumberOfLinks!=1))throw new IOException("HARDLINK_REFUSED");
+        CheckNoNamedStreams(handle,directory);
+        var entry=new InventoryEntry { path=relative,type=directory?"directory":"file",identity=id,
+          size=directory?0:standard.EndOfFile,nlink=standard.NumberOfLinks,sha256=null };
+        budget.Add(entry);
+        if(directory) {
+          foreach(string child in System.IO.Directory.EnumerateFileSystemEntries(file)) {
+            budget.Time();string name=Path.GetFileName(child);
+            if(!Equal(id,GetIdentity(handle,true)))throw new IOException("INVENTORY_DIRECTORY_CHANGED");
+            if(!SafeInventoryName(name))throw new IOException("INVALID_ENTRY_NAME");
+            InventoryWalk(child,relative.Length==0?name:relative+"/"+name,depth+1,budget);
+          }
+        } else {
+          if(standard.EndOfFile>512L*1024*1024-budget.bytes)throw new IOException("INVENTORY_BYTE_LIMIT");
+          using(var stream=new FileStream(handle,FileAccess.Read,65536,false))
+          using(var sha=SHA256.Create()) {
+            byte[] buffer=new byte[65536];int n;long read=0;
+            while((n=stream.Read(buffer,0,buffer.Length))>0) {
+              budget.Time();read+=n;budget.bytes+=n;
+              if(budget.bytes>512L*1024*1024 || read>standard.EndOfFile)throw new IOException("INVENTORY_BYTE_LIMIT");
+              sha.TransformBlock(buffer,0,n,buffer,0);
+            }
+            sha.TransformFinalBlock(new byte[0],0,0);
+            if(read!=standard.EndOfFile)throw new IOException("INVENTORY_FILE_CHANGED");
+            entry.sha256=BitConverter.ToString(sha.Hash).Replace("-","").ToLowerInvariant();
+            var after=ReadBasic(handle);var afterStandard=ReadStandard(handle);
+            if(!Equal(id,GetIdentity(handle,false)) || !SameBasic(before,after) || afterStandard.EndOfFile!=standard.EndOfFile || afterStandard.NumberOfLinks!=1)throw new IOException("INVENTORY_FILE_CHANGED");
+            CheckNoNamedStreams(handle,false);
+          }
+          return;
+        }
+        var end=ReadBasic(handle);
+        if(!Equal(id,GetIdentity(handle,true)) || !SameBasic(before,end))throw new IOException("INVENTORY_DIRECTORY_CHANGED");
+        CheckNoNamedStreams(handle,true);
+      }
+    }
+    public InventoryReceipt Inventory() {
+      if(disposed)throw new IOException("LEASE_CLOSED");
+      if(destinationParent==null)throw new IOException("PAYLOAD_UNAVAILABLE");
+      if(!String.Equals(GetIdentity(destinationParent,true).volume,volume,StringComparison.OrdinalIgnoreCase))throw new IOException("CROSS_VOLUME");
+      var budget=new InventoryBudget();InventoryWalk(destination,"",0,budget);budget.Time();
+      return new InventoryReceipt { schema="workbridge-retention-inventory/1",complete=true,nonAtomic=true,
+        namedStreams=0,totalBytes=budget.bytes,entries=budget.entries.ToArray() };
+    }
     public void Dispose() { if(disposed)return;disposed=true;if(updater!=null)updater.Dispose();for(int i=pins.Count-1;i>=0;i--)pins[i].Dispose(); }
   }
 }
 '@
 function Emit($object) { [Console]::Out.WriteLine(($object|ConvertTo-Json -Compress -Depth 8)) }
+function Emit-Inventory($state,$inventory,$status,$clock) {
+  $json=@{status=$status;source=$state.source;destination=$state.destination;sameVolume=$state.sameVolume;inventory=$inventory}|ConvertTo-Json -Compress -Depth 8
+  if($clock.ElapsedMilliseconds -ge 60000) { throw 'INVENTORY_TIME_LIMIT' }
+  if([Text.Encoding]::UTF8.GetByteCount($json) -gt 8*1024*1024) { throw 'INVENTORY_OUTPUT_LIMIT' }
+  [Console]::Out.WriteLine($json)
+}
 $lease=$null
 try {
   if($Mode -eq 'Lease' -and -not $MaintenanceConfirmed) { throw 'MAINTENANCE_REQUIRED' }
@@ -183,6 +315,7 @@ try {
   if($Kind -eq 'candidate' -and -not [string]::IsNullOrEmpty($DisplacedId)) { throw 'UNEXPECTED_DISPLACED_ID' }
   $lease=[RetentionMaintenanceNative+Lease]::new($root,$OperationId,$UpdaterOperationId,$Kind,$DisplacedId,($Mode -eq 'Lease'))
   $state=$lease.Inspect()
+  if($Mode -eq 'Inventory') { $clock=[Diagnostics.Stopwatch]::StartNew();Emit-Inventory $state ($lease.Inventory()) 'ready' $clock;exit 0 }
   Emit @{status='ready';source=$state.source;destination=$state.destination;sameVolume=$state.sameVolume}
   if($Mode -eq 'Inspect') { exit 0 }
   while($true) {
@@ -192,6 +325,11 @@ try {
       if($line.Length -gt 4096) { throw 'COMMAND_TOO_LARGE' }
       $command=ConvertFrom-Json -InputObject $line
       if($command.command -eq 'inspect') { $state=$lease.Inspect() }
+      elseif($command.command -eq 'inventory') {
+        $clock=[Diagnostics.Stopwatch]::StartNew()
+        Emit-Inventory ($lease.Inspect()) ($lease.Inventory()) 'ok' $clock
+        continue
+      }
       elseif($command.command -eq 'phase') {
         $state=$lease.PublishPhase([string]$command.phase,[string]$command.planSha256)
       }

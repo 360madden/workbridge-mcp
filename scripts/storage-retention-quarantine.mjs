@@ -125,7 +125,7 @@ function sameId(actual, expected) {
 const MISSING = Symbol('missing');
 async function readObject(file, installRoot, metadata, missing = false) {
   try {
-    return (await loadBoundedJson(file, { installRoot, maxBytes: 65536, metadata })).value;
+    return await loadBoundedJson(file, { installRoot, maxBytes: 65536, metadata });
   } catch (error) {
     const exactMissing =
       error.code === 'ENOENT' &&
@@ -136,13 +136,19 @@ async function readObject(file, installRoot, metadata, missing = false) {
     throw error;
   }
 }
-async function loadJournal(installRoot, operationId) {
+export function validPhaseUtc(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+  const millis = Date.parse(value);
+  return Number.isFinite(millis) && new Date(millis).toISOString() === value;
+}
+export async function loadRetentionJournal(installRoot, operationId) {
   if (typeof installRoot !== 'string' || !path.isAbsolute(installRoot) || !validId(operationId))
     throw fail('INVALID_ARGUMENTS');
   const metadata = windowsMetadata();
   try {
     const dir = path.join(installRoot, '.local', 'storage-quarantine', operationId);
-    const intent = await readObject(path.join(dir, 'intent.json'), installRoot, metadata);
+    const intentBinding = await readObject(path.join(dir, 'intent.json'), installRoot, metadata);
+    const intent = intentBinding.value;
     if (
       !exactKeys(intent, ['schema', 'operationId', 'planSha256', 'plan']) ||
       intent.schema !== 'workbridge-retention-intent/1' ||
@@ -151,34 +157,42 @@ async function loadJournal(installRoot, operationId) {
     )
       throw fail('INVALID_JOURNAL');
     const ctx = contextFor(installRoot, operationId, intent.plan);
-    const phases = {};
+    const phases = {},
+      markers = {},
+      bindings = { intent: { sha256: intentBinding.sha256, identity: intentBinding.identity } };
     for (const phase of ['quarantined', 'restoring', 'restored']) {
-      const marker = await readObject(path.join(dir, `${phase}.json`), installRoot, metadata, true);
+      const binding = await readObject(path.join(dir, `${phase}.json`), installRoot, metadata, true);
+      const marker = binding === MISSING ? MISSING : binding.value;
       if (
         marker !== MISSING &&
-        (!exactKeys(marker, ['schema', 'operationId', 'planSha256', 'phase']) ||
-          marker.schema !== 'workbridge-retention-phase/1' ||
+        (!(marker?.schema === 'workbridge-retention-phase/1'
+          ? exactKeys(marker, ['schema', 'operationId', 'planSha256', 'phase'])
+          : marker?.schema === 'workbridge-retention-phase/2' &&
+            exactKeys(marker, ['schema', 'operationId', 'planSha256', 'phase', 'publishedAtUtc']) &&
+            validPhaseUtc(marker.publishedAtUtc)) ||
           marker.operationId !== operationId ||
           marker.planSha256 !== intent.planSha256 ||
           marker.phase !== phase)
       )
         throw fail('INVALID_JOURNAL');
       phases[phase] = marker !== MISSING;
+      markers[phase] = marker === MISSING ? null : marker;
+      bindings[phase] = binding === MISSING ? null : { sha256: binding.sha256, identity: binding.identity };
     }
     if ((phases.restoring && !phases.quarantined) || (phases.restored && !phases.restoring))
       throw fail('INVALID_JOURNAL');
-    return { intent, ctx, phases };
+    return { intent, ctx, phases, markers, bindings };
   } finally {
     metadata.close();
   }
 }
 async function publishPhase(guard, ctx, hash, name) {
   await guard.publishPhase({ phase: name, planSha256: hash });
-  const journal = await loadJournal(ctx.installRoot, ctx.operationId);
+  const journal = await loadRetentionJournal(ctx.installRoot, ctx.operationId);
   if (journal.intent.planSha256 !== hash || journal.phases[name] !== true) throw fail('INVALID_JOURNAL');
   return journal;
 }
-function classify(journal, locations) {
+export function classifyRetentionJournal(journal, locations) {
   const { intent, phases } = journal;
   const source = locations?.source,
     destination = locations?.destination;
@@ -229,8 +243,8 @@ async function runFault(deps, name) {
 
 export async function retentionStatus({ installRoot, operationId }, deps = {}) {
   requireDeps(deps, 'inspectLocations');
-  const journal = await loadJournal(installRoot, operationId);
-  return classify(journal, await deps.inspectLocations(journal.ctx));
+  const journal = await loadRetentionJournal(installRoot, operationId);
+  return classifyRetentionJournal(journal, await deps.inspectLocations(journal.ctx));
 }
 
 export async function quarantine(
@@ -246,33 +260,33 @@ export async function quarantine(
   requireDeps(deps, 'prepareOperation', 'withMaintenance', 'revalidatePlan');
   const intent = { schema: 'workbridge-retention-intent/1', operationId, planSha256: hash, plan };
   await deps.prepareOperation(ctx, intent);
-  const prepared = await loadJournal(installRoot, operationId);
+  const prepared = await loadRetentionJournal(installRoot, operationId);
   if (prepared.intent.planSha256 !== hash) throw fail('OPERATION_CONFLICT');
   return deps.withMaintenance(ctx, async (guard) => {
     await guardCheck(guard);
-    let journal = await loadJournal(installRoot, operationId);
+    let journal = await loadRetentionJournal(installRoot, operationId);
     if (journal.intent.planSha256 !== hash || journal.phases.restoring) throw fail('OPERATION_CONFLICT');
-    let state = classify(journal, await guard.inspect());
+    let state = classifyRetentionJournal(journal, await guard.inspect());
     if (state.state === 'conflict') throw fail('LOCATION_CONFLICT');
     if (state.state === 'prepared') {
       if (canonicalPlanSha256(await deps.revalidatePlan(plan)) !== hash) throw fail('STALE_PLAN');
-      state = classify(journal, await guard.inspect());
+      state = classifyRetentionJournal(journal, await guard.inspect());
       if (state.state !== 'prepared') throw fail('LOCATION_CONFLICT');
       if ((await guard.verifyPayload('source', plan)) !== true) throw fail('PAYLOAD_CHANGED');
-      state = classify(journal, await guard.inspect());
+      state = classifyRetentionJournal(journal, await guard.inspect());
       if (state.state !== 'prepared') throw fail('LOCATION_CONFLICT');
       await runFault(deps, 'after-intent-before-rename');
       await guard.moveNoReplace({ from: 'source', expectedIdentity: plan.sourceIdentity });
       await runFault(deps, 'after-rename-before-commit');
-      state = classify(journal, await guard.inspect());
+      state = classifyRetentionJournal(journal, await guard.inspect());
     }
     if (state.state !== 'quarantined' || (await guard.verifyPayload('destination', plan)) !== true)
       throw fail('LOCATION_CONFLICT');
-    state = classify(journal, await guard.inspect());
+    state = classifyRetentionJournal(journal, await guard.inspect());
     if (state.state !== 'quarantined') throw fail('LOCATION_CONFLICT');
     if (!journal.phases.quarantined) journal = await publishPhase(guard, ctx, hash, 'quarantined');
-    else journal = await loadJournal(installRoot, operationId);
-    return classify(journal, await guard.inspect());
+    else journal = await loadRetentionJournal(installRoot, operationId);
+    return classifyRetentionJournal(journal, await guard.inspect());
   });
 }
 
@@ -282,13 +296,13 @@ export async function restore(
 ) {
   if (maintenanceConfirmed !== true) throw fail('MAINTENANCE_REQUIRED');
   requireDeps(deps, 'withMaintenance');
-  const prior = await loadJournal(installRoot, operationId);
+  const prior = await loadRetentionJournal(installRoot, operationId);
   if (prior.intent.planSha256 !== expectedPlanSha256) throw fail('PLAN_HASH_MISMATCH');
   return deps.withMaintenance(prior.ctx, async (guard) => {
     await guardCheck(guard);
-    let journal = await loadJournal(installRoot, operationId);
+    let journal = await loadRetentionJournal(installRoot, operationId);
     if (journal.intent.planSha256 !== expectedPlanSha256) throw fail('OPERATION_CONFLICT');
-    let state = classify(journal, await guard.inspect());
+    let state = classifyRetentionJournal(journal, await guard.inspect());
     if (state.state === 'conflict' || state.state === 'prepared' || !journal.phases.quarantined)
       throw fail('LOCATION_CONFLICT');
     if (state.state === 'restored') return state;
@@ -299,18 +313,18 @@ export async function restore(
         (await guard.verifyPayload('destination', journal.intent.plan)) !== true
       )
         throw fail('PAYLOAD_CHANGED');
-      state = classify(journal, await guard.inspect());
+      state = classifyRetentionJournal(journal, await guard.inspect());
       if (state.state !== 'quarantined') throw fail('LOCATION_CONFLICT');
       destinationVerified = true;
       journal = await publishPhase(guard, prior.ctx, expectedPlanSha256, 'restoring');
     }
-    state = classify(journal, await guard.inspect());
+    state = classifyRetentionJournal(journal, await guard.inspect());
     if (state.state !== 'restoring') throw fail('LOCATION_CONFLICT');
     if (state.destination.exists) {
       if (!destinationVerified) {
         if ((await guard.verifyPayload('destination', journal.intent.plan)) !== true)
           throw fail('PAYLOAD_CHANGED');
-        state = classify(journal, await guard.inspect());
+        state = classifyRetentionJournal(journal, await guard.inspect());
         if (state.state !== 'restoring' || !state.destination.exists) throw fail('LOCATION_CONFLICT');
       }
       await runFault(deps, 'after-restore-intent-before-rename');
@@ -319,7 +333,7 @@ export async function restore(
         expectedIdentity: journal.intent.plan.sourceIdentity,
       });
       await runFault(deps, 'after-restore-rename-before-commit');
-      state = classify(journal, await guard.inspect());
+      state = classifyRetentionJournal(journal, await guard.inspect());
     }
     if (
       state.state !== 'restoring' ||
@@ -327,9 +341,9 @@ export async function restore(
       (await guard.verifyPayload('source', journal.intent.plan)) !== true
     )
       throw fail('LOCATION_CONFLICT');
-    state = classify(journal, await guard.inspect());
+    state = classifyRetentionJournal(journal, await guard.inspect());
     if (state.state !== 'restoring' || !state.source.exists) throw fail('LOCATION_CONFLICT');
     journal = await publishPhase(guard, prior.ctx, expectedPlanSha256, 'restored');
-    return classify(journal, await guard.inspect());
+    return classifyRetentionJournal(journal, await guard.inspect());
   });
 }

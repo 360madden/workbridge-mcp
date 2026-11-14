@@ -28,6 +28,14 @@ retained data and the live service remain unchanged. Next: qualify a concrete
 real maintenance action without discarding the missing-journal evidence, then
 implement separately reviewed purge. Job compaction and scheduling remain later.
 
+Purge prerequisites now include timestamped v2 phase receipts, legacy restore
+compatibility, a seven-day read-only `purge-check`, and a bounded native inventory
+that refuses named streams (including directory streams), links and unsupported
+attributes. The adapter validates the root identity and canonicalizes entries.
+There is still no purge mutation command. Next is a reviewed per-entry deletion
+ledger with partial-purge recovery, fresh retained-copy/reference checks and
+disposable Windows acceptance; actual deletion remains a separate reviewed action.
+
 ## Current checkpoint — 2026-11-01
 
 **Current deployed and committed baseline: Workbridge 0.16.4-dev / 36 command-job slots / 36 coordinated-worker assignments.** The sealed release passed nine WB-001 gates and 1,037 tests (zero failures; three skips). The healthy hosted instance and its capacity were independently verified, and the source, scripts, tests and documentation were reconciled into selected-file Git commits on `main`. The previous 0.16.3-dev/six-slot architecture is retired from active use, while Git and release history are retained. See [36-slot release and adoption evidence](workbridge-36-capacity-20261101.md). Browser-session helpers and tests of 36 independent AI reasoning workers remain separate future work.

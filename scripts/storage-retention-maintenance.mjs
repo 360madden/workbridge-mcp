@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { lstat, mkdir, open } from 'node:fs/promises';
 import { windowsMetadata } from './preview-storage-retention.mjs';
 import { loadBoundedJson } from './storage-retention-references.mjs';
+import { normalizePurgeInventory } from './storage-retention-purge-inventory.mjs';
 
 const fail = (code) => Object.assign(new Error(code), { code });
 const id = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -131,6 +132,10 @@ async function startHelper(ctx, mode, testDependencies = {}) {
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
+  const inventoryMode = mode === 'Inventory';
+  const stdoutLimit = inventoryMode ? 8 * 1024 * 1024 : 65536;
+  const lineLimit = inventoryMode ? 8 * 1024 * 1024 : 8192;
+  const replyTimeout = inventoryMode ? 70000 : 15000;
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
   const replies = lines[Symbol.asyncIterator]();
   let failure = null,
@@ -148,7 +153,7 @@ async function startHelper(ctx, mode, testDependencies = {}) {
   };
   child.stdout.on('data', (chunk) => {
     stdoutBytes += chunk.length;
-    if (stdoutBytes > 65536) {
+    if (stdoutBytes > stdoutLimit) {
       rejectHelper('HELPER_OUTPUT_LIMIT');
       child.kill();
     }
@@ -184,11 +189,11 @@ async function startHelper(ctx, mode, testDependencies = {}) {
           throw fail(code);
         }),
         new Promise((_, reject) => {
-          timer = setTimeout(() => reject(fail('MAINTENANCE_REPLY_TIMEOUT')), 15000);
+          timer = setTimeout(() => reject(fail('MAINTENANCE_REPLY_TIMEOUT')), replyTimeout);
         }),
       ]);
       if (failure) throw fail(failure);
-      if (item.done || item.value.length > 8192) throw fail('MAINTENANCE_REPLY_INVALID');
+      if (item.done || item.value.length > lineLimit) throw fail('MAINTENANCE_REPLY_INVALID');
       const result = JSON.parse(item.value);
       if (result.status === 'error') throw fail(String(result.code ?? 'MAINTENANCE_REFUSED').slice(0, 300));
       if (
@@ -264,6 +269,14 @@ export function createMaintenanceAdapter({
       const helper = await startHelper(ctx, 'Inspect', testDependencies);
       try {
         return helper.ready;
+      } finally {
+        await helper.close();
+      }
+    },
+    async inspectInventory(ctx) {
+      const helper = await startHelper(ctx, 'Inventory', testDependencies);
+      try {
+        return normalizePurgeInventory(helper.ready.inventory, ctx.plan.sourceIdentity);
       } finally {
         await helper.close();
       }

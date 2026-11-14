@@ -1,5 +1,15 @@
 #requires -Version 5.1
 $ErrorActionPreference='Stop'
+Add-Type -TypeDefinition @'
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+public static class RetentionFixtureNative {
+  [DllImport("kernel32.dll",EntryPoint="DeleteFileW",CharSet=CharSet.Unicode,SetLastError=true)]
+  public static extern bool Delete(string path);
+  [DllImport("kernel32.dll",SetLastError=true)]
+  public static extern bool DeviceIoControl(SafeFileHandle h,uint code,System.IntPtr input,uint inputSize,System.IntPtr output,uint outputSize,out uint bytes,System.IntPtr overlapped);
+}
+'@
 $script:helper=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\scripts\Storage-RetentionMaintenance.ps1'))
 $root=Join-Path ([IO.Path]::GetTempPath()) ('wb-retention-maintenance-'+[Guid]::NewGuid().ToString('N'))
 $script:children=[Collections.Generic.List[Diagnostics.Process]]::new()
@@ -12,6 +22,7 @@ function Start-Helper([string]$mode,[string]$gc='gc1',[string]$updater='up1',[st
   if($mode -eq 'Lease') { $info.Arguments += ' -MaintenanceConfirmed' }
   $info.UseShellExecute=$false;$info.CreateNoWindow=$true
   $info.RedirectStandardInput=$true;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
+  $info.StandardOutputEncoding=[Text.UTF8Encoding]::new($false)
   $p=[Diagnostics.Process]::Start($info);$script:children.Add($p);return $p
 }
 function Read-Reply($process) {
@@ -51,7 +62,7 @@ try {
   $phasePath=Join-Path ([IO.Path]::GetDirectoryName($dest)) 'quarantined.json'
   $receiptText=[IO.File]::ReadAllText($phasePath)
   $receipt=$receiptText|ConvertFrom-Json
-  Assert ($receipt.schema -eq 'workbridge-retention-phase/1' -and $receipt.operationId -eq 'gc1' -and $receipt.planSha256 -ceq ('a'*64) -and $receipt.phase -ceq 'quarantined') 'phase fields invalid'
+  Assert ($receipt.schema -eq 'workbridge-retention-phase/2' -and $receipt.publishedAtUtc -cmatch '\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z\z' -and $receipt.operationId -eq 'gc1' -and $receipt.planSha256 -ceq ('a'*64) -and $receipt.phase -ceq 'quarantined') 'phase fields invalid'
   $again=Send $lease @{command='phase';phase='quarantined';planSha256=('b'*64)}
   Assert ($again.status -eq 'error' -and $again.code -match 'RENAME_NO_REPLACE_FAILED') 'duplicate phase did not fail'
   Assert ([IO.File]::ReadAllText($phasePath) -ceq $receiptText) 'duplicate phase overwrote original'
@@ -77,6 +88,55 @@ try {
   $moved=Send $lease @{command='move';from='source';expectedIdentity=$ready.source.identity}
   Assert ($moved.status -eq 'ok' -and -not $moved.source.exists -and $moved.destination.exists) ('move failed: '+($moved|ConvertTo-Json -Compress -Depth 6))
   Assert ($moved.destination.identity.id -eq $ready.source.identity.id) 'move changed identity'
+  $inventory=Send $lease @{command='inventory'}
+  Assert ($inventory.status -eq 'ok' -and $inventory.inventory.complete -and $inventory.inventory.nonAtomic) ('inventory failed: '+($inventory|ConvertTo-Json -Compress -Depth 8))
+  Assert (@($inventory.inventory.entries).Count -eq 2 -and $inventory.inventory.totalBytes -eq 8) 'inventory counts invalid'
+  $item=@($inventory.inventory.entries|Where-Object {$_.path -eq 'marker'})[0]
+  Assert ($item.sha256 -eq '0682c5f2076f099c34cfdd15a9e063849ed437a49677e6fcc5b4198c76575be5') 'inventory hash invalid'
+  $unicodeName=([string][char]0x03C0)+'.txt'
+  [IO.File]::WriteAllText((Join-Path $dest $unicodeName),'unicode')
+  $unicodeInventory=Send $lease @{command='inventory'}
+  Assert ($unicodeInventory.status -eq 'ok' -and @($unicodeInventory.inventory.entries|Where-Object {$_.path -ceq $unicodeName}).Count -eq 1) 'unicode path was not preserved'
+  [IO.File]::Delete((Join-Path $dest $unicodeName))
+  $readOnly=Start-Helper 'Inventory';$readOnlyResult=Read-Reply $readOnly
+  Assert ($readOnlyResult.status -eq 'ready' -and $readOnlyResult.inventory.complete) 'read-only inventory failed'
+  Stop-Helper $readOnly
+  $nested=Join-Path $dest 'nested';[IO.Directory]::CreateDirectory($nested)|Out-Null
+  foreach($streamObject in @((Join-Path $dest 'marker'),$nested,$dest)) {
+    Set-Content -LiteralPath $streamObject -Stream 'wbprobe' -Value 'private stream'
+    $streamResult=Send $lease @{command='inventory'}
+    Assert ($streamResult.status -eq 'error' -and $streamResult.code -match 'NAMED_STREAM_REFUSED') ('named stream accepted: '+$streamObject+' '+($streamResult|ConvertTo-Json -Compress))
+    if(-not [RetentionFixtureNative]::Delete($streamObject+':wbprobe')) { throw 'stream cleanup failed' }
+  }
+  [IO.Directory]::Delete($nested)
+  $hardlink=Join-Path $dest 'hardlink'
+  New-Item -ItemType HardLink -Path $hardlink -Target (Join-Path $dest 'marker')|Out-Null
+  $hardResult=Send $lease @{command='inventory'}
+  Assert ($hardResult.status -eq 'error' -and $hardResult.code -match 'HARDLINK_REFUSED') ('hardlink accepted: '+($hardResult|ConvertTo-Json -Compress))
+  [IO.File]::Delete($hardlink)
+  $insideJunction=Join-Path $dest 'junction'
+  $external=Join-Path $root 'inventory-outside';[IO.Directory]::CreateDirectory($external)|Out-Null
+  New-Item -ItemType Junction -Path $insideJunction -Target $external|Out-Null
+  $junctionResult=Send $lease @{command='inventory'}
+  Assert ($junctionResult.status -eq 'error' -and $junctionResult.code -match 'REPARSE_POINT_REFUSED') ('junction accepted: '+($junctionResult|ConvertTo-Json -Compress))
+  [IO.Directory]::Delete($insideJunction)
+  $sparse=Join-Path $dest 'sparse'
+  $sparseFile=[IO.File]::Open($sparse,[IO.FileMode]::CreateNew,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+  try {
+    [uint32]$returned=0
+    if(-not [RetentionFixtureNative]::DeviceIoControl($sparseFile.SafeFileHandle,0x900C4,[IntPtr]::Zero,0,[IntPtr]::Zero,0,[ref]$returned,[IntPtr]::Zero)) { throw 'fixture sparse flag unavailable' }
+  } finally { $sparseFile.Dispose() }
+  try {
+    $sparseResult=Send $lease @{command='inventory'}
+    Assert ($sparseResult.status -eq 'error' -and $sparseResult.code -match 'UNSUPPORTED_ATTRIBUTES') ('sparse accepted: '+($sparseResult|ConvertTo-Json -Compress))
+  } finally { [IO.File]::Delete($sparse) }
+  $large=Join-Path $dest 'oversized'
+  $largeFile=[IO.File]::Open($large,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+  try { $largeFile.SetLength(512L*1024*1024+1) } finally { $largeFile.Dispose() }
+  try {
+    $limitResult=Send $lease @{command='inventory'}
+    Assert ($limitResult.status -eq 'error' -and $limitResult.code -match 'INVENTORY_BYTE_LIMIT') ('oversize accepted: '+($limitResult|ConvertTo-Json -Compress))
+  } finally { [IO.File]::Delete($large) }
   [IO.Directory]::CreateDirectory($source)|Out-Null
   [IO.File]::WriteAllText((Join-Path $source 'marker'),'replacement')
   $restoreCollision=Send $lease @{command='move';from='destination';expectedIdentity=$moved.destination.identity}

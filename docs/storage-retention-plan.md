@@ -391,3 +391,48 @@ all 15 focused plan tests, including the exact UTC boundary. The separate
 Windows PowerShell native fixture also passed. These checks exercised process
 interruption and disposable filesystem state, not system power-loss recovery or
 an unattended real service maintenance window.
+
+## Purge prerequisites (deletion still pending)
+
+New native phase receipts use `workbridge-retention-phase/2`, adding an exact UTC
+`publishedAtUtc` timestamp generated before atomic publication. Status and restore
+still accept legacy v1 receipts. The read-only `purge-check` command requires a
+committed v2 quarantine, the original source absent, the expected directory at
+the quarantine location, and seven complete days since publication. Future,
+invalid or changed receipts refuse. Legacy receipts have no trusted grace start
+and are never backdated from filesystem times.
+
+```powershell
+node scripts/storage-retention.mjs purge-check --install-root C:\work\workbridge-mcp --operation-id GC_OPERATION
+```
+
+This reports grace/location prerequisites only, with `mutationAuthorized:false`.
+It does not establish current reference closure, surviving-copy proof or deletion
+authority. Production CLI exposes no clock override and still has no purge action.
+
+The native read-only Inventory mode now inventories only the derived quarantine
+payload, with full volume/file IDs, exact relative paths, entry types, sizes,
+link counts and default-stream SHA-256. It refuses reparse points, hardlinked
+files, named streams on files/directories/root, unsupported file attributes and
+exceeded bounds. A directory can have named streams: disposable Windows tests
+confirmed this, so ordinary file hashes alone are insufficient purge evidence.
+
+Inventory is bounded at 20,000 entries, 512 MiB hashed data, 60 seconds and an
+8 MiB response. The adapter gives only this mode the larger bounded frame and
+wait; ordinary protocol limits remain smaller. Its consumer binds the native root
+identity, validates topology/paths/counts and canonicalizes entry order. The
+snapshot remains explicitly non-atomic and authorizes no mutation.
+
+Disposable acceptance passed for the real native CLI cycle including v2 receipts,
+read-only inventory and an unelapsed grace result. The final combined
+engine/CLI/adapter/inventory/grace suite passed 38 focused tests. The separate Windows native fixture passed named-stream,
+hardlink, junction, sparse/oversized, Unicode and ordinary inventory cases.
+
+Actual irreversible purge remains the next implementation. It needs a reviewed
+digest binding native per-entry identities, a verified surviving copy, fresh
+closed references and a durable partial-deletion ledger. On interruption, only
+the recorded in-flight deletion prefix may be absent; newly created or replaced
+entries must survive and cause conflict. Directory pins do not freeze child
+creation, as a disposable Windows probe demonstrated. No generic pathname-based
+recursive deletion or weaker whole-tree snapshot claim is an acceptable fallback.
+No real retained data was deleted and no disk space has been reclaimed.

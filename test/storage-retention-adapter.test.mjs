@@ -17,7 +17,7 @@ const ready =
     source: { exists: true },
     destination: { exists: false },
   }) + '\n';
-function fakeSpawn({ stuck = false, oversized = false } = {}) {
+function fakeSpawn({ stuck = false, oversized = false, response = ready } = {}) {
   const calls = [];
   function launch(_exe, args) {
     calls.push(args);
@@ -41,7 +41,7 @@ function fakeSpawn({ stuck = false, oversized = false } = {}) {
       if (!stuck) finish();
       return !stuck;
     };
-    setImmediate(() => child.stdout.write(oversized ? Buffer.alloc(65537, 65) : ready));
+    setImmediate(() => child.stdout.write(oversized ? Buffer.alloc(65537, 65) : response));
     return child;
   }
   return { calls, launch };
@@ -89,5 +89,45 @@ test('helper that will not exit even after kill refuses cleanup', async () => {
 test('oversized unterminated stdout is bounded and refused', async () => {
   const fake = fakeSpawn({ oversized: true });
   const adapter = createMaintenanceAdapter({ testDependencies: testDeps(fake.launch) });
+  await assert.rejects(adapter.inspectLocations(ctx), { code: 'HELPER_OUTPUT_LIMIT' });
+});
+
+test('only Inventory mode accepts a bounded reply beyond the ordinary protocol limit', async () => {
+  const identity = { volume: '1'.repeat(16), id: '1'.repeat(32) };
+  const entries = [{ path: '', type: 'directory', identity, size: 0, nlink: 1, sha256: null }];
+  for (let index = 0; index < 1000; index++)
+    entries.push({
+      path: `file-${index}.txt`,
+      type: 'file',
+      identity: { volume: identity.volume, id: (index + 2).toString(16).padStart(32, '0') },
+      size: 0,
+      nlink: 1,
+      sha256: 'a'.repeat(64),
+    });
+  const response =
+    JSON.stringify({
+      status: 'ready',
+      sameVolume: true,
+      source: { exists: false },
+      destination: { exists: true, identity },
+      inventory: {
+        schema: 'workbridge-retention-inventory/1',
+        complete: true,
+        nonAtomic: true,
+        namedStreams: 0,
+        totalBytes: 0,
+        entries,
+      },
+    }) + '\n';
+  assert.ok(Buffer.byteLength(response) > 65536);
+  const fake = fakeSpawn({ response });
+  const adapter = createMaintenanceAdapter({ testDependencies: testDeps(fake.launch) });
+  assert.equal(
+    (await adapter.inspectInventory({ ...ctx, plan: { ...ctx.plan, sourceIdentity: identity } })).entries
+      .length,
+    1001,
+  );
+  assert.ok(fake.calls[0].includes('Inventory'));
+  assert.equal(fake.calls[0].includes('-MaintenanceConfirmed'), false);
   await assert.rejects(adapter.inspectLocations(ctx), { code: 'HELPER_OUTPUT_LIMIT' });
 });

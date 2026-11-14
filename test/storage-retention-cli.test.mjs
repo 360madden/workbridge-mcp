@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { createHash } from 'node:crypto';
 import { parseArgs, runRetention } from '../scripts/storage-retention.mjs';
+import { createMaintenanceAdapter } from '../scripts/storage-retention-maintenance.mjs';
 
 const hash = (text) => createHash('sha256').update(text).digest('hex').toUpperCase();
 test('CLI refuses missing maintenance, mutation aliases, and unbounded source paths', () => {
@@ -133,6 +134,20 @@ test(
       parseArgs(['status', '--install-root', root, '--operation-id', 'fixture-q']),
     );
     assert.equal(state.state, 'quarantined');
+    const inventory = await createMaintenanceAdapter().inspectInventory({
+      installRoot: root,
+      operationId: 'fixture-q',
+      plan: planned.plan,
+    });
+    assert.equal(inventory.entries.filter((entry) => entry.type === 'file').length, 4);
+    assert.equal(inventory.totalBytes, 11);
+    assert.equal(inventory.mutationAuthorized, false);
+    const grace = await runRetention(
+      parseArgs(['purge-check', '--install-root', root, '--operation-id', 'fixture-q']),
+    );
+    assert.equal(grace.eligible, false);
+    assert.equal(grace.reason, 'GRACE_NOT_ELAPSED');
+    assert.equal(grace.mutationAuthorized, false);
     const archived = path.join(
       root,
       '.local',

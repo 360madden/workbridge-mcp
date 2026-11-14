@@ -14,6 +14,7 @@ import {
   restore,
 } from './storage-retention-quarantine.mjs';
 import { createMaintenanceAdapter } from './storage-retention-maintenance.mjs';
+import { inspectPurgeGrace } from './storage-retention-purge.mjs';
 
 const fail = (code) => Object.assign(new Error(code), { code });
 const identifier = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -24,6 +25,7 @@ export function parseArgs(args) {
     plan: ['--install-root', '--updater-operation', '--kind', '--output'],
     quarantine: ['--plan', '--expect-plan-sha256', '--operation-id', '--maintenance-confirmed'],
     status: ['--install-root', '--operation-id'],
+    'purge-check': ['--install-root', '--operation-id'],
     restore: ['--install-root', '--operation-id', '--expect-plan-sha256', '--maintenance-confirmed'],
   };
   if (!Object.hasOwn(allowed, action)) throw fail('INVALID_ACTION');
@@ -102,6 +104,8 @@ export async function runRetention(options) {
   }
   if (options.action === 'status')
     return retentionStatus({ installRoot: root, operationId: options['--operation-id'] }, adapter);
+  if (options.action === 'purge-check')
+    return inspectPurgeGrace({ installRoot: root, operationId: options['--operation-id'] }, adapter);
   return restore(
     {
       installRoot: root,
@@ -116,7 +120,7 @@ export async function runRetention(options) {
 async function main(args) {
   if (args.length === 1 && args[0] === '--help') {
     process.stdout.write(
-      'Workbridge retention (no purge):\n  plan --install-root PATH --updater-operation ID --kind candidate|displaced [--output ABSOLUTE_FILE]\n  quarantine --plan ABSOLUTE_FILE --expect-plan-sha256 SHA --operation-id GCID --maintenance-confirmed\n  status --install-root PATH --operation-id GCID\n  restore --install-root PATH --operation-id GCID --expect-plan-sha256 SHA --maintenance-confirmed\nMaintenance confirmation attests coordinated quiet clients/builders; the updater lock alone is insufficient.\nExit: 0 planned/settled, 1 refused/conflict, 2 invalid arguments. Quarantine reclaims zero bytes.\n',
+      'Workbridge retention (no purge mutation):\n  plan --install-root PATH --updater-operation ID --kind candidate|displaced [--output ABSOLUTE_FILE]\n  quarantine --plan ABSOLUTE_FILE --expect-plan-sha256 SHA --operation-id GCID --maintenance-confirmed\n  status --install-root PATH --operation-id GCID\n  restore --install-root PATH --operation-id GCID --expect-plan-sha256 SHA --maintenance-confirmed\n  purge-check --install-root PATH --operation-id GCID\nPurge-check is read-only grace/location evidence, not deletion authority.\nMaintenance confirmation attests coordinated quiet clients/builders; the updater lock alone is insufficient.\nExit: 0 planned/settled/check passed, 1 refused/conflict/check incomplete, 2 invalid arguments. Quarantine reclaims zero bytes.\n',
     );
     return 0;
   }
@@ -132,7 +136,7 @@ async function main(args) {
   try {
     const result = await runRetention(options);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    return result.status === 'refused' || result.state === 'conflict' ? 1 : 0;
+    return result.status === 'refused' || result.state === 'conflict' || result.eligible === false ? 1 : 0;
   } catch (error) {
     process.stdout.write(
       `${JSON.stringify({ status: 'refused', code: error.code ?? 'RETENTION_FAILED' })}\n`,

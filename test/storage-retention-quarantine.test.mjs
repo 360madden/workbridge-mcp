@@ -434,3 +434,43 @@ test('stale scratch is never treated as a phase or a blocker to validated replay
   assert.equal(status.pendingCommit, true);
   assert.equal((await quarantine(f.request, f.deps)).state, 'quarantined');
 });
+
+test('timestamped v2 phases support quarantine, status and restore', async (t) => {
+  const f = await fixture(t);
+  const deps = {
+    ...f.deps,
+    withMaintenance: (ctx, callback) =>
+      f.deps.withMaintenance(ctx, (guard) =>
+        callback({
+          ...guard,
+          publishPhase: async ({ phase, planSha256 }) => {
+            const scratch = path.join(ctx.operationDir, `v2-${randomUUID()}.tmp`);
+            const handle = await open(scratch, 'wx');
+            try {
+              await handle.writeFile(
+                JSON.stringify({
+                  schema: 'workbridge-retention-phase/2',
+                  operationId: ctx.operationId,
+                  planSha256,
+                  phase,
+                  publishedAtUtc: new Date().toISOString(),
+                }),
+              );
+              await handle.sync();
+            } finally {
+              await handle.close();
+            }
+            try {
+              await link(scratch, path.join(ctx.operationDir, `${phase}.json`));
+            } finally {
+              await rm(scratch, { force: true });
+            }
+          },
+        }),
+      ),
+  };
+  assert.equal((await quarantine(f.request, deps)).state, 'quarantined');
+  assert.equal((await retentionStatus(f.statusArgs, deps)).state, 'quarantined');
+  assert.equal((await restore(f.restoreArgs, deps)).state, 'restored');
+  assert.equal((await retentionStatus(f.statusArgs, deps)).state, 'restored');
+});
