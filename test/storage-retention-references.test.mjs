@@ -287,3 +287,39 @@ test('0.16.4-dev active seal additionally requires all three GUI validation gate
   assert.equal(complete.installed.sealBinding.status, 'manifest-bound');
   assert.equal(complete.installed.sealBinding.payloadVerified, false);
 });
+
+test('unknown request path fields prevent reference closure while known release remains protected', async (t) => {
+  const f = await fixture(t);
+  await f.operation('old', null, { request: { futureRecoveryPath: path.join(f.root, 'other-resource') } });
+  await f.save('.local/installed-release.json', f.marker('old'));
+  const graph = await inspectRetentionReferences({ installRoot: f.root });
+  assert.equal(graph.complete, false);
+  assert.ok(graph.blockers.some((b) => b.code === 'UNKNOWN_OPERATION_REQUEST_FIELD'));
+  assert.deepEqual(graph.operations[0].comparisonScopes, []);
+  assert.equal(graph.operations[0].release.scope, 'internal');
+  assert.ok(graph.protectedPaths.includes(graph.operations[0].release.path));
+});
+
+test('known node executable references protect internal copy aliases without traversal', async (t) => {
+  const f = await fixture(t);
+  const alias = path.join(f.root, '.local/update-operations/old/candidate/node.exe');
+  await f.operation('old', null, { request: { nodePath: alias } });
+  await f.save('.local/installed-release.json', f.marker('old'));
+  const graph = await inspectRetentionReferences({ installRoot: f.root });
+  assert.equal(graph.complete, true, JSON.stringify(graph.blockers));
+  assert.ok(
+    graph.references.some((r) => r.kind === 'node-executable' && r.path === alias && r.scope === 'internal'),
+  );
+  assert.ok(graph.protectedPaths.includes(alias));
+});
+test('malformed node executable references prevent closure without hiding the release reference', async (t) => {
+  for (const nodePath of [false, '', 'relative-node.exe', 'x'.repeat(32768)]) {
+    const f = await fixture(t);
+    await f.operation('old', null, { request: { nodePath } });
+    await f.save('.local/installed-release.json', f.marker('old'));
+    const graph = await inspectRetentionReferences({ installRoot: f.root });
+    assert.equal(graph.complete, false);
+    assert.ok(graph.blockers.some((b) => b.code === 'INVALID_NODE_EXECUTABLE_REFERENCE'));
+    assert.equal(graph.operations[0].release.scope, 'internal');
+  }
+});

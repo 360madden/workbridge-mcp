@@ -19,8 +19,14 @@ selected candidate/displaced runtime with retained manifest bytes. A bounded
 real comparison verified 5,730 files across a displaced runtime and its backup
 (148,056,112 bytes hashed; 74,028,056 duplicate logical bytes observed). Two
 missing journals keep overall reference closure incomplete and their operations
-protected. No result is mutation eligible. Next: journaled quarantine/restore
-with disposable acceptance, then a separately reviewed real maintenance action.
+protected. Read-only results are not mutation authority. Journaled
+quarantine/status/restore is now implemented behind the shared CLI, a reviewed
+plan hash, explicit maintenance confirmation and native updater lease. Disposable
+Windows acceptance covers the complete CLI cycle, no-overwrite moves and atomic
+phase publication. Actual plan creation refuses the incomplete live graph;
+retained data and the live service remain unchanged. Next: qualify a concrete
+real maintenance action without discarding the missing-journal evidence, then
+implement separately reviewed purge. Job compaction and scheduling remain later.
 
 ## Current checkpoint — 2026-11-01
 

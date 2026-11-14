@@ -312,6 +312,27 @@ export async function verifyRuntimeDuplicate(
       }
     }
     checkTime();
+    const treeHash = (inventory) =>
+      createHash('sha256')
+        .update(
+          JSON.stringify(
+            [...files.keys()].sort().map((key) => {
+              const info = inventory.found.get(key).info;
+              return [
+                key,
+                files.get(key).sha256,
+                files.get(key).bytes,
+                ...['dev', 'ino', 'size', 'mtimeNs', 'ctimeNs', 'mode', 'nlink'].map((field) =>
+                  String(info[field]),
+                ),
+              ];
+            }),
+          ),
+        )
+        .digest('hex');
+    result.sourceTreeSha256 = treeHash(inventories[0]);
+    result.retainedTreeSha256 = treeHash(inventories[1]);
+    checkTime();
     result.verifiedDuplicate = true;
     result.reason = 'verified-read-only';
   } catch (error) {

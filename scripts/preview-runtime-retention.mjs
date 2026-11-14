@@ -241,6 +241,7 @@ export async function previewRuntimeRetention(options, services = {}) {
       retainedRoot,
       manifestBinding,
       manifestFileCount: manifest.length,
+      metadataBindings: reads,
     });
     result.comparison = await verify({
       resourceRoot,

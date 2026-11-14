@@ -97,7 +97,7 @@ authorization to apply them to current files:
 | Installed runtime, exact sealed release and required containing paths | Protect |
 | Current operation and rollback chain | Initially preserve all 30 backup runtimes; verify checksums before declaring rollback available |
 | Unresolved, missing, malformed or unknown operation state | Protect; report the blocker |
-| Older than 30 days, terminal, redundant candidate/displaced runtime | Review only after equivalent retained bytes and all references are verified |
+| At least 14 days old, completed, redundant candidate/displaced runtime | Review only after equivalent retained bytes and all references are verified |
 | Referenced release, active preparation or Git worktree/staging root | Protect regardless of age |
 | Unreferenced sealed release older than 30 days | Review only after validation and recovery references are closed |
 | Operation request, controller, journal, manifests and retirement receipt | Retain compact history |
@@ -307,3 +307,87 @@ identity change; Windows refused the attempted physical reparent fixture.
 The next implementation is journaled quarantine/restore of explicitly reviewed
 resource units, with fresh reference and identity checks under coordinated
 maintenance. Purge and job-output compaction remain later gates.
+
+## Quarantine and restore implementation
+
+The CLI is now `node scripts/storage-retention.mjs --help`, with shared operations
+for `plan`, `quarantine`, `status` and `restore`. It exposes no purge command.
+
+```powershell
+# Read-only policy/proof checks; save only to an explicit absent output file.
+node scripts/storage-retention.mjs plan --install-root C:\work\workbridge-mcp --updater-operation OLD_OPERATION --kind displaced --output C:\absolute\reviewed-plan.json
+
+# Review the exact plan and coordinate quiet clients/builders before maintenance.
+node scripts/storage-retention.mjs quarantine --plan C:\absolute\reviewed-plan.json --expect-plan-sha256 REVIEWED_SHA256 --operation-id GC_OPERATION --maintenance-confirmed
+node scripts/storage-retention.mjs status --install-root C:\work\workbridge-mcp --operation-id GC_OPERATION
+node scripts/storage-retention.mjs restore --install-root C:\work\workbridge-mcp --operation-id GC_OPERATION --expect-plan-sha256 REVIEWED_SHA256 --maintenance-confirmed
+```
+
+These examples are templates, not a reviewed action for current retained data.
+The maintenance flag attests that clients, builders and manual writers have
+been coordinated; an idle snapshot or updater lock alone cannot establish that.
+
+The first policy requires a complete reference graph, a completed operation at
+least 14 full days old, an unreferenced allowed resource, and current byte-equivalence
+proof. The current and immediately previous deployment generations are excluded.
+Every recovery backup remains protected. A metadata-only preflight rejects known
+blockers before hashing runtime copies. Actual AMD-DESKTOP plan creation refused
+`REFERENCE_GRAPH_INCOMPLETE` in about 1.35 seconds because of the two retained
+missing journals. It created no plan, quarantine directory or maintenance lease.
+
+The candidate/displaced age was reassessed from the initial proposed 30 days to
+14 days after this milestone. The oldest current deployment is October 18, so
+the original cutoff would prevent any useful current cleanup despite keeping
+every recovery backup. Fourteen days, exclusion of the current and preceding
+generation, active duplicate verification and the planned seven-day quarantine
+grace give a practical first default. Release review remains 30 days; backup
+retention has no automatic expiry. No purge is implemented or authorized here.
+
+Plans bind the actual host, canonical installation path, exact updater operation
+and resource kind, native directory volume/file ID, manifest, source/retained
+file evidence and stable reference metadata. Output is create-only; execution
+requires the reviewed canonical plan SHA-256 and a durable GC operation ID.
+
+The journal lives at `.local/storage-quarantine/<GCID>`. Preparatory creation
+checks ordinary ancestry and flushes a create-only immutable intent before any
+payload move. An existing incomplete or different intent refuses reuse. This
+preparation is path-based and assumes coordinated maintenance; it grants no move
+authority. Before movement, the Windows helper pins the relevant directory
+chains, holds the updater's exclusive lock, rechecks volume/reparse state, and
+renames the expected directory through its handle without replacing an existing
+destination. There is no production Node rename fallback.
+
+The engine revalidates the plan under the lease and verifies payload bytes before
+and after movement. Its prepared/quarantined/restoring/restored states reconcile
+the original and archive directory identities. Both locations present, neither
+present, unexpected identity, modified payload or a restore collision refuses
+without overwriting. Restore verifies the archive against its retained proof;
+it does not require the original source still to exist or rerun the original
+source preview. Status is read-only.
+
+Phase receipts are generated from fixed fields by the native helper, written to
+a unique private temporary file, flushed, then published atomically with a
+handle-relative no-replace rename while the lease is held. A crash before
+publication leaves an inert scratch file and an absent phase, allowing existing
+identity-based reconciliation. Explicitly corrupted journal files fail closed.
+A partial initial intent still requires manual reconciliation, before a payload
+can move. Source contents rely on coordinated quiet writers; neither the hash
+scan nor the final lease observation claims an adversarially atomic whole-tree
+snapshot.
+
+Disposable Windows acceptance has exercised the full CLI plan, quarantine,
+status and restore sequence, preserving both runtime copies. Separate fixtures
+cover native lock contention, no-overwrite moves in both directions, identity
+and junction refusals, lease timeouts, atomic phase publication, interrupted
+state transitions, stale plans and journal corruption. Only generated test
+installations were moved. No real retained data or running service was changed,
+and quarantine frees zero disk space. Real maintenance, purge, job compaction
+and routine scheduling remain open.
+
+Validation on AMD-DESKTOP: the combined retention suite passed **105 tests with
+one file-symlink privilege skip**, including the full native CLI fixture and
+adapter shutdown/output-limit cases. The final 14-day age-policy check passed
+all 15 focused plan tests, including the exact UTC boundary. The separate
+Windows PowerShell native fixture also passed. These checks exercised process
+interruption and disposable filesystem state, not system power-loss recovery or
+an unattended real service maintenance window.

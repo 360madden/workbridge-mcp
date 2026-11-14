@@ -14,6 +14,18 @@ export const referenceLimits = Object.freeze({
 });
 const idPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const digestPattern = /^[a-fA-F0-9]{64}$/;
+const requestKeys = new Set([
+  'schema',
+  'action',
+  'installRoot',
+  'operationId',
+  'releasePath',
+  'releaseDigest',
+  'nodePath',
+  'serviceTaskName',
+  'readinessTimeoutSeconds',
+  'version',
+]);
 const fail = (code) => Object.assign(new Error(code), { code });
 const stamp = (s) => [s.dev, s.ino, s.size, s.mtimeNs, s.ctimeNs, s.nlink].join(':');
 const sameDirectory = (a, b) => a.dev === b.dev && a.ino === b.ino;
@@ -271,6 +283,10 @@ export async function inspectRetentionReferences({ installRoot, limits = {} } = 
               !['Apply', 'Recover', 'Rollback'].includes(request.action)
             )
               throw fail('INVALID_OPERATION_REQUEST');
+            // Unknown request fields could introduce another resource reference.
+            // Keep safely parsed known references, but do not claim closure.
+            if (Object.keys(request).some((key) => !requestKeys.has(key)))
+              opBlock('UNKNOWN_OPERATION_REQUEST_FIELD');
             if (typeof request.releasePath !== 'string' || !path.isAbsolute(request.releasePath))
               throw fail('INVALID_RELEASE_REFERENCE');
             const releasePath = path.resolve(request.releasePath);
@@ -281,6 +297,20 @@ export async function inspectRetentionReferences({ installRoot, limits = {} } = 
             };
             result.references.push({ operationId: op.id, ...op.release });
             if (op.release.scope === 'internal') protect(releasePath);
+            if (Object.hasOwn(request, 'nodePath')) {
+              if (
+                typeof request.nodePath !== 'string' ||
+                request.nodePath.length < 1 ||
+                request.nodePath.length > 32767 ||
+                /[\u0000-\u001f]/.test(request.nodePath) ||
+                !path.isAbsolute(request.nodePath)
+              )
+                throw fail('INVALID_NODE_EXECUTABLE_REFERENCE');
+              const nodePath = path.resolve(request.nodePath);
+              const scope = inside(installRoot, nodePath) ? 'internal' : 'external';
+              result.references.push({ operationId: op.id, kind: 'node-executable', path: nodePath, scope });
+              if (scope === 'internal') protect(nodePath);
+            }
             if (request.action !== 'Apply') op.caveats.push('request-action-rewritten');
           } catch (error) {
             opBlock(error.code || 'UNREADABLE_OPERATION_REQUEST');
@@ -304,6 +334,7 @@ export async function inspectRetentionReferences({ installRoot, limits = {} } = 
             )
               throw fail('INVALID_OPERATION_JOURNAL');
             op.phase = journal.phase;
+            op.updatedUtc = journal.updatedUtc ?? null;
             op.version = journal.version;
             op.releaseDigest = digest(journal.releaseDigest);
             op.previousRelease =
