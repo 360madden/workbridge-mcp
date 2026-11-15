@@ -1,9 +1,9 @@
 # Workbridge storage retention and garbage collection
 
 November 14, 2026. Active machine: **AMD-DESKTOP**. This is an implementation
-plan; no retained runtime, backup, job, fixture or evidence has been deleted.
-The first implementation is an offline, read-only storage inventory. Source
-commits, installed runtime changes and reclaimed disk space are separate results.
+plan. No live retained runtime, backup or job has been deleted or compacted in
+this workstream. Source commits, installed runtime changes and reclaimed disk
+space are separate results.
 
 ## Outcome and priorities
 
@@ -26,14 +26,15 @@ Work in this order, reassessing after each measured result:
 3. **Recoverable maintenance with explicit purge.** Implement guarded quarantine,
    restore and later purge of reviewed resource units. Confirm real disk savings
    only after purge; a move on the same volume reclaims no space.
-4. **Job-output compaction.** Expire large output while keeping durable command
-   identities and workflow reconciliation. This requires owner/schema work;
-   deleting historical job JSON is not an acceptable shortcut.
+4. **Job-output compaction.** Preserve complete original job records in lossless
+   archives while keeping durable command identities and workflow reconciliation.
+   A one-job owner operation is implemented in source; output expiry remains a
+   separate future policy. Deleting historical job JSON is not an acceptable shortcut.
 5. **Routine retention and UI.** After a successful manual cycle and recovery
    exercise, add bounded scheduled previews, pressure reporting and shared GUI
    review. Automatic purge remains an explicit operator policy, not the default.
 
-## Current source findings
+## November 14 census and source findings
 
 The bounded November 14 census counted the following logical file bytes. This
 is a changing filesystem, not an atomic snapshot or an allocated-space measure.
@@ -264,7 +265,7 @@ the bounded read-only behavior. At that checkpoint, reference closure, duplicate
 proof, quarantine, restore and purge were still upcoming work. No retained data was deleted and the
 live service was unchanged.
 
-## Reference and duplicate preview
+## Historical reference and duplicate preview checkpoint
 
 `scripts/preview-runtime-retention.mjs` now connects the reference graph to
 bounded, current-content comparison of a selected completed operation:
@@ -287,8 +288,8 @@ No request provides an arbitrary deletion path, and every result remains
 The graph discovers 32 operation directories and traverses all 30 installed
 predecessor identities. At `cap12-activate-20261031-01`, the recorded previous
 runtime version differs from its predecessor marker version; this is reported
-as a caveat and does not certify exact-version rollback. Two missing journals
-leave the overall graph incomplete while preserving those entire operations.
+as a caveat and does not certify exact-version rollback. At that checkpoint, two
+missing journals left the overall graph incomplete while preserving those operations.
 Independent hash evidence for another completed operation remains reportable.
 The active internal release seal binds the manifest bytes to the installed
 marker, request, journal and passed named validation gates. Its status is
@@ -314,14 +315,13 @@ The combined preview/reference/duplicate suite passed **60 tests with one
 host-privilege skip**. The ancestor replacement regression uses an injected file
 identity change; Windows refused the attempted physical reparent fixture.
 
-The next implementation is journaled quarantine/restore of explicitly reviewed
-resource units, with fresh reference and identity checks under coordinated
-maintenance. Purge and job-output compaction remain later gates.
+That checkpoint preceded the quarantine, purge and job archive work described
+below. Its read-only results were not mutation authority.
 
-## Quarantine and restore implementation
+## Historical quarantine and restore checkpoint
 
-The CLI is now `node scripts/storage-retention.mjs --help`, with shared operations
-for `plan`, `quarantine`, `status` and `restore`. It exposes no purge command.
+At this checkpoint the CLI supported `plan`, `quarantine`, `status` and
+`restore`. The later purge commands are described below.
 
 ```powershell
 # Read-only policy/proof checks; save only to an explicit absent output file.
@@ -351,7 +351,8 @@ the original cutoff would prevent any useful current cleanup despite keeping
 every recovery backup. Fourteen days, exclusion of the current and preceding
 generation, active duplicate verification and the planned seven-day quarantine
 grace give a practical first default. Release review remains 30 days; backup
-retention has no automatic expiry. No purge is implemented or authorized here.
+retention has no automatic expiry. At that checkpoint purge was not implemented;
+the later implementation does not itself authorize a production purge.
 
 Plans bind the actual host, canonical installation path, exact updater operation
 and resource kind, native directory volume/file ID, manifest, source/retained
@@ -391,8 +392,8 @@ cover native lock contention, no-overwrite moves in both directions, identity
 and junction refusals, lease timeouts, atomic phase publication, interrupted
 state transitions, stale plans and journal corruption. Only generated test
 installations were moved. No real retained data or running service was changed,
-and quarantine frees zero disk space. Real maintenance, purge, job compaction
-and routine scheduling remain open.
+and quarantine frees zero disk space. At that checkpoint real maintenance,
+purge, job compaction and routine scheduling remained open.
 
 Validation on AMD-DESKTOP: the combined retention suite passed **105 tests with
 one file-symlink privilege skip**, including the full native CLI fixture and
@@ -402,7 +403,7 @@ Windows PowerShell native fixture also passed. These checks exercised process
 interruption and disposable filesystem state, not system power-loss recovery or
 an unattended real service maintenance window.
 
-## Purge prerequisites (deletion still pending)
+## Historical purge prerequisites checkpoint
 
 New native phase receipts use `workbridge-retention-phase/2`, adding an exact UTC
 `publishedAtUtc` timestamp generated before atomic publication. Status and restore
@@ -418,7 +419,8 @@ node scripts/storage-retention.mjs purge-check --install-root C:\work\workbridge
 
 This reports grace/location prerequisites only, with `mutationAuthorized:false`.
 It does not establish current reference closure, surviving-copy proof or deletion
-authority. Production CLI exposes no clock override and still has no purge action.
+authority. The CLI exposes no clock override. The separately confirmed purge
+action was implemented later, as described below.
 
 The native read-only Inventory mode now inventories only the derived quarantine
 payload, with full volume/file IDs, exact relative paths, entry types, sizes,
@@ -438,7 +440,7 @@ read-only inventory and an unelapsed grace result. The final combined
 engine/CLI/adapter/inventory/grace suite passed 38 focused tests. The separate Windows native fixture passed named-stream,
 hardlink, junction, sparse/oversized, Unicode and ordinary inventory cases.
 
-Actual irreversible purge remains the next implementation. It needs a reviewed
+The subsequent irreversible purge implementation needed a reviewed
 digest binding native per-entry identities, a verified surviving copy, fresh
 closed references and a durable partial-deletion ledger. On interruption, only
 the recorded in-flight deletion prefix may be absent; newly created or replaced
@@ -447,7 +449,7 @@ creation, as a disposable Windows probe demonstrated. No generic pathname-based
 recursive deletion or weaker whole-tree snapshot claim is an acceptable fallback.
 No real retained data was deleted and no disk space has been reclaimed.
 
-## Journaled purge mechanism checkpoint (production proof integration pending)
+## Historical journaled purge mechanism checkpoint
 
 The separate `Storage-RetentionPurge.ps1` helper, Node lease provider and journal
 core now implement bounded deletion against a reviewed immutable per-entry
@@ -520,7 +522,7 @@ temporary payloads; there is no production clock override. Focused proof/core
 checks also passed. Neither source tests nor a successful fixture authorize real
 deletion. Actual maintenance still requires a reviewed target and explicit
 confirmation. The two historical missing-journal cases are handled by the narrow
-evidence classification below; job compaction and scheduling are later work.
+evidence classification below; scheduling remains later work.
 
 ## Historical controller refusals
 
@@ -579,10 +581,58 @@ reclaimed no space. This is one selected record, not an estimate for the catalog
 The artifact explicitly sets `compactionAuthorized:false`. No age, inactivity,
 replay safety, allocated-space savings or writer permission is established.
 
-The versioned archive reader is now integrated with the existing Jobs loader;
-the combined archive/recovery/result/retry suite passed 73 tests, including exact
-stream behavior, same-ID replay, changed-request refusal and corrupt-archive
-refusal before launch. It retains the descriptor's hash for guarded saves. This
-is source/read support only: no production archive descriptor or compaction
-writer exists yet. A compaction writer, expiry and routine scheduling remain
-separate work. Worker result receipts and workflow/agent journals stay unchanged.
+The versioned archive reader and one-job compact/restore writer are integrated
+with the Jobs owner in source commit `adc2c86`. The shared-service CLI/MCP
+surface provides `command_archive_status` and `command_archive`; the
+[operator examples](workbridge-cli.md#lossless-saved-job-compaction) show the
+explicit operation ID, direction and current record hash. An eligible saved
+terminal job can be compacted only when the compressed copy, descriptor and
+receipt allowance give positive logical savings. A verified private archive
+retains the exact original bytes, including unknown fields and stream presence.
+Restore recovers those bytes, and historical completion receipts prevent an old
+compact request from reapplying after restoration. Worker result receipts and
+workflow/agent journals are not compacted by this operation.
+
+The source build and **94 focused archive, CLI, recovery, result and publication
+tests passed**. They include disposable crash/retry and replay cases; independent
+review found no remaining safety blocker within the documented single-owner
+model. The operation serializes with that owner and the updater admission lease.
+Its hash-guarded rename does not prevent arbitrary external writers between the
+check and replacement, and the fixtures do not prove power-loss durability.
+Existing valid blobs are retained, with no automatic expiry. A conflicting
+two-link pending marker or an incomplete gzip stage after a compressor change
+can require explicit reconciliation; both refuse rather than bypass checks.
+
+This is a **source milestone**, not deployment or permission to alter a real
+job. No production job was compacted by the tests, and the proposal's modelled
+bytes are not reclaimed space. An older owner cannot read the descriptor; restore
+each compacted record before downgrading to a runtime without archive support.
+The one-ID restore API alone does not prove the entire state directory is ready
+for downgrade. Output expiry, automatic compaction and scheduling remain separate
+work.
+
+## Ranked next steps
+
+1. **Prepare and validate a source release.** Run the applicable WB-001 release
+   gates on a sealed candidate, retain rollback evidence, and verify the exact
+   candidate and current owner before any separately authorized service update.
+   A successful build, source commit or dispatch is not observed activation or
+   hosted acceptance. Deploying the job archive tools needs that update; the
+   read-only proposal and retention source CLIs do not prove the live owner has
+   acquired them.
+2. **Review one runtime cleanup target.** Refresh the selected plan and reference,
+   identity and retained-copy evidence under coordinated quiet maintenance before
+   an explicitly reviewed quarantine. Quarantine is reversible and reclaims no
+   bytes. A real purge requires the full v2 grace period, a freshly reviewed
+   approval digest and separate explicit authorization for that exact operation;
+   no real retained-data purge is authorized by the source work or test fixtures.
+   Measure actual storage after any authorized purge.
+3. **Exercise one saved-job archive after owner acceptance.** Select and review an
+   explicit job and its current canonical hash, then use a distinct operation ID
+   through the updated owner if that real operation is authorized. Verify status,
+   output, replay and byte-exact restoration, and measure actual disk use. Do not
+   infer permission to compact the catalog or expire output from a proposal.
+4. **Consider routine retention and UI afterward.** Use measured results and a
+   successful manual recovery cycle to design bounded previews and shared GUI
+   controls. Scheduling, automatic purge and output expiry require separate
+   policy and implementation decisions.

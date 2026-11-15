@@ -2,64 +2,50 @@
 
 ## Storage retention — November 14, 2026
 
-The next job-retention milestone has a read-only one-ID lossless archive proposal
-CLI. Its private output and exact gzip roundtrip passed six tests plus one real
-record model. No source job was changed and no space was reclaimed. The
-archive-aware Jobs reader subsequently passed 73 focused compatibility checks.
-The one-ID owner writer and CLI/MCP interface are now implemented with explicit
-source hashes, live-job exclusion and recoverable operation receipts. The build
-and 94 focused archive/recovery/publication checks passed; independent review
-found no remaining safety blocker under the documented single-owner model.
-Request replay, original output streams and exact byte restoration are preserved. Source changes are not live
-owner deployment.
+On **AMD-DESKTOP**, the [retention plan](storage-retention-plan.md) now has
+reference-aware runtime quarantine/restore and separately reviewed purge in
+source. A fresh read-only scan closed the installed chain and reference graph
+using narrow evidence for two historical controller preflight refusals; their
+operation roots and release references remain protected, with no synthesized
+journals or comparison scope. A real candidate plan was reviewed read-only,
+but it must be revalidated under coordinated quiet maintenance before any move.
+No real retained payload has been quarantined or purged by this workstream.
 
-Active machine: **AMD-DESKTOP**. The [ranked garbage-collection plan](storage-retention-plan.md)
-prioritizes bounded read-only inventory, then reference-aware review of old
-candidate/displaced runtime copies, recoverable quarantine and explicit purge,
-followed by job-output compaction and routine retention/UI. The fresh census
-found 6.23 GiB in updater operations, including about 4.08 GiB of candidate and
-displaced copies before exclusions. This is not a reclaimable-space claim.
-Keep all 30 rollback backup runtimes initially. The installed sealed release is
-nested inside `.local/wb001-gui-src-20261105c`, and durable job IDs prevent repeated
-side effects; neither staging roots nor old job JSON may be deleted by age alone.
-No retained data has been removed or service changed in this workstream.
+The Jobs owner now has a one-ID lossless archive reader and compact/restore
+writer, exposed in source through shared CLI/MCP operations. Source commit
+`adc2c86` passed the build and **94 focused archive, CLI, recovery, result and
+publication tests**; independent review found no remaining safety blocker under
+the documented single-owner model. The writer preserves exact record bytes,
+request identity and streams, requires positive logical savings, and uses durable
+operation receipts. A prior single-record proposal modelled 30,743 logical bytes
+of savings while retaining the original. No production job was compacted, and
+neither that estimate nor a quarantine move establishes reclaimed space.
 
-The next read-only slice resolves 32 operation directories and the 30-generation
-installed marker chain, binds the active nested release seal, and compares a
-selected candidate/displaced runtime with retained manifest bytes. A bounded
-real comparison verified 5,730 files across a displaced runtime and its backup
-(148,056,112 bytes hashed; 74,028,056 duplicate logical bytes observed). Two
-missing journals keep overall reference closure incomplete and their operations
-protected. Read-only results are not mutation authority. Journaled
-quarantine/status/restore is now implemented behind the shared CLI, a reviewed
-plan hash, explicit maintenance confirmation and native updater lease. Disposable
-Windows acceptance covers the complete CLI cycle, no-overwrite moves and atomic
-phase publication. Actual plan creation refuses the incomplete live graph;
-retained data and the live service remain unchanged. Next: qualify a concrete
-real maintenance action without discarding the missing-journal evidence, then
-implement separately reviewed purge. Job compaction and scheduling remain later.
+The November 14 census counted 6.23 GiB in updater operations, including about
+4.08 GiB of candidate and displaced copies before exclusions. Those figures are
+not a reclaimable-space claim. Keep all 30 rollback backup runtimes initially.
+The installed sealed release is nested inside `.local/wb001-gui-src-20261105c`;
+staging roots and durable job IDs must not be deleted by age alone.
 
-Purge prerequisites now include timestamped v2 phase receipts, legacy restore
-compatibility, a seven-day read-only `purge-check`, and a bounded native inventory
-that refuses named streams (including directory streams), links and unsupported
-attributes. The adapter validates the root identity and canonicalizes entries.
-The CLI now has review-only `purge-prepare` and separately digest/operation-
-confirmed `purge`, with a per-entry deletion ledger, partial-purge recovery,
-fresh surviving-copy/reference checks and disposable Windows acceptance. Actual
-deletion remains a separate reviewed action.
+Next steps, in priority order:
 
-The per-entry native purge mechanism and Node journal/provider checkpoint now
-passes 57 focused tests, including four disposable real-provider/native cases.
-It enforces seven full days, immutable approval bindings, fixed batch journals,
-identity checks and ordinary restore exclusion once purge starts. The subsequent
-production surviving-copy verifier and approval/outer CLI integration passed two
-actual NTFS fixtures using real plan/reference/native evidence. No real retained
-data has been purged. The two historical missing-journal blockers now have a
-reviewed, exact-evidence controller-refusal classification; a read-only scan
-closed the graph while retaining their protections and empty comparison scopes.
-Next prepare a concrete real-target review before any permanent cleanup. Job
-compaction and scheduling remain later. See the mechanism checkpoint in the
-[retention plan](storage-retention-plan.md).
+1. Validate a sealed source release with the applicable WB-001 gates and retain
+   rollback evidence. A separately authorized update and observed activation and
+   hosted acceptance are required before the live owner provides the new job
+   archive tools. Source commits and dispatch alone do not establish deployment.
+2. Refresh a concrete runtime target's plan and retained-copy/reference proof;
+   review and explicitly authorize any quarantine under coordinated quiet
+   maintenance. After the full v2 grace period, a real purge requires a separate
+   reviewed digest and explicit authorization for that exact operation. Measure
+   storage after any authorized purge.
+3. After an updated owner is accepted, review and authorize one explicit saved-job
+   archive operation. Verify status, output, same-ID replay and byte-exact restore,
+   then measure actual disk use. Restore compacted records before downgrading to
+   an owner without archive-reader support; one-ID restore does not certify the
+   entire state directory.
+4. Defer routine scheduling, automatic purge, output expiry and shared GUI controls
+   until a successful manual cycle and explicit policy choices. See the
+   [ranked next steps](storage-retention-plan.md#ranked-next-steps).
 
 ## Current checkpoint — 2026-11-01
 
