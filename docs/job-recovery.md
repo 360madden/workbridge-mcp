@@ -81,8 +81,6 @@ request retains `ID_REUSE`. After an uncertain call, inspect the original ID
 before deciding whether any new action is necessary. The shared CLI and browser
 address the same owner; do not create a second owner against the live state.
 
-## `command_list` paging and failures
-
 ## Archived-record read compatibility
 
 The source job loader now recognizes `workbridge-job-archive/1` descriptors
@@ -105,6 +103,8 @@ This adds read compatibility only. No compaction writer or production archived
 record has been created. Running owners require the normal WB-001 release process
 to use the new reader. A future writer must retain exact restoration for rollback
 to an owner that does not support archive descriptors.
+
+## `command_list` paging and failures
 
 The source implementation now gives the Jobs namespace its own 100,000-entry
 enumeration cap. Worker-result receipts count toward this bound but are not
