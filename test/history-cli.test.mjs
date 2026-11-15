@@ -91,8 +91,8 @@ async function preserved() {
 test('CLI discovers history filters and continues a sparse MCP page without modifying files or journals', async () => {
   const discovery = await cli([], ['--list-tools']);
   assert.equal(discovery.code, 0);
-  assert.equal(discovery.rows[0].serverVersion, '0.16.4-dev');
-  assert.equal(discovery.rows[0].tools.length, 64);
+  assert.equal(discovery.rows[0].serverVersion, '0.16.5-dev');
+  assert.equal(discovery.rows[0].tools.length, 66);
   for (const name of ['change_list', 'patch_list']) {
     const tool = discovery.rows[0].tools.find((t) => t.name === name);
     for (const field of ['project', 'path', 'state', 'scanLimit'])

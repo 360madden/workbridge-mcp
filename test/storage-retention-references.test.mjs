@@ -268,33 +268,38 @@ test('active seal rejects digest mismatch, missing receipts and missing named ch
   }
 });
 
-test('0.16.4-dev active seal additionally requires all three GUI validation gates', async (t) => {
-  const f = await fixture(t);
-  const manifest = { schema: 1, version: '0.16.4-dev', files: [] };
-  const sha = createHash('sha256').update(JSON.stringify(manifest)).digest('hex').toUpperCase();
-  await f.operation('gui', null, {
-    request: { releaseDigest: sha },
-    journal: { version: '0.16.4-dev', releaseDigest: sha },
-  });
-  await f.save('.local/releases/gui/manifest.json', manifest);
-  const receipt = {
-    schema: 1,
-    version: '0.16.4-dev',
-    result: 'passed',
-    manifestSha256: sha,
-    checks: { install: 0, tests: 0, startup: 0, updater: 0, format: 0, acceptance: 0 },
-  };
-  await f.save('.local/releases/gui/validated.json', receipt);
-  await f.save('.local/installed-release.json', f.marker('gui', '0.16.4-dev', sha));
-  const missing = await inspectRetentionReferences({ installRoot: f.root });
-  assert.equal(missing.installed.sealBinding, null);
-  assert.ok(missing.blockers.some((b) => b.code === 'ACTIVE_RELEASE_SEAL_INVALID'));
-  Object.assign(receipt.checks, { generic: 0, 'desktop-stage': 0, 'desktop-closure': 0 });
-  await f.save('.local/releases/gui/validated.json', receipt);
-  const complete = await inspectRetentionReferences({ installRoot: f.root });
-  assert.equal(complete.complete, true, JSON.stringify(complete.blockers));
-  assert.equal(complete.installed.sealBinding.status, 'manifest-bound');
-  assert.equal(complete.installed.sealBinding.payloadVerified, false);
+test('0.16.4 and 0.16.5 active seals both require all three GUI validation gates', async (t) => {
+  for (const version of ['0.16.4-dev', '0.16.5-dev']) {
+    const f = await fixture(t);
+    const manifest = { schema: 1, version, files: [] };
+    const sha = createHash('sha256').update(JSON.stringify(manifest)).digest('hex').toUpperCase();
+    await f.operation('gui', null, {
+      request: { releaseDigest: sha },
+      journal: { version, releaseDigest: sha },
+    });
+    await f.save('.local/releases/gui/manifest.json', manifest);
+    const receipt = {
+      schema: 1,
+      version,
+      result: 'passed',
+      manifestSha256: sha,
+      checks: { install: 0, tests: 0, startup: 0, updater: 0, format: 0, acceptance: 0 },
+    };
+    await f.save('.local/releases/gui/validated.json', receipt);
+    await f.save('.local/installed-release.json', f.marker('gui', version, sha));
+    const missing = await inspectRetentionReferences({ installRoot: f.root });
+    assert.equal(missing.installed.sealBinding, null, version);
+    assert.ok(
+      missing.blockers.some((b) => b.code === 'ACTIVE_RELEASE_SEAL_INVALID'),
+      version,
+    );
+    Object.assign(receipt.checks, { generic: 0, 'desktop-stage': 0, 'desktop-closure': 0 });
+    await f.save('.local/releases/gui/validated.json', receipt);
+    const complete = await inspectRetentionReferences({ installRoot: f.root });
+    assert.equal(complete.complete, true, JSON.stringify(complete.blockers));
+    assert.equal(complete.installed.sealBinding.status, 'manifest-bound');
+    assert.equal(complete.installed.sealBinding.payloadVerified, false);
+  }
 });
 
 test('unknown request path fields prevent reference closure while known release remains protected', async (t) => {

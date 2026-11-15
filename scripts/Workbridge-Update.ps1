@@ -234,7 +234,7 @@ function Get-WBRelease([string]$Path) {
     Test-WBManifest $payload $manifest.files
     # GUI-006 requires its desktop runtime closure and gate receipts even on a
     # manually supplied release. Legacy releases retain their original contract.
-    if ($manifest.version -ceq '0.16.4-dev') {
+    if (@('0.16.4-dev', '0.16.5-dev') -ccontains $manifest.version) {
         foreach ($check in @('install', 'tests', 'startup', 'updater', 'format', 'generic', 'desktop-stage', 'acceptance', 'desktop-closure')) {
             $value = $receipt.checks.$check
             if (($value -isnot [int] -and $value -isnot [long]) -or $value -ne 0) {

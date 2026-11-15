@@ -99,8 +99,8 @@ test('CLI discovers both structured tools and previews/applies a multi-file set 
   const discovered = await cli([], ['--list-tools']);
   assert.equal(discovered.code, 0);
   const catalog = discovered.rows[0];
-  assert.equal(catalog.serverVersion, '0.16.4-dev');
-  assert.equal(catalog.tools.length, 64);
+  assert.equal(catalog.serverVersion, '0.16.5-dev');
+  assert.equal(catalog.tools.length, 66);
   for (const name of ['config_preview', 'config_apply'])
     assert.ok(catalog.tools.find((t) => t.name === name)?.outputSchema);
   assert.equal(catalog.tools.find((t) => t.name === 'config_preview').annotations.readOnlyHint, true);

@@ -107,7 +107,7 @@ async function waitJob(id) {
 
 test('shared CLI and MCP discover all workflow schemas, run sequential literal commands, and review saved output', async () => {
   const catalog = await owner.listTools();
-  assert.equal(catalog.tools.length, 64);
+  assert.equal(catalog.tools.length, 66);
   for (const name of [
     'workflow_create',
     'workflow_status',

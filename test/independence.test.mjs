@@ -447,6 +447,7 @@ test(
       'Command-Host.cs',
       'Tunnel-ProcessLifetime.cs',
       'Local-Service-Descriptor.ps1',
+      'Job-Archive-Private.ps1',
     ])
       await copyFile(path.join('scripts', file), path.join(installation, 'scripts', file));
     const build = () =>

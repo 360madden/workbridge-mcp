@@ -127,7 +127,7 @@ test('existing diagnostics advertises bounded capacity and inventory schemas wit
   const f = await fixture(),
     catalog = await f.client.listTools(),
     tool = catalog.tools.find((t) => t.name === 'diagnostics');
-  assert.equal(catalog.tools.length, 64);
+  assert.equal(catalog.tools.length, 66);
   assert.equal(tool.annotations.readOnlyHint, true);
   assert.ok(tool.outputSchema.properties.jobs.properties.capacity);
   assert.ok(tool.outputSchema.properties.jobs.properties.inventory);

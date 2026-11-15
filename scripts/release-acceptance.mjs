@@ -52,45 +52,57 @@ try {
   ];
   const agentToolCount = tools.filter((tool) => agentToolNames.includes(tool.name)).length;
   const expectedTools =
-    runtimeVersion === '0.16.4-dev'
+    runtimeVersion === '0.16.5-dev'
       ? agentToolCount === 0
-        ? 56
-        : 64
-      : [
-            '0.15.0-dev',
-            '0.15.1-dev',
-            '0.15.2-dev',
-            '0.16.0-dev',
-            '0.16.1-dev',
-            '0.16.2-dev',
-            '0.16.3-dev',
-          ].includes(runtimeVersion)
-        ? 52
-        : ['0.11.0-dev', '0.12.0-dev', '0.12.1-dev', '0.12.2-dev', '0.13.0-dev', '0.14.0-dev'].includes(
-              runtimeVersion,
-            )
-          ? 51
-          : runtimeVersion === '0.10.0-dev'
-            ? 49
-            : runtimeVersion === '0.9.0-dev'
-              ? 48
-              : runtimeVersion === '0.8.0-dev'
-                ? 42
-                : runtimeVersion === '0.3.0'
-                  ? 32
-                  : ['0.6.3-dev', '0.7.0-dev'].includes(runtimeVersion)
-                    ? 35
-                    : runtimeVersion === '0.6.2-dev'
-                      ? 34
-                      : 33;
+        ? 58
+        : 66
+      : runtimeVersion === '0.16.4-dev'
+        ? agentToolCount === 0
+          ? 56
+          : 64
+        : [
+              '0.15.0-dev',
+              '0.15.1-dev',
+              '0.15.2-dev',
+              '0.16.0-dev',
+              '0.16.1-dev',
+              '0.16.2-dev',
+              '0.16.3-dev',
+            ].includes(runtimeVersion)
+          ? 52
+          : ['0.11.0-dev', '0.12.0-dev', '0.12.1-dev', '0.12.2-dev', '0.13.0-dev', '0.14.0-dev'].includes(
+                runtimeVersion,
+              )
+            ? 51
+            : runtimeVersion === '0.10.0-dev'
+              ? 49
+              : runtimeVersion === '0.9.0-dev'
+                ? 48
+                : runtimeVersion === '0.8.0-dev'
+                  ? 42
+                  : runtimeVersion === '0.3.0'
+                    ? 32
+                    : ['0.6.3-dev', '0.7.0-dev'].includes(runtimeVersion)
+                      ? 35
+                      : runtimeVersion === '0.6.2-dev'
+                        ? 34
+                        : 33;
   assert.equal(tools.length, expectedTools);
-  if (runtimeVersion === '0.16.4-dev' && agentToolCount !== 0) {
+  if (['0.16.4-dev', '0.16.5-dev'].includes(runtimeVersion) && agentToolCount !== 0) {
     assert.equal(agentToolCount, agentToolNames.length, 'Incomplete coordination tool catalog');
     for (const name of agentToolNames)
       assert.ok(
         tools.some((tool) => tool.name === name),
         `Missing coordination tool: ${name}`,
       );
+  }
+  if (runtimeVersion === '0.16.5-dev') {
+    const archive = tools.find((tool) => tool.name === 'command_archive');
+    const archiveStatus = tools.find((tool) => tool.name === 'command_archive_status');
+    assert.ok(archive, 'Missing archive mutation tool: command_archive');
+    assert.ok(archiveStatus, 'Missing archive status tool: command_archive_status');
+    assert.equal(archive.annotations?.readOnlyHint, false, 'Archive mutation tool must not be read-only');
+    assert.equal(archiveStatus.annotations?.readOnlyHint, true, 'Archive status tool must be read-only');
   }
   const result = await client.callTool({ name: 'workspace_info', arguments: {} });
   assert.ok(!result.isError);

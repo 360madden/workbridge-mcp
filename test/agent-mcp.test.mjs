@@ -87,7 +87,7 @@ test('MCP agent tools expose the 36-worker limit and isolate repository journals
     'agent_finish',
     'agent_verify',
   ];
-  assert.equal(tools.length, 64);
+  assert.equal(tools.length, 66);
   for (const name of names) assert.ok(tools.find((t) => t.name === name)?.outputSchema, name);
   const info = await call('workspace_info');
   assert.equal(info.limits.commandJobs, 36);

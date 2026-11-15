@@ -50,9 +50,9 @@ function New-WBCase([string]$Name, [scriptblock]$Code) {
         Write-Output "FAIL: $Name - $($_.Exception.Message)"
     }
 }
-function Set-WBGuiFixtureRelease([string]$ReleasePath) {
+function Set-WBGuiFixtureRelease([string]$ReleasePath, [string]$Version = '0.16.4-dev') {
     $payload = Join-Path $ReleasePath 'payload'
-    Write-WBJson (Join-Path $payload 'package.json') ([pscustomobject]@{name='workbridge-mcp'; version='0.16.4-dev'; type='module'})
+    Write-WBJson (Join-Path $payload 'package.json') ([pscustomobject]@{name='workbridge-mcp'; version=$Version; type='module'})
     $names = @('desktop-ui.mjs', 'desktop-capture.mjs', 'vmware-host-capture.mjs', 'desktop-probe-act.mjs', 'desktop-turn-admission.mjs', 'Check-DesktopWindowHandle.ps1')
     $entries = @()
     foreach ($name in $names) {
@@ -64,14 +64,14 @@ function Set-WBGuiFixtureRelease([string]$ReleasePath) {
         $entries += [pscustomobject]@{name=$name; sizeBytes=$item.Length; sha256=(Get-FileHash -LiteralPath $runtimePath -Algorithm SHA256).Hash.ToLowerInvariant()}
     }
     Write-WBJson (Join-Path $payload 'dist\desktop-runtime-manifest.json') ([pscustomobject]@{schemaVersion=1; files=$entries})
-    Set-WBGuiFixtureSeal $ReleasePath
+    Set-WBGuiFixtureSeal $ReleasePath $Version
 }
-function Set-WBGuiFixtureSeal([string]$ReleasePath) {
+function Set-WBGuiFixtureSeal([string]$ReleasePath, [string]$Version = '0.16.4-dev') {
     $payload = Join-Path $ReleasePath 'payload'
-    Write-WBJson (Join-Path $ReleasePath 'manifest.json') ([pscustomobject]@{schema=1; version='0.16.4-dev'; files=@(Get-WBManifest $payload)})
+    Write-WBJson (Join-Path $ReleasePath 'manifest.json') ([pscustomobject]@{schema=1; version=$Version; files=@(Get-WBManifest $payload)})
     $receiptPath = Join-Path $ReleasePath 'validated.json'
     $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
-    $receipt.version = '0.16.4-dev'
+    $receipt.version = $Version
     if (!$receipt.checks.PSObject.Properties['generic']) {
         Add-Member -InputObject $receipt.checks -MemberType NoteProperty -Name generic -Value 0
         Add-Member -InputObject $receipt.checks -MemberType NoteProperty -Name 'desktop-stage' -Value 0
@@ -170,6 +170,19 @@ try {
         Set-WBGuiFixtureRelease $release
         $verified = Get-WBRelease $release
         Assert-WB ($verified.version -ceq '0.16.4-dev') 'Complete GUI closure should verify.'
+    }
+    New-WBCase 'gui-006-0.16.5-valid-closure-accepted' {
+        Set-WBGuiFixtureRelease $release '0.16.5-dev'
+        $verified = Get-WBRelease $release
+        Assert-WB ($verified.version -ceq '0.16.5-dev') 'Complete 0.16.5 GUI closure should verify.'
+    }
+    New-WBCase 'gui-006-0.16.5-missing-stage-receipt-refused' {
+        Set-WBGuiFixtureRelease $release '0.16.5-dev'
+        $receiptPath = Join-Path $release 'validated.json'
+        $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+        $receipt.checks.PSObject.Properties.Remove('desktop-stage')
+        Write-WBJson $receiptPath $receipt
+        Assert-WBThrows { Get-WBRelease $release } '*GUI release validation is missing or failed*'
     }
     New-WBCase 'gui-006-missing-stage-receipt-refused' {
         Set-WBGuiFixtureRelease $release

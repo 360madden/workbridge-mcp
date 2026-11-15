@@ -196,10 +196,9 @@ export async function previewRuntimeRetention(options, services = {}) {
       const sealed = await read(path.join(release.path, 'manifest.json'));
       const validated = await read(path.join(release.path, 'validated.json'));
       const digest = request.value.releaseDigest;
-      const requiredChecks =
-        journal.value.version === '0.16.4-dev'
-          ? [...baseChecks, 'generic', 'desktop-stage', 'desktop-closure']
-          : baseChecks;
+      const requiredChecks = ['0.16.4-dev', '0.16.5-dev'].includes(journal.value.version)
+        ? [...baseChecks, 'generic', 'desktop-stage', 'desktop-closure']
+        : baseChecks;
       if (
         !digestPattern.test(digest) ||
         sealed.sha256.toLowerCase() !== digest.toLowerCase() ||

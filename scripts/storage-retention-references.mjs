@@ -531,7 +531,8 @@ export async function inspectRetentionReferences({ installRoot, limits = {} } = 
           validated = await read(validatedPath);
         const expected = digest(result.installed.releaseDigest);
         const checks = ['install', 'tests', 'startup', 'updater', 'format', 'acceptance'];
-        if (active.version === '0.16.4-dev') checks.push('generic', 'desktop-stage', 'desktop-closure');
+        if (['0.16.4-dev', '0.16.5-dev'].includes(active.version))
+          checks.push('generic', 'desktop-stage', 'desktop-closure');
         if (
           !object(manifest.value) ||
           manifest.value.schema !== 1 ||

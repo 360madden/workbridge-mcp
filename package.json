@@ -1,6 +1,6 @@
 {
   "name": "workbridge-mcp",
-  "version": "0.16.4-dev",
+  "version": "0.16.5-dev",
   "private": true,
   "description": "Small Windows coding bridge for browser ChatGPT via Secure MCP Tunnel",
   "type": "module",

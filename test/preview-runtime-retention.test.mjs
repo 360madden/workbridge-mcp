@@ -5,6 +5,7 @@ import os from 'node:os';
 import { parseArgs, previewRuntimeRetention } from '../scripts/preview-runtime-retention.mjs';
 
 function scenario({
+  version = '1',
   complete = true,
   external = false,
   badManifest = false,
@@ -33,18 +34,18 @@ function scenario({
     [path.join(operationRoot, 'request.json'), { value: { releaseDigest: digest }, sha256: 'request' }],
     [
       path.join(operationRoot, 'journal.json'),
-      { value: { releaseDigest: digest, version: '1' }, sha256: 'journal' },
+      { value: { releaseDigest: digest, version }, sha256: 'journal' },
     ],
     [
       path.join(releaseRoot, 'manifest.json'),
-      { value: { schema: 1, version: '1', files: entries }, sha256: digest },
+      { value: { schema: 1, version, files: entries }, sha256: digest },
     ],
     [
       path.join(releaseRoot, 'validated.json'),
       {
         value: {
           schema: 1,
-          version: '1',
+          version,
           result: 'passed',
           manifestSha256: digest,
           checks: missingChecks
@@ -150,6 +151,39 @@ test('a passed label without the required release checks does not bind a seal', 
   const result = await previewRuntimeRetention(fixture.options, fixture.services);
   assert.equal(fixture.verifyCalls, 0);
   assert.deepEqual(result.issues, [{ code: 'RELEASE_SEAL_INVALID' }]);
+});
+
+test('0.16.4 and 0.16.5 candidate seals both require the GUI validation gates', async () => {
+  for (const version of ['0.16.4-dev', '0.16.5-dev']) {
+    const missing = scenario({ version });
+    const refused = await previewRuntimeRetention(missing.options, missing.services);
+    assert.equal(missing.verifyCalls, 0, version);
+    assert.deepEqual(refused.issues, [{ code: 'RELEASE_SEAL_INVALID' }], version);
+
+    const complete = scenario({ version });
+    const validated = complete.services.load;
+    complete.services.load = async (file, options) => {
+      const item = await validated(file, options);
+      if (file.endsWith('validated.json')) {
+        return {
+          ...item,
+          value: {
+            ...item.value,
+            checks: {
+              ...item.value.checks,
+              generic: 0,
+              'desktop-stage': 0,
+              'desktop-closure': 0,
+            },
+          },
+        };
+      }
+      return item;
+    };
+    const accepted = await previewRuntimeRetention(complete.options, complete.services);
+    assert.equal(accepted.complete, true, version);
+    assert.equal(accepted.comparison.verifiedDuplicate, true, version);
+  }
 });
 
 test('reserved non-runtime names and file-prefix collisions are refused before hashing', async () => {

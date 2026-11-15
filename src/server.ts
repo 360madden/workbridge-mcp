@@ -31,7 +31,7 @@ import { readRoots } from './roots-config.js';
 import { startLocalService } from './local-service.js';
 import { registerDesktopTools } from './desktop-registration.js';
 
-const version = '0.16.4-dev';
+const version = '0.16.5-dev';
 const location = z
   .string()
   .max(4096)
@@ -237,45 +237,50 @@ async function main() {
         },
       );
     }
-    register('workspace_info', 'Identify the actual Windows execution host (computerName) and show workspace roots, capabilities and limits. Use this before choosing between multiple Workbridge machines; the connector name is not host verification.', {}, async () => ({
-      computerName: os.hostname(),
-      root: workspace.root,
-      roots: workspace.roots,
-      version,
-      localCli: localService ? { enabled: true, ...localService.status } : { enabled: false },
-      readOnly: false,
-      limits: {
-        ...limits,
-        commandJobs: MAX_CONCURRENT_JOBS,
-        coordinatedWorkers: MAX_AGENT_WORKERS,
-        patchFiles: patchLimits.files,
-        patchInputBytes: patchLimits.inputBytes,
-        patchSnapshotBytes: patchLimits.snapshotBytes,
-        patchDiffChars: patchLimits.diffChars,
-        configFileBytes: configLimits.fileBytes,
-        configInputBytes: configLimits.inputBytes,
-        historyMetadataBytes: historyLimits.metadataBytes,
-        historyScanRecords: historyLimits.scanRecords,
-        configOperationsPerFile: configLimits.operations,
-        configOperations: configLimits.totalOperations,
-      },
-      excludedDirectories,
-      pathRules:
-        'Relative paths use the primary root. Absolute paths may use any listed root; results outside the primary root use absolute paths. Git filters remain repository-relative. Links/junctions, .git internals and runtime state are excluded. Writes require existing parents.',
-      text: 'UTF-8/BOM UTF-16, streamed paging with cursors. No total file-size cap for reads; long lines/output and scan time are bounded. Hashes are supplied for editable-size files.',
-      search:
-        'Bundled ripgrep; literal or Rust regex, glob filters, Git ignore rules. Results are live; budget-limited searches are incomplete.',
-      changes:
-        'Recoverable mutations, 16 MiB per file, operation IDs and SHA256 conflicts. Multi-file text patches use patch_preview/apply/status/diff/list/resume/undo, with whole-set preflight, durable per-file progress and guarded recovery. config_preview/config_apply edit existing JSON or explicit JSONC with pointers and add/replace/remove/test operations; 1 MiB/file/input and 200 total operations. Configuration edits use the same patch IDs, combined diffs, recovery and workflow validation. Patch IDs use the separate patch journal. Directory deletion is empty-only. Journals persist until operator cleanup.',
-      commands: `Fixed command profiles and terminal_run(executable,args,cwd,timeoutSeconds,requestId) share ${MAX_CONCURRENT_JOBS} bounded noninteractive jobs, exit codes, output paging/stream selection, cancellation, and restart-safe IDs. command_retry_save explicitly publishes a retained final result without rerunning its command or restarting; changed records are refused. Child environment omits tunnel/Workbridge/Git overrides. Commands run as the local user; cwd must be inside the workspace but this is not a sandbox. Use WB-001 for runtime updates.`,
-      agents: `Agent tools coordinate up to ${MAX_AGENT_WORKERS} independent worker assignments per Git repository, using existing job IDs, pinned HEAD and exclusive owned files. They do not create AI reasoning agents or reserve command slots for the coordinator. The coordinator is a separate logical role; worker jobs share the ${MAX_CONCURRENT_JOBS} global command slots.`,
-      workflows:
-        'workflow_create links an existing forward patch to 1-10 named checks and explicit watched input hashes. workflow_resume advances using durable job IDs; failed or invalidated checks need an explicit retryJobId. workflow_status/list/review/cancel support recovery. CLI runWorkflow advances and waits without automatic retries. Validation covers only watched inputs, not an atomic project snapshot. No automatic undo, commit, or deployment.',
-      context:
-        'task_context composes scoped instructions, root documents, explicit source excerpts/hashes, bounded search and exact-project workflow discovery. Continue the same request with nextOffset and expectedPlanHash; individual sections retain direct follow-ups. Read-only live evidence, not an exhaustive or atomic project snapshot.',
-      snapshots:
-        'Saved raw binary files have no whole-file size cap. Gzip uses an explicit bounded disk cache. Reads are bounded byte ranges; searches page by byte offset/version. Manifest address arithmetic preserves 64-bit precision. No live capture.',
-    }));
+    register(
+      'workspace_info',
+      'Identify the actual Windows execution host (computerName) and show workspace roots, capabilities and limits. Use this before choosing between multiple Workbridge machines; the connector name is not host verification.',
+      {},
+      async () => ({
+        computerName: os.hostname(),
+        root: workspace.root,
+        roots: workspace.roots,
+        version,
+        localCli: localService ? { enabled: true, ...localService.status } : { enabled: false },
+        readOnly: false,
+        limits: {
+          ...limits,
+          commandJobs: MAX_CONCURRENT_JOBS,
+          coordinatedWorkers: MAX_AGENT_WORKERS,
+          patchFiles: patchLimits.files,
+          patchInputBytes: patchLimits.inputBytes,
+          patchSnapshotBytes: patchLimits.snapshotBytes,
+          patchDiffChars: patchLimits.diffChars,
+          configFileBytes: configLimits.fileBytes,
+          configInputBytes: configLimits.inputBytes,
+          historyMetadataBytes: historyLimits.metadataBytes,
+          historyScanRecords: historyLimits.scanRecords,
+          configOperationsPerFile: configLimits.operations,
+          configOperations: configLimits.totalOperations,
+        },
+        excludedDirectories,
+        pathRules:
+          'Relative paths use the primary root. Absolute paths may use any listed root; results outside the primary root use absolute paths. Git filters remain repository-relative. Links/junctions, .git internals and runtime state are excluded. Writes require existing parents.',
+        text: 'UTF-8/BOM UTF-16, streamed paging with cursors. No total file-size cap for reads; long lines/output and scan time are bounded. Hashes are supplied for editable-size files.',
+        search:
+          'Bundled ripgrep; literal or Rust regex, glob filters, Git ignore rules. Results are live; budget-limited searches are incomplete.',
+        changes:
+          'Recoverable mutations, 16 MiB per file, operation IDs and SHA256 conflicts. Multi-file text patches use patch_preview/apply/status/diff/list/resume/undo, with whole-set preflight, durable per-file progress and guarded recovery. config_preview/config_apply edit existing JSON or explicit JSONC with pointers and add/replace/remove/test operations; 1 MiB/file/input and 200 total operations. Configuration edits use the same patch IDs, combined diffs, recovery and workflow validation. Patch IDs use the separate patch journal. Directory deletion is empty-only. Journals persist until operator cleanup.',
+        commands: `Fixed command profiles and terminal_run(executable,args,cwd,timeoutSeconds,requestId) share ${MAX_CONCURRENT_JOBS} bounded noninteractive jobs, exit codes, output paging/stream selection, cancellation, and restart-safe IDs. command_retry_save explicitly publishes a retained final result without rerunning its command or restarting; changed records are refused. Child environment omits tunnel/Workbridge/Git overrides. Commands run as the local user; cwd must be inside the workspace but this is not a sandbox. Use WB-001 for runtime updates.`,
+        agents: `Agent tools coordinate up to ${MAX_AGENT_WORKERS} independent worker assignments per Git repository, using existing job IDs, pinned HEAD and exclusive owned files. They do not create AI reasoning agents or reserve command slots for the coordinator. The coordinator is a separate logical role; worker jobs share the ${MAX_CONCURRENT_JOBS} global command slots.`,
+        workflows:
+          'workflow_create links an existing forward patch to 1-10 named checks and explicit watched input hashes. workflow_resume advances using durable job IDs; failed or invalidated checks need an explicit retryJobId. workflow_status/list/review/cancel support recovery. CLI runWorkflow advances and waits without automatic retries. Validation covers only watched inputs, not an atomic project snapshot. No automatic undo, commit, or deployment.',
+        context:
+          'task_context composes scoped instructions, root documents, explicit source excerpts/hashes, bounded search and exact-project workflow discovery. Continue the same request with nextOffset and expectedPlanHash; individual sections retain direct follow-ups. Read-only live evidence, not an exhaustive or atomic project snapshot.',
+        snapshots:
+          'Saved raw binary files have no whole-file size cap. Gzip uses an explicit bounded disk cache. Reads are bounded byte ranges; searches page by byte offset/version. Manifest address arithmetic preserves 64-bit precision. No live capture.',
+      }),
+    );
     register(
       'agent_list',
       'List durable agent assignments for one Git repository. Metadata only; no AI agents or jobs are launched.',

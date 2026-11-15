@@ -92,7 +92,7 @@ const only = {
 };
 test('connected CLI discovers task_context and shares section continuation and source hashes with MCP', async () => {
   const tools = await client.listTools();
-  assert.equal(tools.tools.length, 64);
+  assert.equal(tools.tools.length, 66);
   const tool = tools.tools.find((t) => t.name === 'task_context');
   assert.ok(tool.inputSchema);
   assert.ok(tool.outputSchema);
@@ -124,7 +124,7 @@ test('connected CLI discovers task_context and shares section continuation and s
   assert.equal(tail.code, 0);
   assert.ok(tail.rows[0].result.text.includes('second line'));
   const identity = await call('workspace_info');
-  assert.equal(identity.version, '0.16.4-dev');
+  assert.equal(identity.version, '0.16.5-dev');
   assert.ok(identity.context.includes('task_context'));
 });
 test('partial context errors preserve successful data and propagate a failing CLI exit', async () => {
