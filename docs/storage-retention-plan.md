@@ -1,6 +1,6 @@
 # Workbridge storage retention and garbage collection
 
-November 14, 2026. Active machine: **AMD-DESKTOP**. Workbridge **0.16.5-dev** is
+November 15, 2026. Active machine: **AMD-DESKTOP**. Workbridge **0.16.5-dev** is
 deployed and the live archive/restore round trip passed on one newly created
 disposable job, which was restored to its exact original bytes. No historical
 job was compacted and no real retained payload was quarantined or purged.
@@ -19,6 +19,33 @@ runtime/marker rollback backup. **Never roll back the bridge operation**
 cap-36 runtime rejects the preserved hostname setting and is not a usable
 runtime-only rollback with current configuration. Retaining historical backup
 bytes does not establish their configuration compatibility.
+
+## First manual cycle preparation — November 15, 2026
+
+A fresh read-only plan passed for the candidate runtime of
+`agent12-activate-20261031-02`. The current modeled reference graph contains
+34 updater operations with no blockers, and its installed chain is complete.
+The production planner accepted current duplicate-byte and native identity
+proof. A separately hashed summary derives 2,865 runtime files and 74,027,483
+logical bytes from the bound retained sealed manifest; it does not claim a
+second independent payload scan or physical-space savings.
+
+The canonical plan SHA is
+`38e5c0e4645127ad602fdfa72978c054f84dcdfd127a83123d3e8c0b9bfca783`.
+The [trial review packet](storage-cleanup-trial-20261115.md) records exact
+artifacts, hashes, exclusions and commands for proposed operation
+`gc-agent12-candidate-trial-20261115a`. The separately evidenced offline-recovery
+exclusion is not represented as native reference-graph coverage.
+
+Preparation is complete, but the real quarantine/status/restore/status cycle
+has not run or been authorized. Its maintenance confirmation remains false;
+an idle owner snapshot is not proof that clients, builders and manual writers
+are coordinated. Refresh the execution baseline, obtain exact-target cycle
+authorization and establish quiet maintenance before any move. No additional
+server release or duplicate full-suite run is required for the existing CLI.
+The restored trial frees no space. A later purge needs a new quarantine,
+seven full days, fresh preparation proof, a reviewed approval digest and
+separate explicit authorization.
 
 ## Outcome and priorities
 
@@ -635,10 +662,12 @@ work.
    routed live archive/restore exercise are complete. Refresh cached client
    tools to expose the two archive names directly. Preserve the separate hosted
    receipt and the documented prohibition on rolling back the bridge operation.
-2. **Review one runtime cleanup target.** Refresh the selected plan and reference,
-   identity and retained-copy evidence under coordinated quiet maintenance before
-   an explicitly reviewed quarantine. Quarantine is reversible and reclaims no
-   bytes. A real purge requires the full v2 grace period, a freshly reviewed
+2. **Review and run the prepared reversible trial.** The November 15 packet has
+   a fresh one-target plan. Revalidate it under coordinated quiet maintenance
+   after exact-target authorization, then verify quarantine and byte-exact
+   restore using the same operation ID and plan digest. A changed plan needs
+   renewed review. Quarantine is reversible and reclaims no bytes. A later real
+   purge requires the full v2 grace period, a freshly reviewed
    approval digest and separate explicit authorization for that exact operation;
    no real retained-data purge is authorized by the source work or test fixtures.
    Measure actual storage after any authorized purge.

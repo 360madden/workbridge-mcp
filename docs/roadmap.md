@@ -1,5 +1,25 @@
 # Workbridge upgrade execution
 
+## Storage cleanup readiness — November 15, 2026
+
+Read-only preparation passed for one reversible production trial on
+**AMD-DESKTOP**: the old `agent12-activate-20261031-02` candidate runtime.
+The fresh plan accepted current identity and duplicate-byte proof; the modeled
+reference graph and installed chain are complete across 34 updater operations,
+with zero blockers. The bound retained manifest describes 2,865 runtime files
+and 74,027,483 logical bytes. The final release, bridge generation and every
+rollback backup remain protected; offline recovery is a separate operator
+exclusion outside the allowed candidate/displaced source namespace.
+
+The [review packet and exact trial procedure](storage-cleanup-trial-20261115.md)
+bind the fresh plan SHA and proposed operation
+`gc-agent12-candidate-trial-20261115a`. **No real quarantine or restore trial has
+run, and maintenance is not confirmed.** The next gate is exact-target review
+and coordinated quiet maintenance for quarantine, status, restore and final
+verification. That trial restores the candidate and reclaims zero bytes. No
+new server build is needed; later permanent purge remains a separate reviewed
+operation after the real seven-day quarantine grace.
+
 ## Current deployment — November 14, 2026
 
 **AMD-DESKTOP is running Workbridge 0.16.5-dev, with 66 MCP tools, 36 command-job
