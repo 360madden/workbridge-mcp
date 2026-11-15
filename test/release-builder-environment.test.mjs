@@ -430,8 +430,13 @@ try {
 }
 `;
       try {
+        const nativeParentEnvironment = Object.fromEntries(
+          Object.entries(process.env).filter(([name]) => name.toLowerCase() !== 'psmodulepath'),
+        );
+        nativeParentEnvironment.PSModulePath = path.join(path.dirname(shell), 'Modules');
         const result = spawnSync(shell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script], {
           cwd: root,
+          env: nativeParentEnvironment,
           input: JSON.stringify({
             scriptPath: path.join(root, 'scripts', 'New-WorkbridgeRelease.ps1'),
             nodeExe: process.execPath,
