@@ -35,6 +35,9 @@ type Job = {
   stderr?: string;
 };
 export const MAX_CONCURRENT_JOBS = 36;
+// Jobs share this directory with small worker receipts. Enumerating names is
+// cheaper than opening records; page parsing retains its separate limits.
+export const jobCatalogLimits = { maxEntries: 100_000 };
 const outputLimit = 1024 * 1024;
 // Retained combined/separate streams can expand substantially when JSON-escaped.
 export const jobRecordBytes = 16 * 1024 * 1024;
@@ -713,7 +716,7 @@ export class Jobs {
       entries = 0;
     if (await this.jobDirectory()) {
       for await (const entry of await opendir(path.join(this.stateDirectory, 'jobs'))) {
-        if (++entries > limits.scanEntries || Date.now() >= deadline) {
+        if (++entries > jobCatalogLimits.maxEntries || Date.now() >= deadline) {
           catalogTruncated = true;
           timeLimitReached = Date.now() >= deadline;
           break;

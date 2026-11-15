@@ -83,6 +83,16 @@ address the same owner; do not create a second owner against the live state.
 
 ## `command_list` paging and failures
 
+The source implementation now gives the Jobs namespace its own 100,000-entry
+enumeration cap. Worker-result receipts count toward this bound but are not
+opened as job records. The previous general 20,000-entry cap could stop before
+all job IDs were discovered in a large history. Per-page record parsing, response
+size and the 20-second deadline remain unchanged; other directory scans retain
+their existing limits. An incomplete namespace still reports truncation. Pages
+are point-in-time observations, so concurrent additions/removals can shift
+offsets. This source change needs the normal WB-001 release process to reach an
+already running owner.
+
 The request keeps exact `project` and `status` filters, `offset`, `limit` (1–100),
 and `scanLimit` (1–1,000). Ordering remains `id-ascending`. `nextOffset` counts
 scanned IDs, not matched jobs. Empty filtered pages may still need continuation.

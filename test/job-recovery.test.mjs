@@ -5,7 +5,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import path from 'node:path';
 import os from 'node:os';
 import { Workspace } from '../dist/workspace.js';
-import { Jobs } from '../dist/jobs.js';
+import { Jobs, jobCatalogLimits } from '../dist/jobs.js';
 import { limits } from '../dist/core.js';
 let suite,
   sequence = 0;
@@ -323,21 +323,51 @@ test('time, scan and catalog limits explicitly report incomplete discovery', asy
   assert.equal(scan.complete, false);
   assert.equal(scan.hasErrors, false);
   const oldMs = limits.scanMs,
-    oldEntries = limits.scanEntries;
+    oldEntries = jobCatalogLimits.maxEntries;
   try {
     limits.scanMs = 0;
     const timed = await f.jobs.catalog(pageOptions);
     assert.equal(timed.timeLimitReached, true);
     assert.equal(timed.complete, false);
     limits.scanMs = oldMs;
-    limits.scanEntries = 1;
+    jobCatalogLimits.maxEntries = 1;
     const truncated = await f.jobs.catalog(pageOptions);
     assert.equal(truncated.catalogTruncated, true);
     assert.equal(truncated.complete, false);
   } finally {
     limits.scanMs = oldMs;
+    jobCatalogLimits.maxEntries = oldEntries;
+  }
+});
+
+test('catalog traverses job IDs beyond the ordinary directory scan cap without opening receipts', async () => {
+  const f = await fixture();
+  const original = await fs.readFile(f.record);
+  await fs.writeFile(path.join(f.directory, 'a.result.json'), 'not a job record');
+  await fs.writeFile(path.join(f.directory, 'b.result.json'), 'also not a job record');
+  await fs.writeFile(path.join(f.directory, 'z-last.json'), JSON.stringify({ ...base, id: 'z-last' }));
+  const oldEntries = limits.scanEntries;
+  try {
+    limits.scanEntries = 1;
+    const first = await f.jobs.catalog({ ...pageOptions, limit: 1 });
+    assert.equal(first.catalogTruncated, false);
+    assert.deepEqual(
+      first.jobs.map((job) => job.id),
+      ['saved'],
+    );
+    assert.equal(first.nextOffset, 1);
+    const last = await f.jobs.catalog({ ...pageOptions, offset: first.nextOffset, limit: 1 });
+    assert.equal(last.complete, true);
+    assert.deepEqual(
+      last.jobs.map((job) => job.id),
+      ['z-last'],
+    );
+    assert.deepEqual(last.issues, []);
+    assert.equal(last.nextOffset, null);
+  } finally {
     limits.scanEntries = oldEntries;
   }
+  assert.deepEqual(await fs.readFile(f.record), original);
 });
 
 test('invalid paging and unknown job IDs do not create storage', async () => {
