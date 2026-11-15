@@ -543,3 +543,33 @@ successful review record is saved under ignored `.tools/retention-evidence/`.
 No real payload has been moved or deleted; a saved plan still needs fresh
 maintenance revalidation before quarantine and the full grace/review flow before
 permanent deletion.
+
+## One-job lossless archive proposal
+
+The separate read-only proposal CLI models exact compression for one explicit
+job without changing its record or job-owner behavior:
+
+```powershell
+node scripts/job-archive-proposal.mjs --jobs-dir C:\work\workbridge-mcp\.local\jobs --job-id JOB_ID --output-dir C:\work\workbridge-mcp\.tools\job-proposal-NEW
+```
+
+The output directory must be fresh and outside the jobs directory. On Windows it
+is created atomically with a protected current-user/SYSTEM ACL before job data is
+written. Source ancestry, file identity, single-link state and SHA-256 are
+rechecked. The gzip is verified through bounded decompression against the exact
+original bytes, including separate or missing streams. The CLI prints metadata
+only; the private artifact contains the original job data and should stay in an
+ignored location.
+
+Six disposable tests passed. One bounded real-record proposal subsequently
+verified 126,091 original bytes as a 94,300-byte gzip with 1,048 bytes of proposal
+metadata: 30,743 modelled logical bytes saved if a future authorized compactor
+could replace that original. The original remains in place, so this run actually
+reclaimed no space. This is one selected record, not an estimate for the catalog.
+The artifact explicitly sets `compactionAuthorized:false`. No age, inactivity,
+replay safety, allocated-space savings or writer permission is established.
+
+The next implementation is a versioned archive reader integrated with existing
+Jobs semantics and tests. A compaction writer, expiry and routine scheduling
+remain separate work. Worker result receipts and workflow/agent journals stay
+unchanged.

@@ -2,6 +2,12 @@
 
 ## Storage retention — November 14, 2026
 
+The next job-retention milestone has a read-only one-ID lossless archive proposal
+CLI. Its private output and exact gzip roundtrip passed six tests plus one real
+record model. No source job was changed and no space was reclaimed. Next add the
+archive-aware Jobs reader before any one-ID compaction writer; preserve request
+replay, original output streams and all worker/workflow evidence.
+
 Active machine: **AMD-DESKTOP**. The [ranked garbage-collection plan](storage-retention-plan.md)
 prioritizes bounded read-only inventory, then reference-aware review of old
 candidate/displaced runtime copies, recoverable quarantine and explicit purge,
