@@ -4,9 +4,12 @@
 
 The next job-retention milestone has a read-only one-ID lossless archive proposal
 CLI. Its private output and exact gzip roundtrip passed six tests plus one real
-record model. No source job was changed and no space was reclaimed. Next add the
-archive-aware Jobs reader before any one-ID compaction writer; preserve request
-replay, original output streams and all worker/workflow evidence.
+record model. No source job was changed and no space was reclaimed. The
+archive-aware Jobs reader subsequently passed 73 focused compatibility checks.
+Next implement a one-ID writer through the actual job owner with explicit source
+hash and live-job exclusion; preserve request replay, original output streams,
+exact restoration and all worker/workflow evidence. Source changes are not live
+owner deployment.
 
 Active machine: **AMD-DESKTOP**. The [ranked garbage-collection plan](storage-retention-plan.md)
 prioritizes bounded read-only inventory, then reference-aware review of old

@@ -569,7 +569,10 @@ reclaimed no space. This is one selected record, not an estimate for the catalog
 The artifact explicitly sets `compactionAuthorized:false`. No age, inactivity,
 replay safety, allocated-space savings or writer permission is established.
 
-The next implementation is a versioned archive reader integrated with existing
-Jobs semantics and tests. A compaction writer, expiry and routine scheduling
-remain separate work. Worker result receipts and workflow/agent journals stay
-unchanged.
+The versioned archive reader is now integrated with the existing Jobs loader;
+the combined archive/recovery/result/retry suite passed 73 tests, including exact
+stream behavior, same-ID replay, changed-request refusal and corrupt-archive
+refusal before launch. It retains the descriptor's hash for guarded saves. This
+is source/read support only: no production archive descriptor or compaction
+writer exists yet. A compaction writer, expiry and routine scheduling remain
+separate work. Worker result receipts and workflow/agent journals stay unchanged.

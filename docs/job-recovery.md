@@ -83,6 +83,29 @@ address the same owner; do not create a second owner against the live state.
 
 ## `command_list` paging and failures
 
+## Archived-record read compatibility
+
+The source job loader now recognizes `workbridge-job-archive/1` descriptors
+without a legacy `output` field. The descriptor contains only the exact job ID,
+original/compressed SHA-256 values and byte lengths. Its archive path is derived
+under `job-archives/<id>/<sourceSha256>.json.gz`; the record cannot select another
+path. Compressed reads are bounded at 17 MiB and restored bytes at 16 MiB. The
+existing job parser consumes the verified original bytes, preserving absent,
+empty and Unicode output-stream behavior. The descriptor hash remains the
+canonical guarded-save identity.
+
+Missing, changed, linked or corrupt archive data causes `UNREADABLE_JOB_RECORD`;
+it never makes an existing request ID available for a new command. Valid legacy
+records with extra fields, including a coincidental schema label and `output`,
+still follow the legacy path. Nine new reader/replay tests and the combined
+73-test archive/recovery/result/retry suite passed. The old owner's required-output
+refusal was checked in source, not against an older deployed binary.
+
+This adds read compatibility only. No compaction writer or production archived
+record has been created. Running owners require the normal WB-001 release process
+to use the new reader. A future writer must retain exact restoration for rollback
+to an owner that does not support archive descriptors.
+
 The source implementation now gives the Jobs namespace its own 100,000-entry
 enumeration cap. Worker-result receipts count toward this bound but are not
 opened as job records. The previous general 20,000-entry cap could stop before

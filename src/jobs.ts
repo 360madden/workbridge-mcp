@@ -12,6 +12,7 @@ import { executableFor } from './command-executable.js';
 import { rootsFile, rootsLock } from './roots-config.js';
 import { fingerprint } from './text.js';
 import { readCommandResult, invalidCommandResult, type CommandResult } from './command-result.js';
+import { readArchivedJob } from './job-archive.js';
 
 type Command = { executable: string; args: string[]; timeoutSeconds?: number };
 type Profiles = { projects: Record<string, Record<string, Command>> };
@@ -602,9 +603,37 @@ export class Jobs {
         !(await this.jobDirectory())
       )
         throw new Error('changed during read');
-      const job = storedJob.parse(JSON.parse(bytes.subarray(0, length).toString('utf8')));
+      const storedBytes = bytes.subarray(0, length);
+      const value: unknown = JSON.parse(storedBytes.toString('utf8'));
+      let record: unknown = value;
+      if (
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        (value as { schema?: unknown }).schema === 'workbridge-job-archive/1' &&
+        !Object.hasOwn(value, 'output')
+      ) {
+        const stamp = (s: typeof info) =>
+          [s.dev, s.ino, s.size, s.mtimeMs, s.ctimeMs, s.mode, s.nlink].join(':');
+        if (entry.nlink !== 1 || info.nlink !== 1 || stamp(entry) !== stamp(info))
+          throw new Error('changed descriptor');
+        const original = await readArchivedJob(this.stateDirectory, id, value);
+        const after = await handle.stat(),
+          named = await lstat(file);
+        if (
+          !named.isFile() ||
+          named.isSymbolicLink() ||
+          named.nlink !== 1 ||
+          stamp(info) !== stamp(after) ||
+          stamp(after) !== stamp(named) ||
+          !(await this.jobDirectory())
+        )
+          throw new Error('changed descriptor');
+        record = JSON.parse(original.toString('utf8'));
+      }
+      const job = storedJob.parse(record);
       if (job.id !== id) throw new Error('mismatched job identity');
-      return { job, sha256: digest(bytes.subarray(0, length)) };
+      return { job, sha256: digest(storedBytes) };
     } catch (error) {
       if (!observed && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw new BridgeError(
