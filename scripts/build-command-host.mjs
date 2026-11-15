@@ -7,6 +7,7 @@ copyFileSync(
   path.resolve('scripts/Local-Service-Descriptor.ps1'),
   path.resolve('dist/Local-Service-Descriptor.ps1'),
 );
+copyFileSync(path.resolve('scripts/Job-Archive-Private.ps1'), path.resolve('dist/Job-Archive-Private.ps1'));
 
 if (process.platform === 'win32') {
   const windows = process.env.SystemRoot ?? 'C:\\Windows';

@@ -143,3 +143,57 @@ Historical 0.6.3-dev regression and hosted evidence invoke isolated mode through
 Shared-service and multi-file patch implementation, release validation, and deployment are complete. [WB-007 deployment acceptance](wb007-deployment.md) records normal browser Chat/CLI tool workflows and the unresolved browser response-rendering issue. [WB-006](wb006-validation.md) records the original service foundation; [WB-007 candidate verification](wb007-validation.md) records pre-deployment tests. Resumable validation/review is deployed in 0.9.0-dev; [WB-008](wb008-deployment.md) records its current acceptance. Task-focused context gathering is deployed in 0.10.0-dev; [WB-009](wb009-deployment.md) records browser/CLI section and file-cursor handoffs, expected failures, and no implicit mutations. AI-011 is deployed in 0.11.0-dev: `config_preview` and `config_apply` use ordinary request files and existing patch status/diff/discovery/resume/undo. See [structured configuration edits](structured-config-edits.md) and [WB-010 verification](wb010-validation.md). The installed CLI and owner now match at 0.12.2-dev; [WB-013 acceptance](wb013-deployment.md) verifies deployed recovery and preservation. [WB-010 acceptance](wb010-deployment.md) verifies configuration replay, validation, failures, and guarded undo across browser Chat and CLI. New browser replies rendered in this acceptance; historical display failures remain in earlier reports.
 
 [WB-011 acceptance](wb011-deployment.md) adds filtered-history continuation, discovery of moved files and configuration patches, partial-result handling, and restored fixtures. Browser response display failures recurred despite successful tools; they remain an intermittent presentation limitation.
+
+
+## Lossless saved-job compaction
+
+The source CLI/MCP surface includes `command_archive_status` and `command_archive`.
+This is explicit one-job maintenance through the registered owner, not automatic
+age-based deletion. It is not deployed until a separate WB-001 update succeeds.
+Use `--service-state` with that updated owner; never start another owner against
+its state directory.
+
+First submit a request file containing:
+
+```json
+[{"tool":"command_archive_status","arguments":{"jobId":"SAVED_JOB_ID","operationId":"compact-example-1"}}]
+```
+
+Use the returned `currentRecordSha256` as the precondition in a second file:
+
+```json
+[{"tool":"command_archive","arguments":{"jobId":"SAVED_JOB_ID","direction":"compact","operationId":"compact-example-1","expectedRecordSha256":"SHA256_FROM_STATUS"}}]
+```
+
+Compaction accepts eligible saved terminal jobs only and requires a positive
+logical byte saving after the compressed data, descriptor and receipt costs.
+It preserves original bytes, unknown fields, command replay identity and output
+streams. Existing command status/output tools read archived records transparently.
+Archive blobs have no automatic expiry. Logical savings do not measure filesystem
+allocation or space reclaimed elsewhere.
+
+For byte-exact restoration, inspect status again and submit `direction: "restore"`
+with a new operation ID and the current descriptor hash. Restore every compacted
+job before downgrading to an owner without archive-reader support; this one-ID API
+does not certify that the entire state directory is ready for downgrade.
+
+After uncertainty, inspect the same operation ID. If `pendingOperationId` is
+present, reconcile that operation with `pendingDirection` and
+`pendingExpectedRecordSha256`; the current record may already have changed.
+Reuse an operation ID only for the identical job, direction and expected hash.
+A completed receipt is historical: its `resultRecordSha256` can differ from the
+present `currentRecordSha256` after a later restore. Repeating a completed compact
+request returns its receipt without compacting the restored record again.
+
+The implementation serializes the registered owner's writes and holds the updater
+admission lease. Its hash-guarded rename is not a kernel compare-and-swap against
+arbitrary external writers. Disposable tests exercise process-crash recovery;
+power-loss durability is not established. No production job was compacted by the
+implementation tests.
+
+A fresh operation encountering another operation's interrupted two-link pending
+marker can report `JOB_ARCHIVE_CONFLICT` rather than `JOB_ARCHIVE_BUSY`; inspect
+status and resume the identified pending request. An incomplete gzip stage may
+also refuse recovery if the compressor's bytes change before retry. Both cases
+fail closed; do not remove canonical job records or invent a new operation ID to
+force past them.

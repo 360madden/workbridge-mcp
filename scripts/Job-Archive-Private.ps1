@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$Directory)
+param([Parameter(Mandatory=$true)][string]$Directory,[ValidateSet('Create','Existing')][string]$Mode='Create')
 $ErrorActionPreference='Stop'
 [Console]::InputEncoding=[Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
@@ -42,7 +42,7 @@ try {
    $rule=[Security.AccessControl.FileSystemAccessRule]::new($who,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
    $acl.AddAccessRule($rule)
  }
- [ArchivePrivateDirectory]::Create($Directory,$acl.GetSecurityDescriptorBinaryForm())
+ if($Mode -eq 'Create') { [ArchivePrivateDirectory]::Create($Directory,$acl.GetSecurityDescriptorBinaryForm()) }
  $pin=[ArchivePrivateDirectory]::Pin($Directory)
  function Assert-Private([string]$Path,[bool]$IsDirectory) {
    $item=Get-Item -LiteralPath $Path -Force
@@ -66,8 +66,10 @@ try {
  Assert-Private $Directory $true
  [Console]::Out.WriteLine('READY');[Console]::Out.Flush()
  while($null -ne ($line=[Console]::In.ReadLine())) {
-   if($line -cnotin @('VERIFY original.json.gz','VERIFY proposal.json')) { throw 'INVALID_COMMAND' }
-   $name=$line.Substring(7);Assert-Private ([IO.Path]::Combine($Directory,$name)) $false
+   if(-not $line.StartsWith('VERIFY ',[StringComparison]::Ordinal)) { throw 'INVALID_COMMAND' }
+   $name=$line.Substring(7)
+   if($name -notmatch '^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,199}$' -or $name.Contains('..') -or $name.EndsWith('.')) { throw 'INVALID_COMMAND' }
+   Assert-Private ([IO.Path]::Combine($Directory,$name)) $false
    [Console]::Out.WriteLine('VERIFIED');[Console]::Out.Flush()
  }
 } catch { [Console]::Error.WriteLine('PRIVATE_DIRECTORY_FAILED');exit 1 }

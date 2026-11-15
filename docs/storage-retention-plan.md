@@ -182,6 +182,16 @@ A missing job for a workflow attempt in `starting` state can be interpreted as
 never launched. Removing the record can therefore repeat real side effects.
 A `.result.json` by itself is not an equivalent replay record.
 
+Lossless compaction is a separate first milestone from output expiry below.
+The explicit one-ID owner API compresses complete saved `passed`, `failed`,
+`cancelled` and `timed_out` records with an end timestamp and restores their exact
+original bytes. It does not expire any output or remove replay evidence; no age
+threshold is needed for this reversible representation change. Running,
+owner-retained/unsaved, interrupted, malformed and unknown records remain
+ineligible. Compressed blobs and operation receipts have no automatic expiry.
+All eligibility statements about old successful output below apply to future
+lossy expiry, not this byte-preserving compression.
+
 Introduce a versioned durable terminal tombstone before expiring output. Preserve
 ID, request digest, terminal result, timestamps and references; output APIs must
 report explicit expiration, never fabricated empty output. The current stored-job

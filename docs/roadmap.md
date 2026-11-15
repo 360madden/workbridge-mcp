@@ -6,9 +6,11 @@ The next job-retention milestone has a read-only one-ID lossless archive proposa
 CLI. Its private output and exact gzip roundtrip passed six tests plus one real
 record model. No source job was changed and no space was reclaimed. The
 archive-aware Jobs reader subsequently passed 73 focused compatibility checks.
-Next implement a one-ID writer through the actual job owner with explicit source
-hash and live-job exclusion; preserve request replay, original output streams,
-exact restoration and all worker/workflow evidence. Source changes are not live
+The one-ID owner writer and CLI/MCP interface are now implemented with explicit
+source hashes, live-job exclusion and recoverable operation receipts. The build
+and 94 focused archive/recovery/publication checks passed; independent review
+found no remaining safety blocker under the documented single-owner model.
+Request replay, original output streams and exact byte restoration are preserved. Source changes are not live
 owner deployment.
 
 Active machine: **AMD-DESKTOP**. The [ranked garbage-collection plan](storage-retention-plan.md)

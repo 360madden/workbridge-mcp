@@ -13,6 +13,7 @@ import { rootsFile, rootsLock } from './roots-config.js';
 import { fingerprint } from './text.js';
 import { readCommandResult, invalidCommandResult, type CommandResult } from './command-result.js';
 import { readArchivedJob } from './job-archive.js';
+import { executeJobArchive, getJobArchiveStatus, type ArchiveDirection } from './job-archive-write.js';
 
 type Command = { executable: string; args: string[]; timeoutSeconds?: number };
 type Profiles = { projects: Record<string, Record<string, Command>> };
@@ -572,7 +573,9 @@ export class Jobs {
       stderrLength: job.stderr?.length ?? null,
     };
   }
-  private async readStored(id: string): Promise<{ job: Job; sha256: string } | null> {
+  private async readStored(
+    id: string,
+  ): Promise<{ job: Job; sha256: string; storedBytes: Buffer; originalBytes: Buffer | null } | null> {
     const file = this.jobFile(id);
     let handle;
     let observed = false;
@@ -606,6 +609,7 @@ export class Jobs {
       const storedBytes = bytes.subarray(0, length);
       const value: unknown = JSON.parse(storedBytes.toString('utf8'));
       let record: unknown = value;
+      let originalBytes: Buffer | null = null;
       if (
         value &&
         typeof value === 'object' &&
@@ -618,6 +622,7 @@ export class Jobs {
         if (entry.nlink !== 1 || info.nlink !== 1 || stamp(entry) !== stamp(info))
           throw new Error('changed descriptor');
         const original = await readArchivedJob(this.stateDirectory, id, value);
+        originalBytes = original;
         const after = await handle.stat(),
           named = await lstat(file);
         if (
@@ -633,7 +638,7 @@ export class Jobs {
       }
       const job = storedJob.parse(record);
       if (job.id !== id) throw new Error('mismatched job identity');
-      return { job, sha256: digest(storedBytes) };
+      return { job, sha256: digest(storedBytes), storedBytes, originalBytes };
     } catch (error) {
       if (!observed && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw new BridgeError(
@@ -656,6 +661,86 @@ export class Jobs {
       job.error = 'The server restarted; this job is not being resumed.';
     }
     return job;
+  }
+  /** Explicit one-job compaction or exact restoration; no command is started. */
+  archive(jobId: string, direction: ArchiveDirection, operationId: string, expectedRecordSha256: string) {
+    return this.serial.run(async () => {
+      if (this.closing)
+        throw new BridgeError(
+          'SERVER_CLOSING',
+          'Server is stopping; retry archive maintenance after reconnecting.',
+        );
+      this.jobFile(jobId);
+      if (this.live.has(jobId))
+        throw new BridgeError(
+          'JOB_ARCHIVE_ACTIVE',
+          'This owner still holds the job or its unpublished result.',
+        );
+      const lock = await this.acquireAdmissionLock();
+      try {
+        return await executeJobArchive(
+          this.stateDirectory,
+          jobId,
+          operationId,
+          direction,
+          expectedRecordSha256,
+          async () => {
+            const file = this.jobFile(jobId);
+            let before;
+            try {
+              before = await lstat(file);
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+              throw error;
+            }
+            if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1)
+              throw new BridgeError(
+                'JOB_ARCHIVE_CONFLICT',
+                'Job record is linked or is not an ordinary file.',
+              );
+            const current = await this.readStored(jobId);
+            if (!current) return null;
+            const after = await lstat(file);
+            const stamp = (value: typeof before) =>
+              [value.dev, value.ino, value.size, value.mtimeMs, value.ctimeMs, value.mode, value.nlink].join(
+                ':',
+              );
+            if (
+              !after.isFile() ||
+              after.isSymbolicLink() ||
+              after.nlink !== 1 ||
+              stamp(before) !== stamp(after)
+            )
+              throw new BridgeError('JOB_ARCHIVE_CONFLICT', 'Job record changed during maintenance.');
+            return {
+              ...current,
+              eligible:
+                ['passed', 'failed', 'cancelled', 'timed_out'].includes(current.job.status) &&
+                typeof current.job.endedAt === 'string' &&
+                current.job.errorCode !== 'JOB_RECORD_SAVE_FAILED',
+            };
+          },
+        );
+      } finally {
+        await lock.close();
+      }
+    });
+  }
+  archiveStatus(jobId: string, operationId: string) {
+    return this.serial.run(async () => {
+      this.jobFile(jobId);
+      const result = await getJobArchiveStatus(this.stateDirectory, jobId, operationId);
+      const current = await this.readStored(jobId);
+      return {
+        ...result,
+        currentRecordSha256: current?.sha256 ?? null,
+        currentRepresentation: current
+          ? current.originalBytes
+            ? ('archived' as const)
+            : ('raw' as const)
+          : ('missing' as const),
+      };
+    });
   }
   /** Publish an owned retained result only. Never executes or reconstructs a command. */
   retrySave(id: string) {
