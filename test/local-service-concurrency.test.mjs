@@ -16,7 +16,7 @@ const cli = fileURLToPath(new URL('../scripts/workbridge-cli.mjs', import.meta.u
 const prefix = path.join(os.tmpdir(), 'wb-mcp-concurrent-clients-');
 
 function createPingServer() {
-  const server = new McpServer({ name: 'workbridge-concurrent-client-test', version: '0.16.4-dev' });
+  const server = new McpServer({ name: 'workbridge-concurrent-client-test', version: '0.16.5-dev' });
   server.registerTool(
     'ping',
     { description: 'Synthetic read-only MCP connectivity test.', inputSchema: z.object({}) },
@@ -45,7 +45,7 @@ test(
       owner = await startLocalService({
         state,
         root,
-        version: '0.16.4-dev',
+        version: '0.16.5-dev',
         createServer: createPingServer,
       });
 
