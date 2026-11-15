@@ -18,7 +18,7 @@ const sameBinding = (left, right) =>
   );
 
 export function parseArgs(args) {
-  const result = { maxScanMs: 30000, maxBytes: 512 * 1024 * 1024 };
+  const result = { maxScanMs: 60000, maxBytes: 512 * 1024 * 1024 };
   const keys = new Map([
     ['--install-root', 'installRoot'],
     ['--operation', 'operationId'],
@@ -136,7 +136,7 @@ export async function previewRuntimeRetention(options, services = {}) {
   const load = services.load ?? loadBoundedJson;
   const verify = services.verify ?? verifyRuntimeDuplicate;
   const started = performance.now();
-  const maxScanMs = options.maxScanMs ?? 30000;
+  const maxScanMs = options.maxScanMs ?? 60000;
   const maxBytes = options.maxBytes ?? 512 * 1024 * 1024;
   const root = path.resolve(options.installRoot);
   const remaining = () => {
@@ -276,7 +276,7 @@ export async function previewRuntimeRetention(options, services = {}) {
 async function main(args) {
   if (args.length === 1 && args[0] === '--help') {
     process.stdout.write(
-      'Usage: node scripts/preview-runtime-retention.mjs --install-root ABSOLUTE_PATH [--operation ID --kind candidate|displaced] [--max-scan-ms 30000] [--max-bytes 536870912]\nRead-only reference and duplicate preview; never deletion eligibility. Exit: 0 complete, 1 partial/refused, 2 invalid arguments.\n',
+      'Usage: node scripts/preview-runtime-retention.mjs --install-root ABSOLUTE_PATH [--operation ID --kind candidate|displaced] [--max-scan-ms 60000] [--max-bytes 536870912]\nRead-only reference and duplicate preview; never deletion eligibility. Exit: 0 complete, 1 partial/refused, 2 invalid arguments.\n',
     );
     return 0;
   }

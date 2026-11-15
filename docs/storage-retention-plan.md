@@ -533,3 +533,13 @@ The classifier/reference suite passed 24 tests, and a fresh read-only scan
 reported a complete reference graph and installed chain with both operations'
 protections retained. This permits evaluating unrelated old candidate/displaced
 copies; it does not authorize moving or deleting either historical operation.
+
+A real candidate plan for `agent12-activate-20261031-02` subsequently passed the
+outer read-only CLI. Its duplicate preview hashed 5,730 files across the candidate
+and retained release (148,054,966 bytes total). The initial cold plan exhausted
+the old 30-second preview budget; the default is now 60 seconds, still within the
+existing maximum, and refused plans retain their underlying proof reason. The
+successful review record is saved under ignored `.tools/retention-evidence/`.
+No real payload has been moved or deleted; a saved plan still needs fresh
+maintenance revalidation before quarantine and the full grace/review flow before
+permanent deletion.

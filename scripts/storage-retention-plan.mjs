@@ -175,8 +175,11 @@ async function build(options, deps) {
     preview.complete !== true ||
     preview.comparison?.verifiedDuplicate !== true ||
     preview.comparison.invalidated === true
-  )
-    throw fail('DUPLICATE_PROOF_UNAVAILABLE');
+  ) {
+    const error = fail('DUPLICATE_PROOF_UNAVAILABLE');
+    error.proofReason = preview.issues?.[0]?.code ?? preview.comparison?.reason ?? 'PROOF_INCOMPLETE';
+    throw error;
+  }
   const selection = preview.selection;
   if (selection?.operationId !== updaterOperationId || selection.kind !== kind)
     throw fail('SELECTION_BINDING_MISMATCH');
@@ -251,7 +254,12 @@ export async function createRetentionPlan(options, deps = {}) {
   try {
     return await build(options, deps);
   } catch (error) {
-    return { status: 'refused', code: error.code ?? 'PLAN_UNAVAILABLE', mutationEligible: false };
+    return {
+      status: 'refused',
+      code: error.code ?? 'PLAN_UNAVAILABLE',
+      mutationEligible: false,
+      ...(typeof error.proofReason === 'string' ? { proofReason: error.proofReason } : {}),
+    };
   }
 }
 export async function revalidateRetentionPlan(plan, deps = {}) {

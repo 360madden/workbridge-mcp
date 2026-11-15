@@ -375,6 +375,16 @@ test('observed controller refusal cannot itself be selected for retention', asyn
   assert.equal((await createRetentionPlan(f.options, f.deps)).code, 'OPERATION_NOT_COMPARABLE');
 });
 
+test('unavailable duplicate proof retains its actionable reason', async () => {
+  const f = fixture();
+  f.preview.complete = false;
+  f.preview.comparison.verifiedDuplicate = false;
+  f.preview.comparison.reason = 'TIME_LIMIT';
+  const result = await createRetentionPlan(f.options, f.deps);
+  assert.equal(result.code, 'DUPLICATE_PROOF_UNAVAILABLE');
+  assert.equal(result.proofReason, 'TIME_LIMIT');
+});
+
 test('a typed node-executable reference inside a selected copy blocks planning', async () => {
   const f = fixture();
   f.preview.references.references.push({
