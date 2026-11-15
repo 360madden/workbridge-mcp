@@ -1,9 +1,24 @@
 # Workbridge storage retention and garbage collection
 
-November 14, 2026. Active machine: **AMD-DESKTOP**. This is an implementation
-plan. No live retained runtime, backup or job has been deleted or compacted in
-this workstream. Source commits, installed runtime changes and reclaimed disk
-space are separate results.
+November 14, 2026. Active machine: **AMD-DESKTOP**. Workbridge **0.16.5-dev** is
+deployed and the live archive/restore round trip passed on one newly created
+disposable job, which was restored to its exact original bytes. No historical
+job was compacted and no real retained payload was quarantined or purged.
+Installed runtime changes and reclaimed disk space remain separate results.
+
+The [deployment evidence](wb0165-deployment-20261114.md) records all 11 passed
+release gates, 1,347 passing tests with six environmental skips, installed and
+rollback runtime verification, and hosted-terminal acceptance through the
+existing shared owner. The current chat's 64-tool cache was not refreshed;
+the owner's discovered catalog contains 66 tools. The read-only postdeployment
+inventory honestly stopped at its 50,000-entry limit and is incomplete.
+
+The final operation `wb0165-archive-final-20261115d` has a consistent 0.16.5
+runtime/marker rollback backup. **Never roll back the bridge operation**
+`wb0165-archive-bridge-20261115d`; its predecessor marker is historical. The old
+cap-36 runtime rejects the preserved hostname setting and is not a usable
+runtime-only rollback with current configuration. Retaining historical backup
+bytes does not establish their configuration compatibility.
 
 ## Outcome and priorities
 
@@ -40,14 +55,14 @@ The bounded November 14 census counted the following logical file bytes. This
 is a changing filesystem, not an atomic snapshot or an allocated-space measure.
 Four links under `temp` were skipped; their targets are not included.
 
-| Area | Counted bytes | Approximate GiB |
-| --- | ---: | ---: |
-| `.local/update-operations` | 6,689,171,575 | 6.23 |
-| `.local/releases` | 2,577,954,844 | 2.40 |
-| `temp` | 2,325,410,128 | 2.17 |
-| `investigations` | 1,300,410,354 | 1.21 |
-| `.local/jobs` | 325,723,318 | 0.30 |
-| Three `.local/wb001-gui-src-*` staging roots | 245,061,484 | 0.23 |
+| Area                                         | Counted bytes | Approximate GiB |
+| -------------------------------------------- | ------------: | --------------: |
+| `.local/update-operations`                   | 6,689,171,575 |            6.23 |
+| `.local/releases`                            | 2,577,954,844 |            2.40 |
+| `temp`                                       | 2,325,410,128 |            2.17 |
+| `investigations`                             | 1,300,410,354 |            1.21 |
+| `.local/jobs`                                |   325,723,318 |            0.30 |
+| Three `.local/wb001-gui-src-*` staging roots |   245,061,484 |            0.23 |
 
 Within updater operations, candidates account for 2,190,105,261 bytes,
 displaced runtimes for 2,187,367,054 and backup runtimes for 2,187,367,054.
@@ -93,19 +108,19 @@ undo snapshots and configuration are excluded from initial cleanup.
 These are proposed defaults for the eventual reference-aware planner, not
 authorization to apply them to current files:
 
-| Resource | Default treatment |
-| --- | --- |
-| Installed runtime, exact sealed release and required containing paths | Protect |
-| Current operation and rollback chain | Initially preserve all 30 backup runtimes; verify checksums before declaring rollback available |
-| Unresolved, missing, malformed or unknown operation state | Protect; report the blocker |
-| At least 14 days old, completed, redundant candidate/displaced runtime | Review only after equivalent retained bytes and all references are verified |
-| Referenced release, active preparation or Git worktree/staging root | Protect regardless of age |
-| Unreferenced sealed release older than 30 days | Review only after validation and recovery references are closed |
-| Operation request, controller, journal, manifests and retirement receipt | Retain compact history |
-| Unique source, Git metadata, configuration/task backups | Preserve; no automatic age expiry in the first version |
-| Job IDs, request digests, terminal status and workflow attempt references | Preserve durable semantics; compact output separately |
-| Credential material, settings, change/patch/workflow journals and undo snapshots | Outside initial GC scope |
-| `temp`, investigations and relocated fixtures | Inventory only until explicit ownership/reference proof exists |
+| Resource                                                                         | Default treatment                                                                               |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Installed runtime, exact sealed release and required containing paths            | Protect                                                                                         |
+| Current operation and rollback chain                                             | Initially preserve all 30 backup runtimes; verify checksums before declaring rollback available |
+| Unresolved, missing, malformed or unknown operation state                        | Protect; report the blocker                                                                     |
+| At least 14 days old, completed, redundant candidate/displaced runtime           | Review only after equivalent retained bytes and all references are verified                     |
+| Referenced release, active preparation or Git worktree/staging root              | Protect regardless of age                                                                       |
+| Unreferenced sealed release older than 30 days                                   | Review only after validation and recovery references are closed                                 |
+| Operation request, controller, journal, manifests and retirement receipt         | Retain compact history                                                                          |
+| Unique source, Git metadata, configuration/task backups                          | Preserve; no automatic age expiry in the first version                                          |
+| Job IDs, request digests, terminal status and workflow attempt references        | Preserve durable semantics; compact output separately                                           |
+| Credential material, settings, change/patch/workflow journals and undo snapshots | Outside initial GC scope                                                                        |
+| `temp`, investigations and relocated fixtures                                    | Inventory only until explicit ownership/reference proof exists                                  |
 
 Keep a seven-day quarantine grace period for eligible payloads. An explicit size
 budget can prioritize review but must never override a protection. If protected
@@ -603,9 +618,11 @@ Existing valid blobs are retained, with no automatic expiry. A conflicting
 two-link pending marker or an incomplete gzip stage after a compressor change
 can require explicit reconciliation; both refuse rather than bypass checks.
 
-This is a **source milestone**, not deployment or permission to alter a real
-job. No production job was compacted by the tests, and the proposal's modelled
-bytes are not reclaimed space. An older owner cannot read the descriptor; restore
+That source milestone was subsequently deployed as **0.16.5-dev**. Routed live
+acceptance compacted a disposable job, verified output and replay, then restored
+the original record hash. No historical job was compacted. The synthetic
+round trip and proposal's modelled bytes are not reclaimed space. An older owner
+cannot read the descriptor; restore
 each compacted record before downgrading to a runtime without archive support.
 The one-ID restore API alone does not prove the entire state directory is ready
 for downgrade. Output expiry, automatic compaction and scheduling remain separate
@@ -613,13 +630,11 @@ work.
 
 ## Ranked next steps
 
-1. **Prepare and validate a source release.** Run the applicable WB-001 release
-   gates on a sealed candidate, retain rollback evidence, and verify the exact
-   candidate and current owner before any separately authorized service update.
-   A successful build, source commit or dispatch is not observed activation or
-   hosted acceptance. Deploying the job archive tools needs that update; the
-   read-only proposal and retention source CLIs do not prove the live owner has
-   acquired them.
+1. **Retain the accepted release and recovery evidence.** The sealed 0.16.5-dev
+   release, final WB-001 activation, consistent immediate rollback backup and
+   routed live archive/restore exercise are complete. Refresh cached client
+   tools to expose the two archive names directly. Preserve the separate hosted
+   receipt and the documented prohibition on rolling back the bridge operation.
 2. **Review one runtime cleanup target.** Refresh the selected plan and reference,
    identity and retained-copy evidence under coordinated quiet maintenance before
    an explicitly reviewed quarantine. Quarantine is reversible and reclaims no
@@ -627,11 +642,11 @@ work.
    approval digest and separate explicit authorization for that exact operation;
    no real retained-data purge is authorized by the source work or test fixtures.
    Measure actual storage after any authorized purge.
-3. **Exercise one saved-job archive after owner acceptance.** Select and review an
-   explicit job and its current canonical hash, then use a distinct operation ID
-   through the updated owner if that real operation is authorized. Verify status,
-   output, replay and byte-exact restoration, and measure actual disk use. Do not
-   infer permission to compact the catalog or expire output from a proposal.
+3. **Review any historical-job archive separately.** The disposable live cycle
+   passed. Select and review an explicit historical job and its current canonical
+   hash before authorizing that operation. Verify status, output, replay and
+   byte-exact restoration, and measure actual disk use. The completed validation
+   does not authorize catalog-wide compaction or output expiry.
 4. **Consider routine retention and UI afterward.** Use measured results and a
    successful manual recovery cycle to design bounded previews and shared GUI
    controls. Scheduling, automatic purge and output expiry require separate

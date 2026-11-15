@@ -1,5 +1,27 @@
 # Workbridge upgrade execution
 
+## Current deployment — November 14, 2026
+
+**AMD-DESKTOP is running Workbridge 0.16.5-dev, with 66 MCP tools, 36 command-job
+slots and 36 coordinated-worker assignments.** Release source `a939ccc` passed all
+11 WB-001 gates: 1,347 tests passed, zero failed and six environmental skips.
+Final operation `wb0165-archive-final-20261115d` completed; all 2,879 installed
+runtime files and its rollback backup match the sealed release.
+
+Live hosted-terminal acceptance reached the existing shared owner, discovered
+66 tools, rejected a stale archive hash, preserved 46,500 output characters and
+same-request replay, then restored the disposable job's exact original bytes.
+The current chat still caches 64 direct tool bindings; refresh Workbridge tools
+to expose the two named archive tools directly. This routed acceptance does not
+claim that the cached bindings were refreshed.
+
+The attempted historical cap-36 rollback rejected the newer hostname settings.
+Recovery installed the validated compatible runtime without changing settings,
+then two normal WB-001 activations established a consistent current marker and
+immediate rollback backup. **Do not roll back the bridge operation or use the
+old cap-36 runtime with current settings.** Use the final operation's documented
+recovery path. See [deployment and recovery evidence](wb0165-deployment-20261114.md).
+
 ## Storage retention — November 14, 2026
 
 On **AMD-DESKTOP**, the [retention plan](storage-retention-plan.md) now has
@@ -11,45 +33,49 @@ journals or comparison scope. A real candidate plan was reviewed read-only,
 but it must be revalidated under coordinated quiet maintenance before any move.
 No real retained payload has been quarantined or purged by this workstream.
 
-The Jobs owner now has a one-ID lossless archive reader and compact/restore
-writer, exposed in source through shared CLI/MCP operations. Source commit
+The deployed Jobs owner now has a one-ID lossless archive reader and
+compact/restore writer, exposed through shared CLI/MCP operations. Source commit
 `adc2c86` passed the build and **94 focused archive, CLI, recovery, result and
 publication tests**; independent review found no remaining safety blocker under
 the documented single-owner model. The writer preserves exact record bytes,
 request identity and streams, requires positive logical savings, and uses durable
 operation receipts. A prior single-record proposal modelled 30,743 logical bytes
-of savings while retaining the original. No production job was compacted, and
-neither that estimate nor a quarantine move establishes reclaimed space.
+of savings while retaining the original. Live acceptance compacted and restored
+only a newly created disposable job. No historical job was compacted; the
+synthetic round trip and proposal do not establish reclaimed space.
 
 The November 14 census counted 6.23 GiB in updater operations, including about
 4.08 GiB of candidate and displaced copies before exclusions. Those figures are
-not a reclaimable-space claim. Keep all 30 rollback backup runtimes initially.
-The installed sealed release is nested inside `.local/wb001-gui-src-20261105c`;
-staging roots and durable job IDs must not be deleted by age alone.
+not a reclaimable-space claim. Preserve historical backup runtimes and their
+evidence; their compatibility is not implied by retained bytes. The installed
+seal is `.local/releases/retention-archive-0165-20261115d`; the older nested
+November 5 release and staging references remain protected. The postdeployment
+read-only inventory honestly reached its 50,000-entry limit and is incomplete.
+Staging roots and durable job IDs must not be deleted by age alone.
 
 Next steps, in priority order:
 
-1. Validate a sealed source release with the applicable WB-001 gates and retain
-   rollback evidence. A separately authorized update and observed activation and
-   hosted acceptance are required before the live owner provides the new job
-   archive tools. Source commits and dispatch alone do not establish deployment.
+1. Release validation, activation and routed live archive/restore acceptance are
+   complete. Retain the seal, final rollback backup and separate hosted receipt;
+   refresh cached client tools before relying on direct archive bindings.
 2. Refresh a concrete runtime target's plan and retained-copy/reference proof;
    review and explicitly authorize any quarantine under coordinated quiet
    maintenance. After the full v2 grace period, a real purge requires a separate
    reviewed digest and explicit authorization for that exact operation. Measure
    storage after any authorized purge.
-3. After an updated owner is accepted, review and authorize one explicit saved-job
-   archive operation. Verify status, output, same-ID replay and byte-exact restore,
-   then measure actual disk use. Restore compacted records before downgrading to
+3. Before archiving a historical saved job, review and authorize that explicit
+   operation and current hash. The disposable acceptance cycle is complete;
+   it does not authorize catalog-wide compaction. Measure actual disk use after
+   any real operation. Restore compacted records before downgrading to
    an owner without archive-reader support; one-ID restore does not certify the
    entire state directory.
 4. Defer routine scheduling, automatic purge, output expiry and shared GUI controls
    until a successful manual cycle and explicit policy choices. See the
    [ranked next steps](storage-retention-plan.md#ranked-next-steps).
 
-## Current checkpoint — 2026-11-01
+## Historical capacity checkpoint — 2026-11-01
 
-**Current deployed and committed baseline: Workbridge 0.16.4-dev / 36 command-job slots / 36 coordinated-worker assignments.** The sealed release passed nine WB-001 gates and 1,037 tests (zero failures; three skips). The healthy hosted instance and its capacity were independently verified, and the source, scripts, tests and documentation were reconciled into selected-file Git commits on `main`. The previous 0.16.3-dev/six-slot architecture is retired from active use, while Git and release history are retained. See [36-slot release and adoption evidence](workbridge-36-capacity-20261101.md). Browser-session helpers and tests of 36 independent AI reasoning workers remain separate future work.
+**Historical deployed and committed baseline: Workbridge 0.16.4-dev / 36 command-job slots / 36 coordinated-worker assignments.** The sealed release passed nine WB-001 gates and 1,037 tests (zero failures; three skips). The healthy hosted instance and its capacity were independently verified, and the source, scripts, tests and documentation were reconciled into selected-file Git commits on `main`. The previous 0.16.3-dev/six-slot architecture is retired from active use, while Git and release history are retained. See [36-slot release and adoption evidence](workbridge-36-capacity-20261101.md). Browser-session helpers and tests of 36 independent AI reasoning workers remain separate future work.
 
 **Workspace consolidation completed 2026-11-01:** 34 archived Workbridge validation/experiment folders moved from the `C:\work` root into ignored `workbridge-mcp\temp`; active Workbridge and `Workbridge Health` remain in place. Live configuration pointers, four NTFS junctions and 12 historical Git-worktree metadata pointers were corrected. See [verified relocation inventory and recovery map](workbridge-historical-fixture-relocation-20261101.md).
 

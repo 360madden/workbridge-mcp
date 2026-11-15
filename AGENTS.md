@@ -21,32 +21,32 @@ For live Workbridge service updates, follow the existing WB-001 staged validatio
 
 ## What this repository is
 
-A local-first MCP server (TypeScript, Node ≥ 24) that exposes Windows file, Git, command, snapshot, desktop/VMware and coordination tools to ChatGPT through an OpenAI Secure MCP Tunnel, plus an authenticated loopback CLI for the same owner. No public listener, database, Docker, or model API. Current version: `0.16.4-dev` (see `package.json` for the authority; README prose can lag).
+A local-first MCP server (TypeScript, Node ≥ 24) that exposes Windows file, Git, command, snapshot, desktop/VMware and coordination tools to ChatGPT through an OpenAI Secure MCP Tunnel, plus an authenticated loopback CLI for the same owner. No public listener, database, Docker, or model API. Current version: `0.16.5-dev` (see `package.json` for the authority; README prose can lag).
 
 ## Repository map
 
-| Path | Contents |
-| --- | --- |
-| `src/server.ts` | MCP entry point. Declares every tool through a local `register(name, description, shape, run, annotations)` wrapper over `McpServer.registerTool`; the server `instructions` string is the agent-facing protocol contract. |
-| `src/core.ts` | Shared `limits`, `excludedDirectories`, `BridgeError` and `errorDetails` mapping. |
-| `src/schemas.ts` | Per-tool output schemas keyed by tool name (`resultSchemas`). |
-| `src/workspace.ts`, `roots-config.ts` | Root allowlists, path policy, `.git`-aware resolution, `workspace-roots.json` reading. |
-| `src/text.ts`, `search.ts`, `overview.ts`, `context.ts` | Streamed reads/paging, ripgrep search, project overview, `task_context` assembly. |
-| `src/changes.ts` | Single-file create/edit/move/delete with SHA-256 preconditions, durable change journal and undo. |
-| `src/patches.ts`, `config-edits.ts` | Multi-file unified-patch journal and JSON/JSONC pointer edits reusing that journal. |
-| `src/jobs.ts`, `command-*.ts`, `command-worker.ts` | Bounded command-job slots, admission/safety/executable resolution, native command host. |
-| `src/workflows.ts`, `src/history.ts`, `src/git.ts` | Resumable validation plans, Git inspection/commits, filtered file history. |
-| `src/snapshots.ts`, `snapshot-cache.ts`, `snapshot-manifest.ts` | Byte-range/gzip snapshot reads and typed RiftReader manifests. |
-| `src/agent-assignments.ts`, `agent-coordination.ts` | Worker assignment capacity and exclusive file ownership (coordination, not AI-agent spawning). |
-| `src/desktop-*.ts` | Desktop/VMware capture, guarded actions, session policy, UI automation registration. |
-| `src/local-service.ts`, `roots-cli.ts` | Authenticated loopback shared service and operator CLI plumbing. |
-| `test/*.test.mjs` | Main suite; imports built output from `../dist`, so it needs `npm run build` first. |
-| `test/*.test.ps1`, `desktop/tests/*` | Separate PowerShell/UIA suites, not run by `npm test`. |
-| `scripts/` | PowerShell lifecycle (install/configure/update/autostart/health/rollback), `.mjs` CLI and acceptance runners, `Command-Host.cs`, C# helpers in `scripts/helpers/`. |
-| `desktop/` | WPF `.NET 10` control center and its smoke fixtures. Built with `dotnet`, not `npm`. |
-| `docs/` | Policies, roadmaps, operator guides, and per-milestone `wb0NN-*` validation evidence. |
-| `investigations/` | Archived investigation artifacts (including published binaries). Evidence, not build input. |
-| `temp/`, `.local/`, `dist/`, `.tools/` | Ignored: relocated historical fixtures, live runtime state, build output, downloaded tunnel binaries. |
+| Path                                                                  | Contents                                                                                                                                                                                                                   |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/server.ts`                                                       | MCP entry point. Declares every tool through a local `register(name, description, shape, run, annotations)` wrapper over `McpServer.registerTool`; the server `instructions` string is the agent-facing protocol contract. |
+| `src/core.ts`                                                         | Shared `limits`, `excludedDirectories`, `BridgeError` and `errorDetails` mapping.                                                                                                                                          |
+| `src/schemas.ts`                                                      | Per-tool output schemas keyed by tool name (`resultSchemas`).                                                                                                                                                              |
+| `src/workspace.ts`, `roots-config.ts`                                 | Root allowlists, path policy, `.git`-aware resolution, `workspace-roots.json` reading.                                                                                                                                     |
+| `src/text.ts`, `search.ts`, `overview.ts`, `context.ts`               | Streamed reads/paging, ripgrep search, project overview, `task_context` assembly.                                                                                                                                          |
+| `src/changes.ts`                                                      | Single-file create/edit/move/delete with SHA-256 preconditions, durable change journal and undo.                                                                                                                           |
+| `src/patches.ts`, `config-edits.ts`                                   | Multi-file unified-patch journal and JSON/JSONC pointer edits reusing that journal.                                                                                                                                        |
+| `src/jobs.ts`, `job-archive*.ts`, `command-*.ts`, `command-worker.ts` | Bounded command-job slots, lossless saved-job archive/restore, admission/safety/executable resolution, native command host.                                                                                                |
+| `src/workflows.ts`, `src/history.ts`, `src/git.ts`                    | Resumable validation plans, Git inspection/commits, filtered file history.                                                                                                                                                 |
+| `src/snapshots.ts`, `snapshot-cache.ts`, `snapshot-manifest.ts`       | Byte-range/gzip snapshot reads and typed RiftReader manifests.                                                                                                                                                             |
+| `src/agent-assignments.ts`, `agent-coordination.ts`                   | Worker assignment capacity and exclusive file ownership (coordination, not AI-agent spawning).                                                                                                                             |
+| `src/desktop-*.ts`                                                    | Desktop/VMware capture, guarded actions, session policy, UI automation registration.                                                                                                                                       |
+| `src/local-service.ts`, `roots-cli.ts`                                | Authenticated loopback shared service and operator CLI plumbing.                                                                                                                                                           |
+| `test/*.test.mjs`                                                     | Main suite; imports built output from `../dist`, so it needs `npm run build` first.                                                                                                                                        |
+| `test/*.test.ps1`, `desktop/tests/*`                                  | Separate PowerShell/UIA suites, not run by `npm test`.                                                                                                                                                                     |
+| `scripts/`                                                            | PowerShell lifecycle (install/configure/update/autostart/health/rollback), `.mjs` CLI and acceptance runners, `Command-Host.cs`, C# helpers in `scripts/helpers/`.                                                         |
+| `desktop/`                                                            | WPF `.NET 10` control center and its smoke fixtures. Built with `dotnet`, not `npm`.                                                                                                                                       |
+| `docs/`                                                               | Policies, roadmaps, operator guides, and per-milestone `wb0NN-*` validation evidence.                                                                                                                                      |
+| `investigations/`                                                     | Archived investigation artifacts (including published binaries). Evidence, not build input.                                                                                                                                |
+| `temp/`, `.local/`, `dist/`, `.tools/`                                | Ignored: relocated historical fixtures, live runtime state, build output, downloaded tunnel binaries.                                                                                                                      |
 
 ## Commands
 
@@ -81,20 +81,20 @@ Desktop UI: `dotnet build .\desktop\Workbridge.ControlCenter\Workbridge.ControlC
 
 ## Runtime state and live service
 
-- `.local/` holds live state: `settings.json` (`snapshotCacheGiB`, `expectedHostname`), `workspace-roots.json`, `commands.json` profiles, journals, `logs/`, `autostart.json`, and the DPAPI-protected tunnel key under `%LOCALAPPDATA%\Workbridge`. Workbridge file tools refuse to edit this state; never hand-edit it casually and never read out credentials.
+- `.local/` holds live state: `settings.json` (`snapshotCacheGiB`, `expectedHostname`), `workspace-roots.json`, `commands.json` profiles, journals, saved jobs and lossless job archives, `logs/`, `autostart.json`, and the DPAPI-protected tunnel key under `%LOCALAPPDATA%\Workbridge`. Workbridge file tools refuse to edit this state; never hand-edit it casually and never read out credentials.
 - Environment overrides: `WORKBRIDGE_ROOT`, `WORKBRIDGE_STATE_DIR`, `WORKBRIDGE_SNAPSHOT_CACHE_GIB`.
 - `npm run build` does **not** deploy. A source change reaches the live owner only through the independent WB-001 updater (`docs/updates.md`); `scripts/Restart-Workbridge.ps1` is for a deliberate restart of the current runtime, reusing the saved key.
 - Tests use temporary fixtures and a real MCP stdio client; no account key, tunnel, or hosted call is required for `npm test`.
 
 ## Where to read more
 
-| Need | Document |
-| --- | --- |
-| Operating posture and blocker playbook | `docs/autonomous-investigation-policy.md` |
-| Active desktop/VM roadmap | `docs/interactive-desktop-vm-roadmap.md` |
-| Machine identity and VM inventory | `docs/machine-identity.md` |
-| Coding workflow, jobs, recovery, local commits | `docs/coding-workflow.md` |
+| Need                                           | Document                                                                                                               |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Operating posture and blocker playbook         | `docs/autonomous-investigation-policy.md`                                                                              |
+| Active desktop/VM roadmap                      | `docs/interactive-desktop-vm-roadmap.md`                                                                               |
+| Machine identity and VM inventory              | `docs/machine-identity.md`                                                                                             |
+| Coding workflow, jobs, recovery, local commits | `docs/coding-workflow.md`                                                                                              |
 | Patches, config edits, workflows, task context | `docs/multi-file-patches.md`, `docs/structured-config-edits.md`, `docs/resumable-workflows.md`, `docs/task-context.md` |
-| Roots, CLI, snapshots, capacity | `docs/workspace-roots.md`, `docs/workbridge-cli.md`, `docs/snapshots.md`, `docs/job-capacity.md` |
-| Deployment, rollback, release gates | `docs/updates.md`, `docs/validation.md` |
-| Current checkpoint and history | `docs/roadmap.md`, `docs/workbridge-36-capacity-20261101.md` |
+| Roots, CLI, snapshots, capacity                | `docs/workspace-roots.md`, `docs/workbridge-cli.md`, `docs/snapshots.md`, `docs/job-capacity.md`                       |
+| Deployment, rollback, release gates            | `docs/updates.md`, `docs/validation.md`                                                                                |
+| Current checkpoint and history                 | `docs/roadmap.md`, `docs/workbridge-36-capacity-20261101.md`                                                           |

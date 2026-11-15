@@ -6,7 +6,7 @@
 
 **A local-first Model Context Protocol bridge for inspecting, editing, testing, and coordinating real projects from ChatGPT and compatible MCP clients.**
 
-[![Version](https://img.shields.io/badge/version-0.16.4--dev-2563eb?style=for-the-badge&logo=typescript&logoColor=white)](docs/workbridge-36-capacity-20261101.md)
+[![Version](https://img.shields.io/badge/version-0.16.5--dev-2563eb?style=for-the-badge&logo=typescript&logoColor=white)](docs/wb0165-deployment-20261114.md)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078d4?style=for-the-badge&logo=windows11&logoColor=white)](#-quick-start)
 [![MCP](https://img.shields.io/badge/protocol-MCP-8b5cf6?style=for-the-badge)](https://modelcontextprotocol.io/)
 [![Private by default](https://img.shields.io/badge/access-local--first-16a34a?style=for-the-badge&logo=shield&logoColor=white)](#-safety--recovery)
@@ -23,13 +23,13 @@
 
 ## 🚀 At a glance
 
-| 🧭 Deployment | ⚡ Concurrent capacity | 🧰 Interface | 🛡️ Operational model |
-| :---: | :---: | :---: | :---: |
-| **0.16.4-dev** | **36 command jobs** | **64 MCP tools** | **Local Windows host** |
-| Active adopted baseline | **36 coordinated-worker assignments** | Git, files, search, workflows, snapshots | Guarded edits and durable recovery |
+|        🧭 Deployment        |        ⚡ Concurrent capacity         |               🧰 Interface               |        🛡️ Operational model        |
+| :-------------------------: | :-----------------------------------: | :--------------------------------------: | :--------------------------------: |
+|       **0.16.5-dev**        |          **36 command jobs**          |             **66 MCP tools**             |       **Local Windows host**       |
+| Current accepted deployment | **36 coordinated-worker assignments** | Git, files, search, workflows, snapshots | Guarded edits and durable recovery |
 
 > [!IMPORTANT]
-> **36 execution slots are not 36 AI reasoning agents.** Workbridge coordinates host-side jobs and worker assignments; your ChatGPT/Codex plan independently determines reasoning-agent availability. The figures above describe the [adopted 2026-11-01 baseline](docs/workbridge-36-capacity-20261101.md), not a guarantee for every installation. Check `workspace_info` for live limits.
+> **36 execution slots are not 36 AI reasoning agents.** Workbridge coordinates host-side jobs and worker assignments; your ChatGPT/Codex plan independently determines reasoning-agent availability. The version and tool count describe the [current accepted deployment](docs/wb0165-deployment-20261114.md); the two 36-slot capacities are the [adopted 2026-11-01 capacity baseline](docs/workbridge-36-capacity-20261101.md). Check `workspace_info` for live limits and the live tool catalog for the current interface.
 
 ### 🗺️ Explore this README
 
@@ -55,17 +55,18 @@ flowchart TB
 
 ## 🧩 Capability map
 
-| Area | What you can do | Helpful detail |
-| :--- | :--- | :--- |
-| 🔎 **Project discovery** | Find repositories, worktrees, and project manifests | Bounded scans and configured roots |
-| 📄 **Code intelligence** | Read multiple files, search source, assemble task context | Line numbers, paging, hashes |
-| 🧬 **Git awareness** | Inspect branches, commits, status, history, and diffs | No automatic remote push |
-| ✍️ **Safe editing** | Apply guarded single-file edits and multi-file patches | SHA-256 preconditions, durable IDs |
-| ⚙️ **Execution** | Run configured checks or explicit developer commands | 36 bounded command-job slots |
-| 🧑‍💻 **Coordination** | Track worker assignments and exclusive file ownership | 36 assignment capacity; not AI-agent spawning |
-| ✅ **Validation** | Resume named checks and review results | Input-consistency guards |
-| 🧊 **Snapshots** | Inspect saved binary/gzip evidence | Bounded reads and typed decoding |
-| ↩️ **Recovery** | Review, retry, or undo eligible operations | Refuses unsafe overwrite of newer edits |
+| Area                      | What you can do                                                | Helpful detail                                |
+| :------------------------ | :------------------------------------------------------------- | :-------------------------------------------- |
+| 🔎 **Project discovery**  | Find repositories, worktrees, and project manifests            | Bounded scans and configured roots            |
+| 📄 **Code intelligence**  | Read multiple files, search source, assemble task context      | Line numbers, paging, hashes                  |
+| 🧬 **Git awareness**      | Inspect branches, commits, status, history, and diffs          | No automatic remote push                      |
+| ✍️ **Safe editing**       | Apply guarded single-file edits and multi-file patches         | SHA-256 preconditions, durable IDs            |
+| ⚙️ **Execution**          | Run configured checks or explicit developer commands           | 36 bounded command-job slots                  |
+| 🧑‍💻 **Coordination**       | Track worker assignments and exclusive file ownership          | 36 assignment capacity; not AI-agent spawning |
+| ✅ **Validation**         | Resume named checks and review results                         | Input-consistency guards                      |
+| 🧊 **Snapshots**          | Inspect saved binary/gzip evidence                             | Bounded reads and typed decoding              |
+| ↩️ **Recovery**           | Review, retry, or undo eligible operations                     | Refuses unsafe overwrite of newer edits       |
+| 💾 **Saved-job archives** | Compact or restore one completed saved terminal job losslessly | Exact record hashes and durable operation IDs |
 
 ### 📊 Capacity snapshot
 
@@ -103,16 +104,17 @@ Next, [configure the tunnel](#configure-and-run), [connect ChatGPT](#connect-bro
 
 ## 📚 Documentation
 
-| Start here | Topic |
-| :--- | :--- |
-| [📘 Coding workflow](docs/coding-workflow.md) | Edits, jobs, Git, checks, and recovery |
-| [🧭 36-slot rollout](docs/workbridge-36-capacity-20261101.md) | Adopted baseline and acceptance evidence |
-| [🧩 Task context](docs/task-context.md) | Scoped instructions, searches, and source excerpts |
-| [🛠️ Resumable workflows](docs/resumable-workflows.md) | Checks, review, and retry behavior |
-| [🗺️ Workspace roots](docs/workspace-roots.md) | Root configuration and path rules |
-| [🧪 Update process](docs/updates.md) | Staged deployment and rollback |
-| [📡 Snapshots](docs/snapshots.md) | Saved evidence inspection |
-| [🗂️ Historical relocation](docs/workbridge-historical-fixture-relocation-20261101.md) | Archived experimental folders |
+| Start here                                                                            | Topic                                              |
+| :------------------------------------------------------------------------------------ | :------------------------------------------------- |
+| [📘 Coding workflow](docs/coding-workflow.md)                                         | Edits, jobs, Git, checks, and recovery             |
+| [🧭 36-slot rollout](docs/workbridge-36-capacity-20261101.md)                         | Adopted baseline and acceptance evidence           |
+| [💾 Local CLI](docs/workbridge-cli.md#lossless-saved-job-compaction)                  | Lossless saved-job compaction and restoration      |
+| [🧩 Task context](docs/task-context.md)                                               | Scoped instructions, searches, and source excerpts |
+| [🛠️ Resumable workflows](docs/resumable-workflows.md)                                 | Checks, review, and retry behavior                 |
+| [🗺️ Workspace roots](docs/workspace-roots.md)                                         | Root configuration and path rules                  |
+| [🧪 Update process](docs/updates.md)                                                  | Staged deployment and rollback                     |
+| [📡 Snapshots](docs/snapshots.md)                                                     | Saved evidence inspection                          |
+| [🗂️ Historical relocation](docs/workbridge-historical-fixture-relocation-20261101.md) | Archived experimental folders                      |
 
 ---
 
@@ -120,8 +122,7 @@ Next, [configure the tunnel](#configure-and-run), [connect ChatGPT](#connect-bro
 
 The sections below retain the detailed setup, operational instructions, and historical evidence for developers and maintainers.
 
-
-**Active, officially adopted architecture (2026-11-01): Workbridge 0.16.4-dev, 36 command-job slots, 36 coordinated-worker assignments, and 64 MCP tools.** The sealed `cap36-quiescence-20261101-03` release passed all nine WB-001 gates (1,037 tests passed, 0 failed, 3 skipped), and the hosted connector independently verified the healthy 36-slot deployment. The old 0.16.3-dev/six-slot runtime is retired as the operational baseline, while its Git history and release evidence are preserved. Workbridge slots are not ChatGPT reasoning-agent quotas. See [36-slot rollout and baseline adoption](docs/workbridge-36-capacity-20261101.md).
+**Historical adopted capacity baseline (2026-11-01): Workbridge 0.16.4-dev, 36 command-job slots, 36 coordinated-worker assignments, and 64 MCP tools.** The sealed `cap36-quiescence-20261101-03` release passed all nine WB-001 gates (1,037 tests passed, 0 failed, 3 skipped), and the hosted connector independently verified the healthy 36-slot deployment. The old 0.16.3-dev/six-slot runtime is retired as the operational baseline, while its Git history and release evidence are preserved. Workbridge slots are not ChatGPT reasoning-agent quotas. See [36-slot rollout and baseline adoption](docs/workbridge-36-capacity-20261101.md).
 
 **Historical checkpoints (preserved):** The [WB-022 deployment](docs/wb022-deployment.md) records the 0.16.3-dev publication safeguards and 52-tool service. The [GUI-006 desktop/VMware investigation](docs/gui006-desktop-vmware-2026-10-26.md) records a sealed candidate and a guarded deployment preflight refusal. Those documents describe earlier states, not the current 36-slot service.
 
@@ -145,7 +146,7 @@ Browser ChatGPT → OpenAI Secure MCP Tunnel ← outbound tunnel-client
 
 One TypeScript server and the official tunnel client. No Supergateway, public listener, database, Docker, or model API integration is needed. `tunnel-client` owns the server child process. The deployed shared-service CLI uses an authenticated loopback endpoint with the official MCP HTTP adapter; browser access retains the existing stdio tunnel. The tunnel needs its own runtime API key and account permissions. Local CLI credentials are generated per service start and protected with Windows DPAPI.
 
-The currently deployed installation is **0.16.4-dev / 64 MCP tools**, with **36 command-job slots and 36 coordinated-worker assignments**. Workbridge reports four configured roots through live `workspace_info`, including `C:\work` (primary) and `C:\rift modding`; the live configuration is authoritative. Windows sign-in startup and existing permissions are preserved. See [current release evidence](docs/workbridge-36-capacity-20261101.md) and [historical hosted validation](docs/validation.md).
+The currently deployed installation is **0.16.5-dev / 66 MCP tools**, with **36 command-job slots and 36 coordinated-worker assignments**. Workbridge reports four configured roots through live `workspace_info`, including `C:\work` (primary) and `C:\rift modding`; the live configuration is authoritative. Windows sign-in startup and existing permissions are preserved. See [current release evidence](docs/wb0165-deployment-20261114.md), the [historical 36-slot capacity baseline](docs/workbridge-36-capacity-20261101.md), and [historical hosted validation](docs/validation.md).
 
 ## Windows setup
 
@@ -308,22 +309,23 @@ For an existing connected plugin, prepare and apply a validated release through 
 | `discover_projects`                                                                                            | Immediate folders or bounded recursive discovery; repository/worktree identity                              |
 | `list_directory`                                                                                               | Optional recursion, filename substring filter, offset pagination                                            |
 | `read_file`                                                                                                    | Source text with one-based line numbers and continuation                                                    |
-| `read_files`                                                                                                   | Bounded multi-file reads with per-file hashes, errors, and continuation                                       |
+| `read_files`                                                                                                   | Bounded multi-file reads with per-file hashes, errors, and continuation                                     |
 | `search_text`                                                                                                  | Recursive literal text search, paths/lines/excerpts                                                         |
 | `git_status`                                                                                                   | Branch and staged/unstaged/untracked status                                                                 |
 | `git_diff`                                                                                                     | Unstaged, staged, or base-commit diff; optional path filter                                                 |
 | `git_history`                                                                                                  | Commit hashes/dates/authors/subjects, path filter and pagination                                            |
 | `file_info`, `project_overview`, `diagnostics`                                                                 | Metadata/hashes, manifest evidence, bridge health                                                           |
-| `task_context`                                                                                                 | Scoped instructions, source/test excerpts, search results, and related workflow IDs                          |
+| `task_context`                                                                                                 | Scoped instructions, source/test excerpts, search results, and related workflow IDs                         |
 | `write_file`, `edit_file`, `create_directory`                                                                  | Create text/directories and exact conflict-checked edits                                                    |
 | `move_file`, `delete_file`                                                                                     | Individual file renames/moves and recoverable deletion; empty directories only                              |
 | `change_list`, `change_status`, `undo_change`                                                                  | Durable operation IDs, current-file checks, conflict-aware undo                                             |
 | `patch_preview`, `patch_apply`, `patch_status`, `patch_diff`, `patch_list`, `patch_resume`, `patch_undo`       | Recoverable multi-file text patches, combined review and guarded recovery                                   |
-| `config_preview`, `config_apply`                                                                                | Conflict-checked JSON/JSONC pointer edits using the patch journal and recovery operations                    |
+| `config_preview`, `config_apply`                                                                               | Conflict-checked JSON/JSONC pointer edits using the patch journal and recovery operations                   |
 | `workflow_create`, `workflow_status`, `workflow_list`, `workflow_resume`, `workflow_review`, `workflow_cancel` | Saved validation plans, explicit continuation/retry, combined review, and cancellation                      |
 | `terminal_run`                                                                                                 | Explicit executable, arguments, and project working directory; bounded noninteractive developer commands    |
-| `commands_list`, `command_run`, `command_list`, `command_status`, `command_output`, `command_cancel`           | Fixed profiles, job discovery, status, output tails/paging, and cancellation                                  |
-| `command_retry_save` | Explicit publication of a retained final job result; no command execution |
+| `commands_list`, `command_run`, `command_list`, `command_status`, `command_output`, `command_cancel`           | Fixed profiles, job discovery, status, output tails/paging, and cancellation                                |
+| `command_retry_save`                                                                                           | Explicit publication of a retained final job result; no command execution                                   |
+| `command_archive_status`, `command_archive`                                                                    | Lossless one-job compaction/restoration with exact record hashes and durable operation IDs                  |
 | `git_read_file`, `git_compare`, `git_blame`, `git_commit`                                                      | Historical source, commit comparisons/blame, selected-file local commits                                    |
 | `snapshot_manifest`, `snapshot_cache`, `snapshot_read`, `snapshot_search`                                      | Saved raw/gzip dumps, pose/segment/address mapping, streaming decompression, typed values and byte searches |
 
