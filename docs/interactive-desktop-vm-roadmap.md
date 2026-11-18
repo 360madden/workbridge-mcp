@@ -1,5 +1,12 @@
 # Interactive Windows desktop and VMware control — GUI-001 onward
 
+## Shared game-player-mcp P0 — November 18, 2026 (read-only source; isolated PASS; deployment HOLD)
+
+- Verified **AMD-DESKTOP** by Workbridge `hostname.exe` exit 0; the owner at `0.16.5-dev` supports both `C:\\work` and `C:\\rift modding`. The shared Python MCP server is installed once at `C:\\work\\game-player-mcp`.
+- Added `game_player_list_windows` only: fixed MCP child, bounded sanitized display text, no caller input parameters, no focus/capture/key/mouse tools. **6/6** isolated fake-session checks and existing **2/2** agent MCP checks passed. A live read-only enumeration returned **7 rows** independently from each configured root without game input.
+- TypeScript no-emit, Git diff checks and formatting pass. Direct `npm run build` failed while replacing an **in-use** native command-host EXE; the owner was deliberately left running. Validate an isolated WB-001 release candidate before any deployment.
+- Full design, evidence, limitations and live-update gate: [game-player-mcp-integration.md](game-player-mcp-integration.md). A Workbridge-only restart requires an explicit exclusive maintenance window; **no live update or RIFT action was performed**.
+
 ## M2 exact queued WTS event and Lab 1 alternative — November 6, 2026 (synthetic PASS; both guests blocked)
 
 - **Stricter event proof:** the isolated .NET 10 hidden session witness now requires its *exact* queued event code **and** target session ID in the recorded ledger. A coincident unrelated WTS notification no longer suffices for the synthetic-delivery check. Added `--synthetic-disconnect` (code **4**, same session) and `--synthetic-mismatch` (code **7**, different session) alongside the prior synthetic lock (code **7**). All three post only to the witness's **own hidden HWND**. This is a queue/handler regression, **not** proof of authentic OS-origin WTS events or authorization for input.

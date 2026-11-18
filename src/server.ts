@@ -30,6 +30,7 @@ import { snapshotManifest } from './snapshot-manifest.js';
 import { readRoots } from './roots-config.js';
 import { startLocalService } from './local-service.js';
 import { registerDesktopTools } from './desktop-registration.js';
+import { gamePlayerListWindows } from './game-player.js';
 
 const version = '0.16.5-dev';
 const location = z
@@ -237,6 +238,12 @@ async function main() {
         },
       );
     }
+    register(
+      'game_player_list_windows',
+      'Read-only shared game-player-mcp window inventory; no focus, screenshots, keyboard, or mouse input.',
+      {},
+      async () => gamePlayerListWindows(),
+    );
     register(
       'workspace_info',
       'Identify the actual Windows execution host (computerName) and show workspace roots, capabilities and limits. Use this before choosing between multiple Workbridge machines; the connector name is not host verification.',

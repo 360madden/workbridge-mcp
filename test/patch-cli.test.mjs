@@ -103,7 +103,7 @@ async function files(name) {
 
 test('CLI discovers patch schemas and uses preview/apply/diff/undo across separate invocations', async () => {
   const catalog = await owner.listTools();
-  assert.equal(catalog.tools.length, 66);
+  assert.equal(catalog.tools.length, 67);
   for (const name of [
     'patch_preview',
     'patch_apply',

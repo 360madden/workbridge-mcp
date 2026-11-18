@@ -209,6 +209,15 @@ const agentLedgerResult = z.object({
 // Explicit important fields keep hosted clients from having to infer result
 // shapes; text JSON remains available alongside structuredContent.
 export const resultSchemas: Record<string, z.ZodObject> = {
+  game_player_list_windows: z.object({
+    source: z.literal('game-player-mcp'),
+    tool: z.literal('list_windows'),
+    scope: z.literal('host-desktop'),
+    format: z.literal('display-text'),
+    includesWindowIds: z.literal(false),
+    text: z.string().max(16384),
+    truncated: z.boolean(),
+  }),
   diagnostics: z.object({
     version: z.string(),
     root: z.string(),

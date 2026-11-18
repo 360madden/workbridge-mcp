@@ -51,11 +51,13 @@ try {
     'agent_verify',
   ];
   const agentToolCount = tools.filter((tool) => agentToolNames.includes(tool.name)).length;
+  const gameWindows = tools.find((tool) => tool.name === 'game_player_list_windows');
+  // The updater also probes sealed pre-discovery 0.16.5-dev releases for rollback.
+  const compatibilityProbe = expectedIndex >= 0 || process.argv.includes('--observe-version');
+  const legacyCatalog = compatibilityProbe && !gameWindows;
   const expectedTools =
     runtimeVersion === '0.16.5-dev'
-      ? agentToolCount === 0
-        ? 58
-        : 66
+      ? (agentToolCount === 0 ? 59 : 67) - (legacyCatalog ? 1 : 0)
       : runtimeVersion === '0.16.4-dev'
         ? agentToolCount === 0
           ? 56
@@ -97,6 +99,10 @@ try {
       );
   }
   if (runtimeVersion === '0.16.5-dev') {
+    if (!legacyCatalog) {
+      assert.ok(gameWindows, 'Missing discovery tool: game_player_list_windows');
+      assert.equal(gameWindows.annotations?.readOnlyHint, true, 'Window discovery must be read-only');
+    }
     const archive = tools.find((tool) => tool.name === 'command_archive');
     const archiveStatus = tools.find((tool) => tool.name === 'command_archive_status');
     assert.ok(archive, 'Missing archive mutation tool: command_archive');

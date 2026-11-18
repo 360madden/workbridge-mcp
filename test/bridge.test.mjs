@@ -80,7 +80,7 @@ after(async () => {
 
 test('MCP initialize, discovery, and accurate read/write annotations', async () => {
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 66);
+  assert.equal(tools.length, 67);
   assert.ok(tools.find((t) => t.name === 'read_file').annotations.readOnlyHint);
   assert.equal(tools.find((t) => t.name === 'edit_file').annotations.readOnlyHint, false);
   assert.equal(tools.find((t) => t.name === 'command_run').annotations.openWorldHint, true);
