@@ -4,7 +4,8 @@ param(
     [string]$ReleaseId = ('release-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ')),
     [string]$WorkspaceRoot = 'C:\work',
     [switch]$RefreshUserEnvironment,
-    [switch]$SerialTests
+    [switch]$SerialTests,
+    [switch]$PendingReceipt
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Workbridge-Update.ps1')
@@ -285,9 +286,10 @@ try {
     $files = @(Get-WBManifest $payload)
     $manifest = [pscustomobject]@{schema=1; releaseId=$ReleaseId; version=$package.version; createdUtc=[DateTime]::UtcNow.ToString('o'); files=$files}
     Write-WBJson (Join-Path $release 'manifest.json') $manifest
-    Write-WBJson (Join-Path $release 'validated.json') ([pscustomobject]@{schema=1; version=$package.version; result='passed'; checks=$checks; testProfile=$testProfile; manifestSha256=(Get-FileHash -LiteralPath (Join-Path $release 'manifest.json') -Algorithm SHA256).Hash; probe=$probe; hostedVerified=$false})
-    $null = Get-WBRelease $release
-    Write-Host "Validated release: $release"
+    Write-WBJson (Join-Path $release $(if ($PendingReceipt) { 'validated.pending.json' } else { 'validated.json' })) ([pscustomobject]@{schema=1; version=$package.version; result='passed'; checks=$checks; testProfile=$testProfile; manifestSha256=(Get-FileHash -LiteralPath (Join-Path $release 'manifest.json') -Algorithm SHA256).Hash; probe=$probe; hostedVerified=$false})
+    $null = Get-WBRelease $release -PendingReceipt:$PendingReceipt
+    if ($PendingReceipt) { Write-Host "Checks passed; pending external review: $release" }
+    else { Write-Host "Validated release: $release" }
     Write-Host 'No service was stopped or deployed. Keep this directory unchanged.'
 } finally {
     $env:CONTROL_PLANE_API_KEY = $previousKey

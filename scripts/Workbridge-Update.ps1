@@ -221,9 +221,11 @@ function Test-WBRuntime([string]$Root, $Files) {
     }
 }
 
-function Get-WBRelease([string]$Path) {
+function Get-WBRelease([string]$Path, [switch]$PendingReceipt) {
     $release = Assert-WBPath $Path
-    $receipt = Get-Content -LiteralPath (Join-Path $release 'validated.json') -Raw | ConvertFrom-Json
+    # The updater never supplies this switch. Only a separate review can promote a pending receipt.
+    $receiptName = if ($PendingReceipt) { 'validated.pending.json' } else { 'validated.json' }
+    $receipt = Get-Content -LiteralPath (Join-Path $release $receiptName) -Raw | ConvertFrom-Json
     $manifestFile = Join-Path $release 'manifest.json'
     if ($receipt.schema -ne 1 -or $receipt.result -cne 'passed' -or $receipt.manifestSha256 -cne (Get-FileHash -LiteralPath $manifestFile -Algorithm SHA256).Hash) { throw 'Release does not have a matching successful validation receipt.' }
     foreach ($check in @('install', 'tests', 'startup', 'updater', 'format', 'acceptance')) {

@@ -18,6 +18,27 @@ $clock = [Diagnostics.Stopwatch]::StartNew()
 # This dedicated process does not need the caller's tunnel credential.
 $env:CONTROL_PLANE_API_KEY = $null
 
+# Arm a managed timer before any filesystem access or Add-Type compilation.
+# Its callback is a bound .NET method, not a PowerShell scriptblock: a blocked
+# runspace cannot prevent it from terminating this dedicated -File process.
+# Never arm it inside an interactive/embedding shell. This guard uses no I/O.
+$wrapperProcess = [Diagnostics.Process]::GetCurrentProcess()
+$argv = [Environment]::GetCommandLineArgs()
+$fileIndex = [Array]::IndexOf($argv, '-File')
+if ($fileIndex -lt 1 -or $fileIndex + 1 -ge $argv.Length -or
+    ![string]::Equals([IO.Path]::GetFullPath($argv[$fileIndex + 1]), $PSCommandPath, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Launch the validation wrapper as a dedicated pwsh -File process.'
+}
+$hardLimitSeconds = 1200 # Shortened only in disposable instrumented test copies.
+$watchdog = [Threading.CancellationTokenSource]::new()
+$killSelf = [Delegate]::CreateDelegate([Action], $wrapperProcess, 'Kill')
+$watchdogRegistration = $watchdog.Token.Register($killSelf, $false)
+# Count shell startup against the budget. Fail closed on an expired or reversed clock.
+$remainingMs = [math]::Floor(($wrapperProcess.StartTime.ToUniversalTime().AddSeconds($hardLimitSeconds) - [DateTime]::UtcNow).TotalMilliseconds)
+if ($remainingMs -le 0 -or $remainingMs -gt 1000 * $hardLimitSeconds) { throw 'Invalid or expired validation process deadline.' }
+$watchdog.CancelAfter([int]$remainingMs)
+# Deliberately never cancel/dispose it: shutdown, logging and finalization are covered.
+
 function Get-WBValidationPath([string]$Path) {
     if (![IO.Path]::IsPathFullyQualified($Path)) { throw 'Validation paths must be absolute.' }
     $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
@@ -115,7 +136,7 @@ namespace Workbridge {
 
 $null = [IO.Directory]::CreateDirectory($evidence)
 $release = Join-Path $source ('.local\releases\' + $ReleaseId)
-$receiptPath = Join-Path $release 'validated.json'
+$receiptPath = Join-Path $release 'validated.pending.json'
 $process = [Diagnostics.Process]::new()
 $startedUtc = [DateTime]::UtcNow.ToString('o')
 $record = [ordered]@{
@@ -123,7 +144,7 @@ $record = [ordered]@{
     sourceCommit = $SourceCommit; sourceRoot = $source; releaseId = $ReleaseId; releasePath = $release
     provenanceSha256 = $ExpectedProvenanceSha256; builderSha256 = $ExpectedBuilderSha256; lifetimeSha256 = $lifetimeHash
     wrapperPid = $PID; wrapperStartedUtc = [Diagnostics.Process]::GetCurrentProcess().StartTime.ToUniversalTime().ToString('o')
-    startedUtc = $startedUtc; timeoutSeconds = $TimeoutSeconds; taskHardLimitSeconds = 1200
+    startedUtc = $startedUtc; timeoutSeconds = $TimeoutSeconds; taskHardLimitSeconds = 1200; wrapperHardLimitSeconds = $hardLimitSeconds; receiptFile = 'validated.pending.json'
     outputLimitBytesPerStream = 4194304; childPid = $null; childExitCode = $null
     activeProcesses = $null; error = $null; receiptSha256 = $null; elapsedSeconds = 0
 }
@@ -140,7 +161,7 @@ try {
     $info.Environment.Remove('CONTROL_PLANE_API_KEY') | Out-Null
     foreach ($argument in @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', $builder,
         '-SourceRoot', $source, '-ReleaseId', $ReleaseId, '-WorkspaceRoot', $workspace,
-        '-RefreshUserEnvironment', '-SerialTests')) { $info.ArgumentList.Add($argument) }
+        '-RefreshUserEnvironment', '-SerialTests', '-PendingReceipt')) { $info.ArgumentList.Add($argument) }
     $process.StartInfo = $info
     if (!$process.Start()) { throw 'Validation builder could not start.' }
     $record.childPid = $process.Id
@@ -197,8 +218,8 @@ try {
         $record.result = 'timed_out'; $record.error = 'Validation exceeded its soft deadline before completion.'; $exitCode = 124
     }
     if ($record.result -ne 'passed' -and (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
-        # Retain but disqualify any builder receipt created before a wrapper-level
-        # failure. Root must require this runner's completed.json as well.
+        # Preserve a failed builder's pending evidence under an explicitly blocked name.
+        # Successful pending receipts are promoted only by a separate post-exit review.
         Move-Item -LiteralPath $receiptPath -Destination (Join-Path $release 'validated.runner-blocked.json') -ErrorAction Stop
     }
     $record.elapsedSeconds = [math]::Round($clock.Elapsed.TotalSeconds, 3)
