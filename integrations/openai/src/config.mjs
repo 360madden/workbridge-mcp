@@ -18,10 +18,13 @@ export class CompanionError extends Error {
 
 export function parseArgs(argv) {
   const [command, ...tokens] = argv;
-  if (!['doctor', 'plan', 'run'].includes(command)) {
-    throw new CompanionError('INVALID_COMMAND', 'Choose doctor, plan or run.');
+  if (!['doctor', 'plan', 'run', 'bridge-doctor'].includes(command)) {
+    throw new CompanionError('INVALID_COMMAND', 'Choose doctor, plan, run or bridge-doctor.');
   }
 
+  if (command === 'bridge-doctor' && tokens.length !== 0) {
+    throw new CompanionError('INVALID_MODE', 'bridge-doctor takes no options.');
+  }
   const opts = {
     command,
     model: 'gpt-6.2-sol',

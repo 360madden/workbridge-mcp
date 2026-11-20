@@ -36,6 +36,14 @@ node src/cli.mjs run --live --input-file "C:\work\workbridge-mcp\temp\my-api-pro
 
 **Warning:** `--live` sends the input file contents to OpenAI and may incur API charges independently from ChatGPT usage. No API credit or key has been used by creating this code. The execution requires both explicit `--live` and a configured key; there is no automatic fallback, replay or retry. Limit is one request per invocation. It does not operate your desktop.
 
+## Read-only Workbridge connection (P2 foundation)
+
+From this companion folder, run `npm run bridge:doctor`. This invokes **the existing shared-service Workbridge CLI**, authenticates through its own protected descriptor, checks that local Windows and the owner both report **AMD-DESKTOP** with root `C:\work`, and returns a small identity/slot report. It does not contact OpenAI, modify project source, start Workbridge, or send game input; its one temporary request file is deleted after the check.
+
+`src/workbridge-readonly.mjs` also exposes `createReadOnlyBridge()`: it verifies the owner first, then permits only `workspace_info`, `project_overview`, `read_file`, `search_text`, `git_status`, `command_status`, and `command_output`. Calls use unique temporary single-request files removed after each invocation; shell execution, patches, editing, desktop input and third-party MCP passthrough are **not** exposed.
+
+This is a **local read-only transport foundation**, not yet a model-tool loop or proven native Multi-agent integration. Future tool registrations must preserve this allowlist and independent identity checks.
+
 ## Technical boundaries
 
 - `openai@7.62.0` (official Node package; pinned for reproducibility, verify against the lockfile).

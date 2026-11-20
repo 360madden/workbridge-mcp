@@ -1,9 +1,21 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { join } from 'node:path';
-import { createResponseRequest, parseArgs, CompanionError, MAX_INPUT_BYTES } from '../src/config.mjs';
+import { dirname, join } from 'node:path';
+import os from 'node:os';
+import {
+  createResponseRequest,
+  parseArgs,
+  CompanionError,
+  MAX_INPUT_BYTES,
+  REPOSITORY_ROOT,
+} from '../src/config.mjs';
 import { createOpenAIClient, executeSingleResponse } from '../src/responses.mjs';
+import {
+  createReadOnlyBridge,
+  parseReadOnlyCliOutput,
+  validateReadOnlyCall,
+} from '../src/workbridge-readonly.mjs';
 
 const cli = join(import.meta.dirname, '..', 'src', 'cli.mjs');
 
@@ -120,4 +132,88 @@ test('live API requires both explicit opt-in and key', () => {
   });
   assert.equal(noKey.status, 1);
   assert.equal(JSON.parse(noKey.stderr).code, 'MISSING_API_KEY');
+});
+
+test('bridge-doctor accepts no paid API or input flags', () => {
+  assert.equal(parseArgs(['bridge-doctor']).command, 'bridge-doctor');
+  assert.throws(() => parseArgs(['bridge-doctor', '--live']), { code: 'INVALID_MODE' });
+});
+
+test('bridge tool allowlist rejects command execution and malformed arguments', () => {
+  validateReadOnlyCall('workspace_info', {});
+  assert.throws(() => validateReadOnlyCall('terminal_run', {}), { code: 'BRIDGE_TOOL_NOT_ALLOWED' });
+  assert.throws(() => validateReadOnlyCall('read_file', []), { code: 'INVALID_BRIDGE_ARGUMENTS' });
+  assert.throws(() => validateReadOnlyCall('read_file', { path: 'x'.repeat(9000) }), {
+    code: 'BRIDGE_ARGUMENTS_TOO_LARGE',
+  });
+});
+
+test('read-only CLI result parsing rejects wrong tool, failures and multiple rows', () => {
+  const row = {
+    schemaVersion: 1,
+    tool: 'workspace_info',
+    index: 0,
+    ok: true,
+    result: { computerName: 'AMD-DESKTOP' },
+  };
+  assert.equal(
+    parseReadOnlyCliOutput(JSON.stringify(row) + '\n', 'workspace_info').computerName,
+    'AMD-DESKTOP',
+  );
+  assert.throws(() => parseReadOnlyCliOutput(JSON.stringify(row), 'terminal_run'), {
+    code: 'BRIDGE_TOOL_FAILED',
+  });
+  assert.throws(
+    () => parseReadOnlyCliOutput(JSON.stringify(row) + '\n' + JSON.stringify(row), 'workspace_info'),
+    {
+      code: 'BRIDGE_OUTPUT_INVALID',
+    },
+  );
+});
+
+test('bridge identity preflight and read-only tool relay use one verified owner', async () => {
+  const fakeHost = os.hostname();
+  const fakeRoot = dirname(REPOSITORY_ROOT);
+  const calls = [];
+  const bridge = await createReadOnlyBridge({
+    expectedHostname: fakeHost,
+    invoke: async (tool, args) => {
+      calls.push({ tool, args });
+      if (tool === 'workspace_info') {
+        return {
+          computerName: fakeHost,
+          root: fakeRoot,
+          version: '0.16.5-dev',
+          localCli: { enabled: true },
+          limits: { commandJobs: 36, coordinatedWorkers: 36 },
+        };
+      }
+      return { path: args.path, content: 'read-only fixture' };
+    },
+  });
+  assert.equal(bridge.identity.commandJobSlots, 36);
+  assert.equal(
+    (await bridge.callTool('read_file', { path: 'workbridge-mcp/README.md' })).content,
+    'read-only fixture',
+  );
+  assert.deepEqual(
+    calls.map((c) => c.tool),
+    ['workspace_info', 'read_file'],
+  );
+  await assert.rejects(bridge.callTool('command_run', {}), { code: 'BRIDGE_TOOL_NOT_ALLOWED' });
+});
+
+test('bridge identity mismatch rejects before any project tool invocation', async () => {
+  await assert.rejects(
+    createReadOnlyBridge({
+      expectedHostname: os.hostname(),
+      invoke: async () => ({
+        computerName: 'WRONG-PC',
+        root: dirname(REPOSITORY_ROOT),
+        version: '0.16.5-dev',
+        localCli: { enabled: true },
+      }),
+    }),
+    { code: 'BRIDGE_IDENTITY_MISMATCH' },
+  );
 });

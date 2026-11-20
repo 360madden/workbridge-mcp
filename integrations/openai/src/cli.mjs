@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import os from 'node:os';
-import { argv, env, exitCode, stdout, stderr, version } from 'node:process';
+import { argv, env, stdout, stderr, version } from 'node:process';
 import { randomUUID } from 'node:crypto';
 import {
   CompanionError,
@@ -11,6 +11,7 @@ import {
   MAX_INPUT_BYTES,
 } from './config.mjs';
 import { createOpenAIClient, executeSingleResponse } from './responses.mjs';
+import { createReadOnlyBridge } from './workbridge-readonly.mjs';
 
 function emit(value) {
   stdout.write(JSON.stringify(value) + '\n');
@@ -43,6 +44,18 @@ async function main() {
       serviceChanged: false,
     });
     if (nodeMajor < 24) process.exitCode = 1;
+    return;
+  }
+  if (options.command === 'bridge-doctor') {
+    const bridge = await createReadOnlyBridge({ expectedHostname: 'AMD-DESKTOP' });
+    emit({
+      ok: true,
+      command: 'bridge-doctor',
+      ...bridge.identity,
+      mode: 'read-only',
+      apiCallsMade: 0,
+      serviceChanged: false,
+    });
     return;
   }
   if (options.command === 'plan') {

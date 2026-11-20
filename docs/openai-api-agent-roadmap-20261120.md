@@ -38,21 +38,21 @@ Use OpenAI's current API with Workbridge's **existing** Windows, file, Git, comm
 - [x] Model/routing config validated by allowlist and reasoning effort (`low|medium|high|xhigh|max` for GPT-6.2); default to Sol/medium, explicit Astra upgrade.
 - [x] Implement one official SDK Responses call behind an explicit `run --live` choice and environmental API key; no arbitrary URL override. Real credentialed call still pending.
 - [x] Return structured receipt: operation ID, model, state, response ID (if available), token usage, elapsed time, and sanitized errors. Never log prompts, private window content or API keys by default; a successful response intentionally emits bounded model output.
-- [x] Add offline fake-provider tests for dry-run, invalid options, missing key, successful call, remote failure and token usage (9/9 passing on 2026-11-20).
+- [x] Add offline fake-provider tests for dry-run, invalid options, missing key, successful call, remote failure and token usage (part of 14/14 tests passing on 2026-11-20).
 - [ ] Add cost-estimation calibration and cancellation/deadline tests before unattended API automation.
 - [x] Maintain one request per invocation, 16-KiB prompt and 2,048-token output caps, and explicit live-call switch. API key must remain in current-user environment or a separate approved secret facility; do not write it into files or pass it in command arguments.
 
-**Gate:** Offline tests 9/9 PASS; SDK export and local doctor PASS. Live API acceptance PENDING until key and spending are explicitly configured.
+**Gate:** Offline tests 14/14 PASS; SDK export and local doctor PASS. Live API acceptance PENDING until key and spending are explicitly configured.
 
 ### P2 — Workbridge shared CLI tool adapter
 
-- [ ] Use its **existing** CLI discovery / shared-service mode rather than reading its protected DPAPI descriptor.
-- [ ] Read-only allowlisted tools first: `workspace_info`, `project_overview`, `read_file`, `search_text`, `git_status`, `command_status`, `command_output`.
+- [x] Use its **existing** CLI discovery / shared-service mode rather than reading its protected DPAPI descriptor.
+- [x] Read-only allowlisted tools first: `workspace_info`, `project_overview`, `read_file`, `search_text`, `git_status`, `command_status`, `command_output`.
 - [ ] Implement bounded tool catalog/schema translation, output-size caps, exact project root and hostname preflight, tool-call ID ledger, timeouts and explicit error returns.
-- [ ] Add offline fake MCP/CLI test and real read-only smoke against AMD-DESKTOP; do not use free-form shell execution from a model until separate review.
+- [x] Add offline fake CLI tests, live `workspace_info` identity proof and a real `read_file` smoke against AMD-DESKTOP; no model-driven shell execution exposed.
 - [ ] Only then opt in to journaled mutations (`patch_preview`, `patch_apply`, tracked validations), with file locks/ownership and postcondition verification.
 
-**Gate:** One model-assisted **read-only** repository summary with independently checkable citations to file paths/hashes; later one disposable file patch/recovery test.
+**Gate:** Local same-owner read-only bridge PASS (AMD-DESKTOP, owner 0.16.5-dev, 36 slots, `read_file` returned actual hash). A model-assisted **read-only** repository summary and later disposable patch/recovery remain PENDING.
 
 ### P3 — Native OpenAI Multi-agent
 

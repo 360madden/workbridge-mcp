@@ -9,6 +9,7 @@
   },
   "scripts": {
     "doctor": "node src/cli.mjs doctor",
+    "bridge:doctor": "node src/cli.mjs bridge-doctor",
     "plan": "node src/cli.mjs plan",
     "test": "node --test test/*.test.mjs"
   },
