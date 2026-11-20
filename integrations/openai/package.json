@@ -1,0 +1,18 @@
+{
+  "name": "@workbridge/openai-companion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Independent OpenAI Responses companion for Workbridge (not part of the live owner)",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "doctor": "node src/cli.mjs doctor",
+    "plan": "node src/cli.mjs plan",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "openai": "7.62.0"
+  }
+}
