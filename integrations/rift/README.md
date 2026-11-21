@@ -140,6 +140,20 @@ The observed physical client at 11:06–11:07 PM EST had PID `34596`, HWND `6584
 
 The independently checked receipt is `C:\work\workbridge-mcp\.tools\rift-physical-epoch-20261120-01`. After implementing the collector and receipt package, **59/59 focused tests passed** (36 earlier companion tests, 17 process/window tests, 6 saved-receipt tests).
 
-Next gates: independently correlating fresh RR2/Telemetry data to a current verified physical process epoch, then screenshot/debugger receipt correlation and targeted Ghidra analysis. No input or memory writes are part of this milestone.
+## Saved-artifact compatibility audit
+
+The `audit` command verifies completed physical-identity, research-session and optional patch-drift packages **without recontacting the game**. It compares the captured executable SHA-256 against RR2/RRE archived source builds and distinguishes a matching **build** from a matching **process epoch** and actual fresh telemetry. It never promotes historic observations to live readings.
+
+In PowerShell 7, from `C:\work\workbridge-mcp\integrations\rift`:
+
+```powershell
+node .\src\cli.mjs audit --physical-bundle 'C:\work\workbridge-mcp\.tools\rift-physical-epoch-20261120-01' --research-bundle 'C:\work\workbridge-mcp\.tools\rift-research-session-20261120-rr2-rre-01' --patch-bundle 'C:\work\workbridge-mcp\.tools\rift-pe-drift-20261120-01'
+```
+
+**Observed saved-data result (November 20, 2026):** physical receipt build `df954b79…` matches the patch report's **after** image; both RR2 and RRE archived observations reference the **older** `1935a05c…` executable. The audit therefore returns `different_executable_build` for each, `changedHistoricalRvaAnchors=4` for the patch report, and `memoryOffsetsQualified=false`. The saved process receipt's checksum is verified, but the audit does not independently verify that PID is still alive. Existing and synthetic saved data can still guide new investigations; they simply cannot qualify current offsets, process ownership, game actions or successful custom teleportation.
+
+The focused compatibility tests cover mismatched builds, same-build/different-epoch, exact-match-without-freshness, old bundles without extra archives, genuine RRE patch reports, tampered sources and missing inputs. No game access or new runtime dependency is needed.
+
+Next gates: independently correlating **fresh** RR2/Telemetry data to a current verified physical process epoch, then screenshot/debugger receipt correlation and targeted Ghidra analysis. No input or memory writes are part of this milestone.
 
 See [the full RIFT RE integration roadmap](../../docs/rift-re-integration-roadmap-20261120.md).

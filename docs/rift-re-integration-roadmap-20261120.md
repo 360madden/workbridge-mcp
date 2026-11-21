@@ -145,6 +145,19 @@ A local XYZ change, native memory write acknowledgement or matching HUD location
 
 **Next useful milestone:** correlate future fresh RR2/Telemetry observations with this exact physical epoch using a source-generated PID, start tick, build hash and time window; never import old snapshots solely because the executable hash matches. Continue targeted offline/native collision and teleporter discovery in separate project-owned collectors.
 
+## Implementation checkpoint — November 20, 2026, 11:11 PM EST
+
+**Saved RIFT research compatibility audit implemented** as `integrations/rift/src/compatibility.mjs` and CLI `audit`. It independently re-verifies physical-identity, archived research and optional patch report checksums, then compares source/build/process identities without reopening or interacting with RIFT.
+
+- **Physical receipt**: previously observed AMD-DESKTOP PID `34596`, exact process start `639308249563595623` and current executable `df954b798331e18359be62a31cc74b49fc3f50b87385ebb080a5448256322c01`.
+- **Archived RR2 and RRE**: saved observations both reference executable `1935a05c9db6d468e34e0055014a4a99c1b5afceb1695884e24600f5c20a4be8`. Both receive `different_executable_build` rather than being merged into the later process epoch.
+- **Existing patch evidence**: currently observed build matches the `after` image. Four original ROOT-001 anchors changed at their historical RVAs, and native offsets remain unqualified. Build agreement alone is not proof of a relocated function.
+- **Audit integrity**: saved package hashes and existing manifest/source associations are checked. The audit can distinguish different builds, same build/different declared process epoch, and matching declared epoch with _freshness still unverified_. It never promotes a saved process receipt into a fresh running process assertion.
+- **Validation**: eight new portable tests, including old bundles, synthetic PE comparison and tampered receipts. The aggregate companion regression is to be rechecked at the final gate before committing.
+- **No** new model/API spending, game input, live memory sampling, VM access, plugin installation, Workbridge service deployment or modifications to sibling project files.
+
+**Remaining priority:** one independently acquired _fresh_ RR2/Telemetry sample with current PID/start ticks/build hash and capture timestamp, followed by a source-bound correlation against a newly checked physical epoch. Only then consider targeted native debug/collision and teleporter experiments.
+
 ## Sources consulted
 
 ### Local, inspected November 20

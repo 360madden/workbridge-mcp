@@ -4,6 +4,7 @@ import { ResearchError } from './identity.mjs';
 import { comparePatch, verifyPatch } from './patch-drift.mjs';
 import { physicalRiftIdentity } from './physical-epoch.mjs';
 import { savePhysicalReceipt, verifyPhysicalReceipt } from './physical-receipt.mjs';
+import { auditArchivedCompatibility } from './compatibility.mjs';
 
 const allowed = new Set([
   '--client',
@@ -23,18 +24,29 @@ const allowed = new Set([
   '--expected-after-sha',
   '--anchors',
   '--pid',
+  '--physical-bundle',
+  '--research-bundle',
+  '--patch-bundle',
 ]);
 
 function parse(argv) {
   const [command, ...rest] = argv;
   if (
-    !['doctor', 'session', 'verify', 'patch', 'verify-patch', 'physical', 'verify-physical', 'help'].includes(
-      command,
-    )
+    ![
+      'doctor',
+      'session',
+      'verify',
+      'patch',
+      'verify-patch',
+      'physical',
+      'verify-physical',
+      'audit',
+      'help',
+    ].includes(command)
   ) {
     throw new ResearchError(
       'COMMAND',
-      'Expected doctor, session, verify, patch, verify-patch, physical, verify-physical or help.',
+      'Expected doctor, session, verify, patch, verify-patch, physical, verify-physical, audit or help.',
     );
   }
   if (command === 'help') return { command, options: {} };
@@ -78,6 +90,7 @@ function parse(argv) {
     'verify-patch': ['--bundle'],
     physical: ['--expect-host', '--expect-sha', '--pid', '--out'],
     'verify-physical': ['--bundle'],
+    audit: ['--physical-bundle', '--research-bundle', '--patch-bundle'],
   };
   if (Object.keys(options).some((key) => !relevant[command].includes(key))) {
     throw new ResearchError('ARGUMENTS', 'An option does not belong to this command.');
@@ -95,6 +108,7 @@ const HELP = [
   'node src/cli.mjs verify-patch --bundle SAVED_PATCH_DIR',
   'node src/cli.mjs physical --expect-host AMD-DESKTOP [--pid EXACT_RIFT_PID] [--expect-sha SHA256] [--out NEW_DIR]',
   'node src/cli.mjs verify-physical --bundle SAVED_IDENTITY_DIR',
+  'node src/cli.mjs audit --physical-bundle SAVED_IDENTITY_DIR --research-bundle SAVED_RESEARCH_DIR [--patch-bundle SAVED_PATCH_DIR]',
   'Output bundles include originals, analyzer source, SHA256SUMS.txt, normalized evidence and the session manifest.',
 ].join('\n');
 
@@ -146,6 +160,12 @@ async function main() {
       pid: rawPid === undefined ? null : Number(rawPid),
     });
     if (opts['--out']) result = { ...result, receipt: await savePhysicalReceipt(result, opts['--out']) };
+  } else if (command === 'audit') {
+    result = await auditArchivedCompatibility({
+      physicalBundleDir: opts['--physical-bundle'],
+      researchBundleDir: opts['--research-bundle'],
+      patchBundleDir: opts['--patch-bundle'] ?? null,
+    });
   } else if (command === 'verify-physical') {
     if (!opts['--bundle'])
       throw new ResearchError('MISSING_ARGUMENT', 'Physical verification requires --bundle.');
