@@ -171,4 +171,16 @@ A real sealed-runtime bug was also corrected: `physical-epoch.mjs` previously im
 
 For the pinned example commands, evidence inventory, capture timing and test details, see [M6a live-witness report](../../docs/wb-rift-001-m6-live-witness-20261121.md). The example PID/start ticks expire after a RIFT restart; re-run `physical` before attempting a new witness.
 
+## M6b — Offline Telemetry RVA drift audit (November 21, 2026)
+
+A new _source-only_ helper at `tools/telemetry-locator-drift.py` reuses the existing **RRE** `rift_update_analyzer.py` PE parser and reads the SHA-pinned old/new archived RIFT executables plus the original Telemetry .NET 10 C# reader. It checks exactly **nine** build-specific `*Rva` fields and reports only **static byte evidence**.
+
+The newer image moved the `.data` section base by **+0x11000**. At the six historical selector RVAs, the newer file now maps `.rdata` instead of `.data` and the old 16-byte contents do not match. At the equivalent **section-relative position** within the new `.data`, all six 16-byte windows **do** match. Three other root constants (`ManagerRva`, `PlayerSystemRva`, `ClockRootRva`) lack file-backed bytes in the older PE and cannot be compared.
+
+**Zero relocated native locators are qualified.** A matching on-disk window does not prove a variable identity, initialized pointer, loaded memory address or working getter. No Telemetry code or installed game files were changed.
+
+Actual repeatable report: `C:\work\workbridge-mcp\.tools\wb-rift001-m6b-locator-audit-20261121.json`. The new test suite `test/telemetry-locator-drift.test.mjs` verifies the real pinned archives and rejects changed executables/parser/source, wrong host, changed field declarations and output overwrite. Focused result **6/6 PASS**, Python syntax PASS.
+
+[Full M6b static locator table and operator command](../../docs/wb-rift-001-m6b-telemetry-locator-drift-20261121.md). The next work is independent cross-reference/owner verification on the changed build, particularly the three non-file-backed roots, before proposing a new exact-build Telemetry reader.
+
 See [the full RIFT RE integration roadmap](../../docs/rift-re-integration-roadmap-20261120.md).
