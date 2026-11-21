@@ -73,9 +73,16 @@ export function windowsMetadata() {
     ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned', '-File', script],
     { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true },
   );
+  return metadataReplyClient(child);
+}
+
+// Export the fixed protocol separately so synthetic tests can reproduce slow
+// PowerShell startup without changing the installed helper or invoking Windows.
+export function metadataReplyClient(child, { startupTimeoutMs = 10000, replyTimeoutMs = 2000 } = {}) {
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
   const replies = lines[Symbol.asyncIterator]();
   let failed = null;
+  let startup = null;
   child.on('error', () => {
     failed = 'METADATA_PROVIDER_FAILED';
   });
@@ -85,18 +92,48 @@ export function windowsMetadata() {
   child.on('exit', () => {
     failed ??= 'METADATA_PROVIDER_EXITED';
   });
+  const ready = () => {
+    startup ??= (async () => {
+      let timer;
+      try {
+        const first = await Promise.race([
+          replies.next(),
+          new Promise((_, reject) => {
+            timer = setTimeout(
+              () =>
+                reject(
+                  Object.assign(new Error('metadata startup timeout'), { code: 'METADATA_STARTUP_TIMEOUT' }),
+                ),
+              startupTimeoutMs,
+            );
+          }),
+        ]);
+        if (failed || first.done || first.value !== 'READY')
+          throw Object.assign(new Error('metadata provider did not become ready'), {
+            code: failed ?? 'METADATA_PROVIDER_FAILED',
+          });
+      } finally {
+        clearTimeout(timer);
+      }
+    })();
+    return startup;
+  };
   return {
     async check(file) {
       if (failed) throw Object.assign(new Error(failed), { code: failed });
       let timer;
       try {
+        // A cold Windows PowerShell launch can be slower than a metadata read.
+        // Do not consume the 2-second per-file budget before READY is observed.
+        await ready();
+        if (failed) throw Object.assign(new Error(failed), { code: failed });
         child.stdin.write(`${JSON.stringify(file)}\n`);
         const response = await Promise.race([
           replies.next(),
           new Promise((_, reject) => {
             timer = setTimeout(
               () => reject(Object.assign(new Error('metadata timeout'), { code: 'METADATA_TIMEOUT' })),
-              2000,
+              replyTimeoutMs,
             );
           }),
         ]);

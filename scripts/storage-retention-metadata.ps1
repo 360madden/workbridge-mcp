@@ -1,5 +1,8 @@
 # Fixed, read-only metadata worker. Paths arrive as JSON strings on stdin.
 $ErrorActionPreference = 'Stop'
+# An explicit ready signal separates PowerShell initialization from metadata replies.
+[Console]::Out.WriteLine('READY')
+[Console]::Out.Flush()
 while ($null -ne ($line = [Console]::In.ReadLine())) {
     try {
         $request = ConvertFrom-Json -InputObject $line
