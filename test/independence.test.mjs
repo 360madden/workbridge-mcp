@@ -54,20 +54,24 @@ function manage(action, target, expectError) {
     root,
   ];
   if (target) args.push('-Path', target);
+  let output;
   try {
-    const output = execFileSync('powershell.exe', args, {
+    output = execFileSync('powershell.exe', args, {
       windowsHide: true,
       env: env(),
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 45000,
+      maxBuffer: 1024 * 1024,
     });
-    if (expectError) assert.fail('Expected configuration error');
-    return JSON.parse(output.trim());
   } catch (error) {
-    if (!expectError) throw error;
-    assert.match(String(error.stdout) + String(error.stderr), expectError);
+    if (!expectError || error.code === 'ETIMEDOUT') throw error;
+    assert.match(String(error.stdout ?? '') + String(error.stderr ?? ''), expectError);
     return null;
   }
+  // Do not catch our own failed expectation as though it were a native error.
+  if (expectError) assert.fail('Expected configuration error but native script exited successfully');
+  return JSON.parse(output.trim());
 }
 before(async () => {
   fixture = await mkdtemp(path.join(os.tmpdir(), 'workbridge-independent-'));
@@ -271,16 +275,29 @@ test(
       executable: process.execPath,
       args: ['-e', 'console.log("ready");setInterval(()=>{},1000)'],
       requestId: 'root-lock-job',
-      timeoutSeconds: 20,
+      // Keep the disposable command alive beyond the bounded Windows runner's
+      // process-launch variability; a timed-out job no longer owns the lock.
+      timeoutSeconds: 90,
     });
-    for (let n = 0; n < 100; n++) {
-      if ((await call('command_output', { jobId: 'root-lock-job' })).text.includes('ready')) break;
-      await new Promise((r) => setTimeout(r, 30));
+    let ready = false;
+    try {
+      for (let n = 0; n < 100; n++) {
+        if ((await call('command_output', { jobId: 'root-lock-job' })).text.includes('ready')) {
+          ready = true;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 30));
+      }
+      assert.equal(ready, true, 'fixture command must emit readiness before lock proof');
+      const active = await call('command_status', { jobId: 'root-lock-job' });
+      assert.equal(active.status, 'running', 'only an active job can prove exclusive configuration lock');
+      const before = await readFile(rootsFile(state), 'utf8');
+      manage('Remove', extra, /configuration is busy/);
+      assert.equal(await readFile(rootsFile(state), 'utf8'), before);
+    } finally {
+      // Release the isolated test owner's command even after a failed assertion.
+      await call('command_cancel', { jobId: 'root-lock-job' });
     }
-    const before = await readFile(rootsFile(state), 'utf8');
-    manage('Remove', extra, /configuration is busy/);
-    assert.equal(await readFile(rootsFile(state), 'utf8'), before);
-    await call('command_cancel', { jobId: 'root-lock-job' });
     assert.ok(manage('Remove', extra).changed);
     await client.close();
     await connect();
