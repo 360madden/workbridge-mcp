@@ -25,9 +25,13 @@ concurrency:
 
 jobs:
   build-test:
-    name: Windows / Node 24
+    name: Windows / Node 24 (${{ matrix.partition }})
     runs-on: windows-2025
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [parallel, isolated]
     steps:
       # GitHub's default TEMP may use an 8.3 RUNNER~1 alias; select a canonical root.
       - name: Set canonical Windows fixture temp
@@ -48,21 +52,23 @@ jobs:
       - name: Verify canonical temporary fixture root
         shell: pwsh
         run: node -e "const os=require('node:os'),fs=require('node:fs'),path=require('node:path');const declared=path.resolve(os.tmpdir());const canonical=fs.realpathSync.native(declared);if(declared.toLowerCase()!==canonical.toLowerCase())throw new Error('CI_TEMP_ALIAS_MISMATCH')"
-      # On a hosted runner, use the complete original Workbridge core suite and
-      # the portable research fixtures. The full RIFT companion tests additionally
-      # require sibling RRE/RPT Python tools and real host archives; WB-001 runs
-      # those unchanged on the verified Windows development machine.
-      - name: Build and run Workbridge core tests
+      # The two runner partitions cover every test/*.test.mjs file exactly once.
+      # Full RIFT companion tests need local RRE/RPT tools; WB-001 runs
+      # those unchanged on the verified physical development machine.
+      - name: Build Workbridge and stage desktop runtime
         run: |
           npm run build
-          # The disposable CI checkout needs the same desktop helper closure as WB-001.
           node scripts/stage-desktop-runtime.mjs
-          # Check the native Git/archive fixtures alone to distinguish host prerequisites
-          # from contention; the complete core suite still runs below, unchanged.
-          node --test --test-concurrency=1 test/git-baseline-audit.test.mjs test/job-archive-proposal.test.mjs test/job-archive-write.test.mjs
-          # Match WB-001's proven bounded file scheduler without omitting any tests.
-          node --test --test-concurrency=4 test/*.test.mjs
+      - name: Check native Git/archive prerequisites
+        if: matrix.partition == 'isolated'
+        run: node --test --test-concurrency=1 test/git-baseline-audit.test.mjs test/job-archive-proposal.test.mjs test/job-archive-write.test.mjs
+      - name: Verify exhaustive core test partition
+        run: node scripts/ci-core-test-runner.mjs inventory
+      - name: Run complete core partition
+        run: node scripts/ci-core-test-runner.mjs ${{ matrix.partition }}
       - name: Test both research providers with synthetic offline fixtures
+        if: matrix.partition == 'parallel'
         run: node --test integrations/research/test/*.test.mjs
       - name: Verify the sealed research runtime closure
+        if: matrix.partition == 'parallel'
         run: node scripts/stage-research-runtime.mjs --verify --repo-root .
