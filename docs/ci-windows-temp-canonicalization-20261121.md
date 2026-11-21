@@ -28,6 +28,13 @@
 - **Unverified until a new hosted run completes:** that `RUNNER_TEMP` resolves to a canonical path in the runner, and that the entire original core suite passes without unrelated failures.
 - Even green GitHub CI does not replace the separate full-host, sealed WB-001 candidate acceptance or authorize an automatic live-service restart.
 
+## Release candidate test-closure correction
+
+- The isolated, committed-source candidate `wb-rift001-sat-20261121-006` passed install and desktop prebuild/prestage but failed its full test gate: **1,546 passed, 1 failed, 5 skipped, 1,552 total**. No validation receipt was written; no runtime activation occurred.
+- The sole failure was the CI-contract test's `ENOENT` reading `payload/.github/workflows/build-test.yml`. The WB-001 source-copy allowlist omitted `.github`; this is a **release payload completeness defect**, independent of the hosted 8.3 path alias.
+- Add `.github` to `WBSourceNames` in `scripts/Workbridge-Update.ps1`. The official release builder already uses that list to copy isolated test source, while `WBRuntimeNames` excludes `.github`, so activation copies no workflow file into the live runtime.
+- Add a release-source-closure regression in `test/research-ci-contract.test.mjs`; the updated focused suite passes **3/3** locally. Rebuild and independently verify a **fresh** candidate from the eventual new committed HEAD rather than reviving failed `...-006`.
+
 ## Follow-up
 
 After pushing this change, inspect the new GitHub Actions job's canonical temp preflight, core test summary, synthetic research tests, and sealed runtime closure. If any remain red, capture the exact failing test/error and investigate independently.

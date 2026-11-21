@@ -1,7 +1,7 @@
 # Shared local update helpers. Compatible with Windows PowerShell 5.1.
 Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Utility') -ErrorAction Stop
 $script:WBRuntimeNames = @('dist', 'node_modules', 'package.json', 'package-lock.json')
-$script:WBSourceNames = @('.gitattributes', '.gitignore', '.prettierrc.json', 'README.md', 'Workbridge Status.cmd', 'package.json', 'package-lock.json', 'tsconfig.json', 'src', 'scripts', 'test', 'docs', 'integrations')
+$script:WBSourceNames = @('.github', '.gitattributes', '.gitignore', '.prettierrc.json', 'README.md', 'Workbridge Status.cmd', 'package.json', 'package-lock.json', 'tsconfig.json', 'src', 'scripts', 'test', 'docs', 'integrations')
 
 function Assert-WBPath([string]$Path) {
     if (![IO.Path]::IsPathRooted($Path)) { throw 'An absolute path is required.' }

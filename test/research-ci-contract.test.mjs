@@ -24,6 +24,15 @@ test('GitHub Windows CI includes research changes and exercises portable two-pro
   assert.doesNotMatch(workflow, /run: npm test\b/);
 });
 
+test('WB-001 carries the CI workflow into its isolated full-test payload', async () => {
+  const updater = await readFile(new URL('../scripts/Workbridge-Update.ps1', import.meta.url), 'utf8');
+  const builder = await readFile(new URL('../scripts/New-WorkbridgeRelease.ps1', import.meta.url), 'utf8');
+  assert.match(updater, /\$script:WBSourceNames\s*=\s*@\([^\r\n]*'\.github'/);
+  assert.match(builder, /foreach\s*\(\$name in \$script:WBSourceNames\)/);
+  // The workflow is validation source, not part of the activated runtime.
+  assert.doesNotMatch(updater.match(/\$script:WBRuntimeNames\s*=\s*@\([^\r\n]*/)?.[0] ?? '', /\.github/);
+});
+
 test('benchmark and synthetic adapter tests are covered by the research CI glob', async () => {
   const benchmark = await readFile(
     new URL('../integrations/research/test/benchmark.test.mjs', import.meta.url),
