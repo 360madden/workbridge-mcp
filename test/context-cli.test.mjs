@@ -92,7 +92,7 @@ const only = {
 };
 test('connected CLI discovers task_context and shares section continuation and source hashes with MCP', async () => {
   const tools = await client.listTools();
-  assert.equal(tools.tools.length, 67);
+  assert.equal(tools.tools.length, 71);
   const tool = tools.tools.find((t) => t.name === 'task_context');
   assert.ok(tool.inputSchema);
   assert.ok(tool.outputSchema);

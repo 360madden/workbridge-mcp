@@ -15,6 +15,10 @@ test('serial release profile changes only test-file scheduling', async () => {
     pkg.scripts['test:serial'],
     pkg.scripts.test.replace('node --test ', 'node --test --test-concurrency=1 '),
   );
+  assert.equal(
+    pkg.scripts['test:bounded'],
+    pkg.scripts.test.replace('node --test ', 'node --test --test-concurrency=4 '),
+  );
 });
 
 const pwsh = path.join(process.env.ProgramFiles || 'C:\\Program Files', 'PowerShell', '7', 'pwsh.exe');
@@ -45,6 +49,8 @@ $ast = [Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tok
 if ($errors.Count) { throw 'Builder parse failed.' }
 $switch = @($ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -ceq 'SerialTests' })
 if ($switch.Count -ne 1 -or $null -ne $switch[0].DefaultValue) { throw 'Serial scheduling must remain opt-in.' }
+$boundedSwitch = @($ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -ceq 'BoundedTests' })
+if ($boundedSwitch.Count -ne 1 -or $null -ne $boundedSwitch[0].DefaultValue) { throw 'Bounded scheduling must remain opt-in.' }
 $profileFunction = @($ast.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Get-WBReleaseTestProfile' }, $true))
 if ($profileFunction.Count -ne 1) { throw 'Expected one pure profile helper.' }
 . ([scriptblock]::Create($profileFunction[0].Extent.Text))
@@ -58,10 +64,14 @@ if ($construction.Count -ne 5) { throw 'Expected all five command construction s
 $constructionBlock = [scriptblock]::Create(($construction | ForEach-Object { $_.Extent.Text }) -join [Environment]::NewLine)
 $payload = 'C:\synthetic-source\payload'
 $checks = 0
-foreach ($SerialTests in @($false, $true)) {
+foreach ($scenario in @('default', 'serial', 'bounded')) {
+    $SerialTests = ($scenario -ceq 'serial')
+    $BoundedTests = ($scenario -ceq 'bounded')
     . ([scriptblock]::Create($profileAssignment[0].Extent.Text))
     if ($SerialTests) {
         if ($testProfile.name -cne 'serial-files' -or $testProfile.fileConcurrency -ne 1 -or ($testProfile.arguments -join '|') -cne 'run|test:serial') { throw 'Wrong serial profile.' }
+    } elseif ($BoundedTests) {
+        if ($testProfile.name -cne 'bounded-files' -or $testProfile.fileConcurrency -ne 4 -or ($testProfile.arguments -join '|') -cne 'run|test:bounded') { throw 'Wrong bounded profile.' }
     } else {
         if ($testProfile.name -cne 'default' -or $null -ne $testProfile.fileConcurrency -or ($testProfile.arguments -join '|') -cne 'test') { throw 'Default test profile changed.' }
     }
@@ -92,6 +102,10 @@ foreach ($SerialTests in @($false, $true)) {
         $checks++
     }
 }
+$conflictRejected = $false
+try { Get-WBReleaseTestProfile -SerialTests -BoundedTests | Out-Null }
+catch { $conflictRejected = $_.Exception.Message.Contains('only one') }
+if (!$conflictRejected) { throw 'Two test scheduling profiles must not be combined.' }
 $receipt = @($ast.FindAll({ param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.GetCommandName() -ceq 'Write-WBJson' -and $n.Extent.Text.Contains("'validated.json'") }, $true))
 if ($receipt.Count -ne 1 -or !$receipt[0].Extent.Text.Contains('testProfile=$testProfile')) { throw 'Successful receipt must record the chosen test profile.' }
 if (!$gateLoop[0].Extent.Text.Contains('if ($code -ne 0) { throw')) { throw 'A failed gate must still reject the release.' }
@@ -107,7 +121,7 @@ Write-Output ("PASS profile scenarios=" + $checks)
       });
       assert.equal(result.error, undefined, String(result.error));
       assert.equal(result.status, 0, result.stdout + result.stderr);
-      assert.match(result.stdout, /PASS profile scenarios=4/);
+      assert.match(result.stdout, /PASS profile scenarios=6/);
     },
   );
 }

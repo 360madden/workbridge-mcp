@@ -5,6 +5,7 @@ param(
     [string]$WorkspaceRoot = 'C:\work',
     [switch]$RefreshUserEnvironment,
     [switch]$SerialTests,
+    [switch]$BoundedTests,
     [switch]$PendingReceipt
 )
 $ErrorActionPreference = 'Stop'
@@ -158,14 +159,16 @@ function Invoke-WBReleaseNativeGate {
 
 # File scheduling only: test cases, deadlines and within-file concurrency stay unchanged.
 function Get-WBReleaseTestProfile {
-    param([switch]$SerialTests)
+    param([switch]$SerialTests, [switch]$BoundedTests)
+    if ($SerialTests -and $BoundedTests) { throw 'Select only one test scheduling profile.' }
+    if ($BoundedTests) { return [pscustomobject]@{ name='bounded-files'; fileConcurrency=4; arguments=@('run','test:bounded') } }
     if ($SerialTests) {
         return [pscustomobject]@{ name='serial-files'; fileConcurrency=1; arguments=@('run','test:serial') }
     }
     return [pscustomobject]@{ name='default'; fileConcurrency=$null; arguments=@('test') }
 }
 
-$testProfile = Get-WBReleaseTestProfile -SerialTests:$SerialTests
+$testProfile = Get-WBReleaseTestProfile -SerialTests:$SerialTests -BoundedTests:$BoundedTests
 $release = Get-WBChild $source ('.local\releases\' + $ReleaseId)
 if (Test-Path -LiteralPath $release) { throw 'Release already exists. Use a new release ID; existing evidence is retained.' }
 $payload = Get-WBChild $release 'payload'

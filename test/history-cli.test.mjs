@@ -92,7 +92,7 @@ test('CLI discovers history filters and continues a sparse MCP page without modi
   const discovery = await cli([], ['--list-tools']);
   assert.equal(discovery.code, 0);
   assert.equal(discovery.rows[0].serverVersion, '0.16.5-dev');
-  assert.equal(discovery.rows[0].tools.length, 67);
+  assert.equal(discovery.rows[0].tools.length, 71);
   for (const name of ['change_list', 'patch_list']) {
     const tool = discovery.rows[0].tools.find((t) => t.name === name);
     for (const field of ['project', 'path', 'state', 'scanLimit'])

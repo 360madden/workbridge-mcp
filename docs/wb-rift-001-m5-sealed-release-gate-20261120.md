@@ -37,6 +37,16 @@ Consequences before M5: a staged release could expose four valid new MCP tools b
 
 The isolated closure manifest had SHA-256 `d9b680f9215e0dce5443396e1084007ad3d49f7dd4baff6c9c6fbf73d6ee8492` at its first successful stage. Its separate four-step evidence package is under ignored `C:\work\workbridge-mcp\.tools\m5-research-isolated\research-run-01`. The tested command used an explicit `WORKBRIDGE_ROOT=C:\work` for the isolated staged layout; installed runtime path resolution is tested separately.
 
+## Official WB-001 release validation — November 21, 2026
+
+**The M5 source-only and isolated runtime gates remain green, but neither initial official candidate was validated. No production Apply occurred.**
+
+- **Candidate `wb-rift001-m5-20261121-001`:** the committed-source release builder passed prerequisite, dependency-install, desktop-prebuild and desktop-prestage gates. Its optional `-SerialTests` full test-file profile advanced too slowly for the Workbridge 600-second command job, so only its isolated validation process tree was explicitly cancelled, retaining its logs. There is **no `validated.json` receipt**.
+- **Candidate `wb-rift001-m5-20261121-002`:** the normal (unbounded default) test-file concurrency completed the full 1,384-case suite: 1,367 passed, 12 failed and 5 skipped; the release builder correctly refused a validated receipt. **Eight test files** had stale pre-upgrade MCP tool-count assertions (`67` instead of current `71`). Subsequent agent/history test failures were affected by incomplete setup after those assertions; one native retention-proof test also reported `DUPLICATE_PROOF_UNAVAILABLE/METADATA_CHANGED` under parallel load.
+- The native retention-proof test file was then run **independently, unchanged**; its two candidate/displaced proof scenarios passed **2/2** (59.2 seconds). No retention-engine logic was weakened based on one overloaded test failure.
+- Corrected the eight catalog assertions to `71`. Added an **opt-in bounded four-test-file** builder profile (`-BoundedTests` / `npm run test:bounded`), preserving every original test, gate, deadline, receipt requirement and the original default/serial profiles. The existing pure PowerShell release-profile tests passed (**2 passed, 1 optional Store-PowerShell test skipped**); full candidate retest is the next gate.
+- **Apply remains HOLD:** new candidate must be built from the next clean committed HEAD with a unique release ID, pass the entire real WB-001 suite, publish an immutable `validated.json` receipt and pass independent payload verification before any separate owner-quiescence/rollback maintenance window.
+
 ## Remaining M5 steps (no service activation yet)
 
 1. Commit exact current code/tests/docs, capture commit hash, and check a clean working tree.
@@ -49,11 +59,11 @@ The isolated closure manifest had SHA-256 `d9b680f9215e0dce5443396e1084007ad3d49
 
 ## Operator commands (PowerShell 7)
 
-Prepare an **isolated release only**, with a NEW ID, from the committed Workbridge source:
+Prepare an **isolated release only**, with a NEW ID, from the committed Workbridge source. The new profile changes only test-file concurrency to four; it does **not** skip test files:
 
 ```powershell
 cd 'C:\work\workbridge-mcp'
-.\scripts\New-WorkbridgeRelease.ps1 -ReleaseId 'wb-rift001-m5-candidate-NEW_ID' -WorkspaceRoot 'C:\work' -RefreshUserEnvironment -SerialTests
+.\scripts\New-WorkbridgeRelease.ps1 -ReleaseId 'wb-rift001-m5-candidate-NEW_ID' -WorkspaceRoot 'C:\work' -RefreshUserEnvironment -BoundedTests
 ```
 
 **No** `Update-Workbridge.ps1 -Action Apply` should be executed until the separate exclusive maintenance gate is satisfied. The WB-001 release builder is independent of deployment.
