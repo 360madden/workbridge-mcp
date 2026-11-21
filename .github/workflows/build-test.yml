@@ -28,13 +28,14 @@ jobs:
     name: Windows / Node 24
     runs-on: windows-2025
     timeout-minutes: 15
-    # GitHub Windows images can expose TEMP through an 8.3 RUNNER~1 alias.
-    # Use the runner-owned, non-aliased temp root for all test fixtures.
-    env:
-      TMPDIR: ${{ runner.temp }}
-      TMP: ${{ runner.temp }}
-      TEMP: ${{ runner.temp }}
     steps:
+      # GitHub's default TEMP may use an 8.3 RUNNER~1 alias; select a canonical root.
+      - name: Set canonical Windows fixture temp
+        shell: pwsh
+        run: |
+          "TMPDIR=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
       - name: Check out source
         uses: actions/checkout@v6
       - name: Install Node.js

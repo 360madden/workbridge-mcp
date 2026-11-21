@@ -7,9 +7,11 @@ test('GitHub Windows CI includes research changes and exercises portable two-pro
   assert.match(workflow, /runs-on: windows-2025/);
   // Windows-hosted tests require one canonical temp path; a RUNNER~1 alias
   // otherwise differs from fs.realpath() and invalidates scoped root fixtures.
-  assert.match(workflow, /TMPDIR:\s*\$\{\{\s*runner\.temp\s*\}\}/);
-  assert.match(workflow, /TMP:\s*\$\{\{\s*runner\.temp\s*\}\}/);
-  assert.match(workflow, /TEMP:\s*\$\{\{\s*runner\.temp\s*\}\}/);
+  assert.match(workflow, /TMPDIR=\$env:RUNNER_TEMP/);
+  assert.match(workflow, /TMP=\$env:RUNNER_TEMP/);
+  assert.match(workflow, /TEMP=\$env:RUNNER_TEMP/);
+  assert.match(workflow, /\$env:GITHUB_ENV/);
+  assert.match(workflow, /Set canonical Windows fixture temp/);
   assert.match(workflow, /Verify canonical temporary fixture root/);
   assert.match(workflow, /node-version: '24'/);
   assert.match(workflow, /- 'integrations\/\*\*'/);

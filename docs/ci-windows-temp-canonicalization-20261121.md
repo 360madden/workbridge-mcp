@@ -13,7 +13,8 @@
 
 ## Narrow fix
 
-- Configure the GitHub Actions **job** variables `TMPDIR`, `TMP`, and `TEMP` to the built-in `${{ runner.temp }}` root, rather than the Windows profile temporary path which can contain an 8.3 alias.
+- An initial job-level `${{ runner.temp }}` reference was rejected at workflow validation; the run [44909817387](https://github.com/360madden/workbridge-mcp/actions/runs/44909817387) created no jobs.
+- A first-step PowerShell action now writes `TMPDIR`, `TMP`, and `TEMP` from `RUNNER_TEMP` into GitHub's supported `GITHUB_ENV` file. Subsequent steps inherit that fixture root without expanding Workbridge permissions.
 - Add a preflight that compares `os.tmpdir()` with `fs.realpathSync.native()` before launching any core tests. A mismatch fails the job immediately and names `CI_TEMP_ALIAS_MISMATCH`.
 - Keep the complete original `node --test test/*.test.mjs` invocation; no tests are skipped, disabled, renamed, or weakened.
 - Keep Workbridge's protected-root and symlink/junction checks unchanged. The correction is to the hosted fixture environment, not an expansion of production permissions.
@@ -24,7 +25,7 @@
 - Local `node --test test/research-ci-contract.test.mjs`: 2 passed, 0 failed.
 - Local strict TypeScript `tsc --noEmit`, Prettier check of both changed files, and `git diff --check`: exit code 0.
 - The previous November 21 CI run [44909270411](https://github.com/360madden/workbridge-mcp/actions/runs/44909270411) was still processing the core suite while the local correction was prepared. It does not include this correction.
-- **Unverified until a new hosted run completes:** that `${{ runner.temp }}` resolves to a canonical path in the runner, and that the entire original core suite passes without unrelated failures.
+- **Unverified until a new hosted run completes:** that `RUNNER_TEMP` resolves to a canonical path in the runner, and that the entire original core suite passes without unrelated failures.
 - Even green GitHub CI does not replace the separate full-host, sealed WB-001 candidate acceptance or authorize an automatic live-service restart.
 
 ## Follow-up
