@@ -2,7 +2,7 @@
 
 A standalone, dependency-free **Node.js 24+** research coordination engine. Workbridge uses RIFT as the first workload; the plan/DAG validator, source reconciliation, execution ledger, evidence packages, inspection and recovery are designed to serve other approved research adapters too.
 
-**Status November 20, 2026:** **M0–M3 implemented and tested in the standalone integration**. M4 live Workbridge MCP facade and M5 staged service deployment remain pending. Nothing has restarted or modified the existing Workbridge 0.16.5-dev owner.
+**Status November 21, 2026:** M0–M4 source work and the M7 two-project offline coordinator are implemented; a prior M5 candidate passed full validation but is **unapplied**. The running Workbridge owner remains 0.16.5-dev and has not been restarted or replaced.
 
 ## Commands — PowerShell 7 on AMD-DESKTOP
 
@@ -121,14 +121,39 @@ The WB-001 release builder now carries `integrations` into its candidate payload
 
 **Verified without service downtime:** 12/12 staging/catalog checks, 70/70 RIFT tests, 40/40 coordinator tests, 8/8 fake MCP-owner tests (**130/130**), TypeScript strict check and isolated compile. A sealed 21-file runtime under ignored `C:\work\workbridge-mcp\.tools\m5-research-isolated\dist\research-runtime` completed a real four-step **offline archival** RIFT session and independently verified its evidence under `…\m5-research-isolated\research-run-01`. This did not execute a native memory reader against the live game.
 
-**Remaining:** the official WB-001 `New-WorkbridgeRelease` full candidate validation and its immutable release receipt, followed by an independently approved **exclusive** Apply/rollback service maintenance window. No direct copying to the running `dist`, no service restart, no new ChatGPT-side MCP tools until hosted post-deploy acceptance.
+**M5 was subsequently validated:** a sealed 21-file release candidate and its full release receipt passed; only an independently approved **exclusive** Apply/rollback service maintenance window remains. No direct copying to the running `dist`, no service restart, no new ChatGPT-side MCP tools until hosted post-deploy acceptance.
 
 [Detailed M5 release gate](../../docs/wb-rift-001-m5-sealed-release-gate-20261120.md)
+
+## M7 — Second real research adapter: Star Wrath (source verified)
+
+The exact same generic plan/run/verify/inspect/resume engine now supports `starwrath.offline.v1`, not just `rift.offline.v1`. Its only three approved actions:
+
+| Step        | Operation                   | Evidence                                                                         |
+| ----------- | --------------------------- | -------------------------------------------------------------------------------- |
+| `identify`  | `starwrath.snapshot-audit`  | Saved Star Wrath EXE version, SHA-256 and archived package/index hashes          |
+| `compare`   | `starwrath.physics-compare` | Existing pinned Python `compare_physics_runs.py` against sanitized saved reports |
+| `correlate` | `starwrath.correlate`       | Explicit agreement/mismatch of archived source hashes and completeness labels    |
+
+**Validated:** The saved Star Wrath baseline `0.10.10.53828(f37cda82a)` passed a real three-step offline session, independent checksum verification and a separately staged **23-file** runtime execution. A controlled process exit after the first completed step was recovered without replaying it; the remaining **two** actions completed and the recovery claim verified. Sources stayed under `C:\work\Star_Wrath_RE`; no installed game interaction or sibling repository modification.
+
+The historical physics comparison is deliberately against **the same saved report**: it reports no differences by construction and retains `incomplete:true` / `exhaustive:false`. Cross-source archive and index hashes agree, but neither client/server authority nor current game state was measured. M7 regression covers pinned Python source drift between steps, path/junction redirection, malformed evidence and run-package tampering.
+
+```powershell
+# PowerShell on AMD-DESKTOP, from C:\work\workbridge-mcp\integrations\research
+node .\src\cli.mjs plan --plan .\examples\starwrath-historical-20261121.plan.json
+node .\src\cli.mjs run --plan .\examples\starwrath-historical-20261121.plan.json --out 'C:\work\workbridge-mcp\.tools\starwrath-NEW_UNIQUE_RUN'
+node .\src\cli.mjs verify --bundle 'C:\work\workbridge-mcp\.tools\starwrath-NEW_UNIQUE_RUN'
+```
+
+The WB-001 default, serial and four-worker full test scripts now include **both** `integrations/research/test/*.test.mjs` and `integrations/rift/test/*.test.mjs`. This change is source-only until a **new** release candidate passes the full WB-001 gates. The previously validated `wb-rift001-m5-20261121-003` candidate remains sealed and unapplied; it does not contain M7.
+
+[Detailed M7 evidence and test report](../../docs/wb-rift-001-m7-starwrath-20261121.md)
 
 ## Next roadmap work
 
 **M5 official release validation passed:** Candidate `wb-rift001-m5-20261121-003` was built from committed source with every gate exit 0, **1,379/1,384 tests passed and five skipped** (zero failures). Independent WB-001 manifest verification checked **7,485 files**; the 21-file research runtime closure and **all four research MCP tool registrations** passed local candidate acceptance. Release manifest SHA-256: `67F1F4E412EF681EF8DC6DA3942708D7AAB0A9E5ED08CC1B56831C95D1E4544E`.
 
-**Deployment HOLD:** This is an immutable _candidate_, not a running Workbridge update. An exclusive Workbridge-only maintenance window, quiescence proof and rollback gate are required before WB-001 Apply, followed by hosted ChatGPT MCP catalog verification. Fresh physical RIFT telemetry M6 and a non-RIFT adapter pilot M7 remain separate future work.
+**Deployment HOLD:** This is an immutable _candidate_, not a running Workbridge update. An exclusive Workbridge-only maintenance window, quiescence proof and rollback gate are required before WB-001 Apply, followed by hosted ChatGPT MCP catalog verification. Fresh physical RIFT telemetry M6 and M8 benchmarks/CI remain future work; the M7 non-RIFT adapter is implemented in source and tested offline.
 
 [WB-RIFT-001 master roadmap](../../docs/wb-rift-001-unified-research-coordinator-roadmap-20261120.md)

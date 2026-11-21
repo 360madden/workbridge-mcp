@@ -4,7 +4,7 @@ import { hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { readPlanFile } from './plan-file.mjs';
 import { validatePlan, PlanError } from './plan.mjs';
-import { RIFT_BUNDLE_VERIFIERS, preflightRiftSources } from './adapters/rift.mjs';
+import { researchProvider } from './providers.mjs';
 
 const SHA = /^[0-9a-f]{64}$/;
 const ATTEMPT = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -78,8 +78,8 @@ export async function readRecoveryCheckpoint({
   directory,
   host = hostname(),
   registry,
-  verifiers = RIFT_BUNDLE_VERIFIERS,
-  preflight = preflightRiftSources,
+  verifiers,
+  preflight,
   ownerAlive = ownerProcessAlive,
   checkSources = true,
 } = {}) {
@@ -87,6 +87,11 @@ export async function readRecoveryCheckpoint({
   const dir = resolve(directory);
   const source = await readPlanFile(join(dir, 'input.plan.json'));
   const plan = validatePlan(source.plan, { host, ...(registry ? { registry } : {}) });
+  if (!verifiers || !preflight) {
+    const provider = researchProvider(plan.profile);
+    verifiers ??= provider.verifiers;
+    preflight ??= provider.preflight;
+  }
   const ledger = await boundedFile(join(dir, 'run-ledger.jsonl'), MAX_LEDGER);
   const lines = new TextDecoder('utf-8', { fatal: true }).decode(ledger.bytes);
   if (!lines.endsWith('\n')) {

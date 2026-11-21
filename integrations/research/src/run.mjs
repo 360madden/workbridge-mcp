@@ -4,7 +4,7 @@ import { hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { PlanError, validatePlan } from './plan.mjs';
 import { readPlanFile } from './plan-file.mjs';
-import { RIFT_ACTIONS, RIFT_BUNDLE_VERIFIERS, preflightRiftSources } from './adapters/rift.mjs';
+import { researchProvider } from './providers.mjs';
 
 const MAX_RESULT_BYTES = 1024 * 1024;
 const MAX_LEDGER_BYTES = 256 * 1024;
@@ -95,9 +95,9 @@ export async function runResearch({
   outputDir,
   host = hostname(),
   registry,
-  actions = RIFT_ACTIONS,
-  verifiers = RIFT_BUNDLE_VERIFIERS,
-  preflight = preflightRiftSources,
+  actions,
+  verifiers,
+  preflight,
   now = () => new Date().toISOString(),
   onStepCommitted = null,
 } = {}) {
@@ -105,6 +105,14 @@ export async function runResearch({
     throw new RunError('RUN_ARGUMENTS', 'Run requires a plan and new output directory.');
   const source = await readPlanFile(planFile);
   const plan = validatePlan(source.plan, { host, ...(registry ? { registry } : {}) });
+  // Injected trusted adapters remain supported for isolated regression fixtures.
+  // Ordinary CLI calls select only built-in, reviewed profile implementations.
+  if (!actions || !verifiers || !preflight) {
+    const provider = researchProvider(plan.profile);
+    actions ??= provider.actions;
+    verifiers ??= provider.verifiers;
+    preflight ??= provider.preflight;
+  }
   const originalSources = await preflight(plan, host);
   const directory = resolve(outputDir);
   let sequence = 0;
@@ -298,10 +306,7 @@ export async function runResearch({
 }
 
 /** Verifies *saved* research packages. It never reruns steps or contacts RIFT. */
-export async function verifyResearchRun(
-  directoryInput,
-  { registry, verifiers = RIFT_BUNDLE_VERIFIERS } = {},
-) {
+export async function verifyResearchRun(directoryInput, { registry, verifiers } = {}) {
   if (!directoryInput) throw new RunError('RUN_ARGUMENTS', 'A completed run directory is required.');
   const directory = resolve(directoryInput);
   let inventory;
@@ -329,6 +334,7 @@ export async function verifyResearchRun(
     host: manifest.executedHost,
     ...(registry ? { registry } : {}),
   });
+  verifiers ??= researchProvider(plan.profile).verifiers;
   if (
     manifest.planId !== plan.planId ||
     manifest.planSha256 !== input.sha256 ||

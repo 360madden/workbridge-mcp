@@ -1,0 +1,53 @@
+{
+  "schema": "workbridge.research-plan.v1",
+  "planId": "starwrath-historical-reference-20261121",
+  "expectedHost": "AMD-DESKTOP",
+  "profile": "starwrath.offline.v1",
+  "inputs": {
+    "snapshot": {
+      "path": "C:\\work\\Star_Wrath_RE\\reports\\snapshots\\star-wrath-0.10.10-2026-11-19.json",
+      "sha256": "6bfc70e2a9a42ce6e48bc07ce05da668ba692fb7f409bd238384cf18488cd45f"
+    },
+    "physicsBefore": {
+      "path": "C:\\work\\Star_Wrath_RE\\reports\\physics-0.10.10-2026-11-19.json",
+      "sha256": "0c6398b5a8075d05976057882e548f52f05db830574d61ae63677f67966cc557"
+    },
+    "physicsAfter": {
+      "path": "C:\\work\\Star_Wrath_RE\\reports\\physics-0.10.10-2026-11-19.json",
+      "sha256": "0c6398b5a8075d05976057882e548f52f05db830574d61ae63677f67966cc557"
+    },
+    "comparator": {
+      "path": "C:\\work\\Star_Wrath_RE\\tools\\compare_physics_runs.py",
+      "sha256": "fa65a376e7689f0aa64146a8e075edac14b1b01e2b27846fc066236a8df022ae"
+    },
+    "physicsInspector": {
+      "path": "C:\\work\\Star_Wrath_RE\\tools\\inspect_physics_params.py",
+      "sha256": "8e145268032ac2ec48b2da860bb67b42c9e5640f548750ab30fe9246cfe8557e"
+    },
+    "indexInspector": {
+      "path": "C:\\work\\Star_Wrath_RE\\tools\\inspect_tgp2_index.py",
+      "sha256": "d4d0d12a19af0a8165d0b891844c1ed1bebfffd18c3d850fa8c5edf3cff5b31c"
+    },
+    "gamedataInspector": {
+      "path": "C:\\work\\Star_Wrath_RE\\tools\\inspect_gamedata.py",
+      "sha256": "ca7fcfa68f5c2774f60a47d5dcc19db305ac808aee058ee67526bd6bdac3746d"
+    }
+  },
+  "steps": [
+    {
+      "id": "identify",
+      "action": "starwrath.snapshot-audit",
+      "needs": []
+    },
+    {
+      "id": "compare",
+      "action": "starwrath.physics-compare",
+      "needs": ["identify"]
+    },
+    {
+      "id": "correlate",
+      "action": "starwrath.correlate",
+      "needs": ["identify", "compare"]
+    }
+  ]
+}

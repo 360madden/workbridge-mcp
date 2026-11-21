@@ -26,4 +26,38 @@ export const PROFILE_REGISTRY = Object.freeze({
     uniqueActions: true,
     executionMode: 'offline_saved_data',
   }),
+  'starwrath.offline.v1': Object.freeze({
+    description:
+      'Saved Star Wrath RE snapshot and bounded physics aggregate comparison; no game assets or process access.',
+    inputs: Object.freeze({
+      snapshot: { kind: 'file', shaRequired: true },
+      physicsBefore: { kind: 'file', shaRequired: true },
+      physicsAfter: { kind: 'file', shaRequired: true },
+      comparator: { kind: 'file', shaRequired: true },
+      physicsInspector: { kind: 'file', shaRequired: true },
+      indexInspector: { kind: 'file', shaRequired: true },
+      gamedataInspector: { kind: 'file', shaRequired: true },
+    }),
+    actions: Object.freeze({
+      'starwrath.snapshot-audit': { requires: ['snapshot'], prior: [] },
+      'starwrath.physics-compare': {
+        requires: [
+          'physicsBefore',
+          'physicsAfter',
+          'comparator',
+          'physicsInspector',
+          'indexInspector',
+          'gamedataInspector',
+        ],
+        prior: ['starwrath.snapshot-audit'],
+      },
+      'starwrath.correlate': {
+        requires: ['snapshot', 'physicsAfter'],
+        prior: ['starwrath.snapshot-audit', 'starwrath.physics-compare'],
+      },
+    }),
+    inputPairs: [['physicsBefore', 'physicsAfter']],
+    uniqueActions: true,
+    executionMode: 'offline_saved_data',
+  }),
 });

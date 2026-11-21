@@ -10,7 +10,10 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 
 test('serial release profile changes only test-file scheduling', async () => {
   const pkg = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
-  assert.equal(pkg.scripts.test, 'npm run build && node --test test/*.test.mjs');
+  assert.equal(
+    pkg.scripts.test,
+    'npm run build && node --test test/*.test.mjs integrations/research/test/*.test.mjs integrations/rift/test/*.test.mjs',
+  );
   assert.equal(
     pkg.scripts['test:serial'],
     pkg.scripts.test.replace('node --test ', 'node --test --test-concurrency=1 '),

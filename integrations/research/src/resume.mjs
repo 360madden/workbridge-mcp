@@ -3,7 +3,7 @@ import { appendFile, lstat, mkdir, readFile, unlink, writeFile } from 'node:fs/p
 import { hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { readPlanFile } from './plan-file.mjs';
-import { RIFT_ACTIONS, RIFT_BUNDLE_VERIFIERS, preflightRiftSources } from './adapters/rift.mjs';
+import { researchProvider } from './providers.mjs';
 import { readRecoveryCheckpoint, RecoveryError } from './recovery.mjs';
 import { verifyResearchRun } from './run.mjs';
 
@@ -64,9 +64,9 @@ export async function resumeResearch({
   expectedLedgerSha256,
   host = hostname(),
   registry,
-  actions = RIFT_ACTIONS,
-  verifiers = RIFT_BUNDLE_VERIFIERS,
-  preflight = preflightRiftSources,
+  actions,
+  verifiers,
+  preflight,
   ownerAlive,
   now = () => new Date().toISOString(),
 } = {}) {
@@ -92,6 +92,12 @@ export async function resumeResearch({
     preflight,
     ...(ownerAlive ? { ownerAlive } : {}),
   });
+  if (!actions || !verifiers || !preflight) {
+    const provider = researchProvider(checkpoint.plan.profile);
+    actions ??= provider.actions;
+    verifiers ??= provider.verifiers;
+    preflight ??= provider.preflight;
+  }
   if (
     checkpoint.originalAttemptId !== expectedAttemptId ||
     checkpoint.ledgerSha256 !== expectedLedgerSha256
