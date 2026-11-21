@@ -133,6 +133,18 @@ A local XYZ change, native memory write acknowledgement or matching HUD location
 
 **Next work:** exact on-host physical RIFT process epoch observation, with PID, start tick, executable/module hash and HWND binding. This must be a distinct read-only data source; archived-file identity is never upgraded automatically to a live session claim.
 
+## Implementation checkpoint — November 20, 2026, 11:08 PM EST
+
+**P0 physical RIFT read-only process epoch collector implemented** in the standalone companion `integrations/rift/`. No Workbridge service deployment, VM access, game input, debugger attachment, memory-byte reads, addon changes, or paid model calls.
+
+- Reused Workbridge's existing pinned WinApp 0.7.1 read-only window enumeration; implemented one fixed PowerShell Get-Process/MainModule census returning PID, Windows process-start UTC **ticks as a decimal string**, user session, executable path, module base and module memory size. No arbitrary caller shell input, process command-line collection or game interaction.
+- New CLI: `physical --expect-host HOST [--pid PID] [--expect-sha HEX] [--out NEW_DIR]` and `verify-physical --bundle DIR`. No process yields `no_process_observed`; multibox requires an explicit selected PID. Exact process-epoch, main-module and HWND checks are repeated after hashing the actual on-disk executable path provided by Windows. Different process starts, module mapping or window binding refuse instead of silently switching.
+- Actual AMD-DESKTOP read-only acceptance observed one physical RIFT PID `34596` (started 2026-11-20 21:29:16.3595623 EST), HWND `658476`, module base `0x7FF60DF30000`, module mapped size `63246336` and executable hash `df954b798331e18359be62a31cc74b49fc3f50b87385ebb080a5448256322c01`. No foreground change. The pinned newer build passed; the older `1935a05c…` hash was deliberately rejected with `BUILD_MISMATCH`.
+- Created a durable read-only identity receipt at `C:\work\workbridge-mcp\.tools\rift-physical-epoch-20261120-01`, containing exact observed PID/start-ticks/HWND/module identity/image hash and checksum completion marker. Independent `verify-physical` passed. A saved receipt is historic and never implies the process is still alive, telemetry correlated, memory layout qualified, input authorized or a custom teleport verified.
+- **59/59 focused tests passed** at the integration checkpoint (36 prior offline tests + 17 synthetic process/window tests + six physical receipt integrity tests). Includes wrong host, multibox explicit PID, PID reuse, old-build mismatch, window reassignment, path substitution, missing metadata, correct semantics of no-process state, duplicate output refusal and rehashed contradictory receipt rejection.
+
+**Next useful milestone:** correlate future fresh RR2/Telemetry observations with this exact physical epoch using a source-generated PID, start tick, build hash and time window; never import old snapshots solely because the executable hash matches. Continue targeted offline/native collision and teleporter discovery in separate project-owned collectors.
+
 ## Sources consulted
 
 ### Local, inspected November 20

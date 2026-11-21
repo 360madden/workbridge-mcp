@@ -1,4 +1,4 @@
-# RIFT Research Companion — offline P0
+# RIFT Research Companion — offline research and read-only physical identity
 
 Standalone Node.js 24+ CLI inside Workbridge-MCP. It reuses the existing RIFT Personal Teleporter Python position analyzer and reads **saved** Telemetry JSON/JSONL. Optional archived RiftReader2 and RRECollector evidence can join the same research package, without building another native reader, addon, debugger or input controller.
 
@@ -112,6 +112,34 @@ Two genuine **archived** `rift_x64.exe` files (SHA-256 prefixes `1935a05c` and `
 
 The archive is `C:\work\workbridge-mcp\.tools\rift-pe-drift-20261120-01`; its five saved artifacts independently verified. After this implementation, the companion's three suites passed **34/34 focused tests** (baseline offline sessions, RR2/RRE archived evidence and patch drift). No new dependencies, Workbridge restart, physical RIFT action or VMware access was needed.
 
-Next gates: a separately guarded live process identity collector, then screenshot/debugger receipt correlation and targeted Ghidra analysis.
+## Read-only physical RIFT process identity (November 20, 2026)
+
+The `physical` command is the first **read-only physical-client** collector. It reuses Workbridge's pinned **WinApp CLI 0.7.1 window enumeration** and queries Windows process metadata through a fixed PowerShell command. It does **not** focus a window, click, type, attach a debugger, read game-memory bytes, or control the RIFT client.
+
+From **PowerShell 7**, starting in `C:\work\workbridge-mcp\integrations\rift`:
+
+```powershell
+# Discover the current physical RIFT process and exact window.
+node .\src\cli.mjs physical --expect-host AMD-DESKTOP
+
+# For multiboxing, repeat with one fresh PID from the above inventory.
+# This example PID and SHA were observed November 20 and can become stale.
+node .\src\cli.mjs physical --expect-host AMD-DESKTOP --pid 34596 --expect-sha df954b798331e18359be62a31cc74b49fc3f50b87385ebb080a5448256322c01 --out 'C:\work\workbridge-mcp\.tools\rift-physical-epoch-NEW_UNIQUE_ID'
+
+# Verify an existing saved process-identity record; this does not re-probe RIFT.
+node .\src\cli.mjs verify-physical --bundle 'C:\work\workbridge-mcp\.tools\rift-physical-epoch-NEW_UNIQUE_ID'
+```
+
+The collector fails closed on incorrect host, ambiguous window, changed process PID/start/module identity, missing module information, invalid executable, mismatched expected SHA-256 or changed HWND. It preserves the full **64-bit process-start tick value as text**, avoiding JavaScript integer precision loss. When several RIFT processes are present, an explicit `--pid` is required. No process found is reported as `no_process_observed`, not as proof that the game could never be running.
+
+With `--out` it saves the observed record and a checksum completion marker; `verify-physical` checks saved bytes and consistency. A frozen record is **historical**: verification does not prove its PID/HWND still exists. Main-module base and size are Windows-reported **metadata**; the collector does not verify loaded memory bytes, pointer chains, gameplay state or identity of an in-game character.
+
+### Physical-host acceptance on AMD-DESKTOP
+
+The observed physical client at 11:06–11:07 PM EST had PID `34596`, HWND `658476`, Windows process-start ticks `639308249563595623`, module base `0x7FF60DF30000`, and executable SHA-256 `df954b798331e18359be62a31cc74b49fc3f50b87385ebb080a5448256322c01`. The before/after Windows process identity and window identity agreed around the on-disk hash. This is the **newer** archived build. Pinning the older `1935a05c…` executable produced the expected `BUILD_MISMATCH` rather than silently treating old RR2/RRE findings as compatible.
+
+The independently checked receipt is `C:\work\workbridge-mcp\.tools\rift-physical-epoch-20261120-01`. After implementing the collector and receipt package, **59/59 focused tests passed** (36 earlier companion tests, 17 process/window tests, 6 saved-receipt tests).
+
+Next gates: independently correlating fresh RR2/Telemetry data to a current verified physical process epoch, then screenshot/debugger receipt correlation and targeted Ghidra analysis. No input or memory writes are part of this milestone.
 
 See [the full RIFT RE integration roadmap](../../docs/rift-re-integration-roadmap-20261120.md).

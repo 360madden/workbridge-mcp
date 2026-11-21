@@ -2,6 +2,8 @@
 import { doctor, session, verifyBundle, DEFAULT_PYTHON } from './bundle.mjs';
 import { ResearchError } from './identity.mjs';
 import { comparePatch, verifyPatch } from './patch-drift.mjs';
+import { physicalRiftIdentity } from './physical-epoch.mjs';
+import { savePhysicalReceipt, verifyPhysicalReceipt } from './physical-receipt.mjs';
 
 const allowed = new Set([
   '--client',
@@ -20,12 +22,20 @@ const allowed = new Set([
   '--expected-before-sha',
   '--expected-after-sha',
   '--anchors',
+  '--pid',
 ]);
 
 function parse(argv) {
   const [command, ...rest] = argv;
-  if (!['doctor', 'session', 'verify', 'patch', 'verify-patch', 'help'].includes(command)) {
-    throw new ResearchError('COMMAND', 'Expected doctor, session, verify, patch, verify-patch or help.');
+  if (
+    !['doctor', 'session', 'verify', 'patch', 'verify-patch', 'physical', 'verify-physical', 'help'].includes(
+      command,
+    )
+  ) {
+    throw new ResearchError(
+      'COMMAND',
+      'Expected doctor, session, verify, patch, verify-patch, physical, verify-physical or help.',
+    );
   }
   if (command === 'help') return { command, options: {} };
   const options = {};
@@ -66,6 +76,8 @@ function parse(argv) {
       '--anchors',
     ],
     'verify-patch': ['--bundle'],
+    physical: ['--expect-host', '--expect-sha', '--pid', '--out'],
+    'verify-physical': ['--bundle'],
   };
   if (Object.keys(options).some((key) => !relevant[command].includes(key))) {
     throw new ResearchError('ARGUMENTS', 'An option does not belong to this command.');
@@ -81,6 +93,8 @@ const HELP = [
   'node src/cli.mjs verify --bundle SAVED_DIR',
   'node src/cli.mjs patch --before OLD_EXE --after NEW_EXE --out NEW_DIR --expect-host HOST --expected-before-sha SHA256 [--expected-after-sha SHA256] [--anchors RRE_JSON]',
   'node src/cli.mjs verify-patch --bundle SAVED_PATCH_DIR',
+  'node src/cli.mjs physical --expect-host AMD-DESKTOP [--pid EXACT_RIFT_PID] [--expect-sha SHA256] [--out NEW_DIR]',
+  'node src/cli.mjs verify-physical --bundle SAVED_IDENTITY_DIR',
   'Output bundles include originals, analyzer source, SHA256SUMS.txt, normalized evidence and the session manifest.',
 ].join('\n');
 
@@ -121,6 +135,21 @@ async function main() {
       anchorsFile: opts['--anchors'] ?? null,
       python: opts['--python'] ?? DEFAULT_PYTHON,
     });
+  } else if (command === 'physical') {
+    const rawPid = opts['--pid'];
+    if (rawPid !== undefined && !/^[1-9][0-9]*$/.test(rawPid)) {
+      throw new ResearchError('INVALID_PID', 'PID must be a positive decimal integer without leading zeros.');
+    }
+    result = await physicalRiftIdentity({
+      expectedHost: opts['--expect-host'],
+      expectedSha256: opts['--expect-sha'] ?? null,
+      pid: rawPid === undefined ? null : Number(rawPid),
+    });
+    if (opts['--out']) result = { ...result, receipt: await savePhysicalReceipt(result, opts['--out']) };
+  } else if (command === 'verify-physical') {
+    if (!opts['--bundle'])
+      throw new ResearchError('MISSING_ARGUMENT', 'Physical verification requires --bundle.');
+    result = await verifyPhysicalReceipt(opts['--bundle']);
   } else if (command === 'verify-patch') {
     if (!opts['--bundle'])
       throw new ResearchError('MISSING_ARGUMENT', 'Patch verification requires --bundle.');
