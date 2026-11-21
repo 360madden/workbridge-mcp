@@ -7,6 +7,7 @@ on:
       - 'src/**'
       - 'test/**'
       - 'scripts/**'
+      - 'integrations/**'
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig.json'
@@ -37,5 +38,15 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Build and run tests
-        run: npm test
+      # On a hosted runner, use the complete original Workbridge core suite and
+      # the portable research fixtures. The full RIFT companion tests additionally
+      # require sibling RRE/RPT Python tools and real host archives; WB-001 runs
+      # those unchanged on the verified Windows development machine.
+      - name: Build and run Workbridge core tests
+        run: |
+          npm run build
+          node --test test/*.test.mjs
+      - name: Test both research providers with synthetic offline fixtures
+        run: node --test integrations/research/test/*.test.mjs
+      - name: Verify the sealed research runtime closure
+        run: node scripts/stage-research-runtime.mjs --verify --repo-root .

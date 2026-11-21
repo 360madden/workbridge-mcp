@@ -150,10 +150,27 @@ The WB-001 default, serial and four-worker full test scripts now include **both*
 
 [Detailed M7 evidence and test report](../../docs/wb-rift-001-m7-starwrath-20261121.md)
 
+## M8 — Read-only benchmark and portable GitHub CI
+
+The `bench/verify-benchmark.mjs` command benchmarks the **actual saved evidence verifier**, without starting research actions, reading live game memory or changing a package. It accepts 1–4 existing package directories, 2–30 verification samples, and emits a bounded JSON report with min/median/p90/mean milliseconds and stored file inventory.
+
+```powershell
+# From C:\work\workbridge-mcp on AMD-DESKTOP:
+npm run bench:research -- --bundle 'C:\work\workbridge-mcp\.tools\m7-star-final\research-run-01' --bundle 'C:\work\workbridge-mcp\.tools\wb-rift001-m3-recovery-20261120-01' --repeats 7
+```
+
+**Observed here, November 21, 2026:** Star Wrath saved package (3 steps, 7 files, 11,042 bytes): **median 4.298 ms**. RIFT recovered saved package (4 steps, 25 files, 152,318 bytes): **median 10.766 ms**. One warm-up and seven independent sample verifications per package; **not** an SLA, current-game claim, or apples-to-apples throughput comparison.
+
+The existing Windows/Node 24 GitHub Actions workflow now triggers on `integrations/**` changes. On a fresh hosted checkout it builds the module and runs the original Workbridge core tests plus portable synthetic research tests (including both provider types and the benchmark), then verifies the staged research runtime. The full host-dependent RIFT companion suite remains in WB-001 local official release validation. GitHub Actions **has not been run for this commit** because no remote push occurred.
+
+**Final local M8 gate:** **63/63 research**, **70/70 RIFT**, **24/24 Workbridge facade/CI/release test checks**, one optional PowerShell-path skip = **157 passed, 0 failed, 1 skipped**. TypeScript, Prettier and Git checks all passed.
+
+[Detailed M8 benchmark and CI record](../../docs/wb-rift-001-m8-benchmark-ci-20261121.md)
+
 ## Next roadmap work
 
 **M5 official release validation passed:** Candidate `wb-rift001-m5-20261121-003` was built from committed source with every gate exit 0, **1,379/1,384 tests passed and five skipped** (zero failures). Independent WB-001 manifest verification checked **7,485 files**; the 21-file research runtime closure and **all four research MCP tool registrations** passed local candidate acceptance. Release manifest SHA-256: `67F1F4E412EF681EF8DC6DA3942708D7AAB0A9E5ED08CC1B56831C95D1E4544E`.
 
-**Deployment HOLD:** This is an immutable _candidate_, not a running Workbridge update. An exclusive Workbridge-only maintenance window, quiescence proof and rollback gate are required before WB-001 Apply, followed by hosted ChatGPT MCP catalog verification. Fresh physical RIFT telemetry M6 and M8 benchmarks/CI remain future work; the M7 non-RIFT adapter is implemented in source and tested offline.
+**Deployment HOLD:** This is an immutable _candidate_, not a running Workbridge update. An exclusive Workbridge-only maintenance window, quiescence proof and rollback gate are required before WB-001 Apply, followed by hosted ChatGPT MCP catalog verification. Fresh physical RIFT telemetry M6 and a new M7/M8-capable sealed WB-001 release candidate remain future work; M7 and M8 source is implemented and tested offline.
 
 [WB-RIFT-001 master roadmap](../../docs/wb-rift-001-unified-research-coordinator-roadmap-20261120.md)

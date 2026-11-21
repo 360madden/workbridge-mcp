@@ -9,6 +9,7 @@
   },
   "scripts": {
     "cli": "node scripts/workbridge-cli.mjs",
+    "bench:research": "node integrations/research/bench/verify-benchmark.mjs",
     "build": "tsc && node scripts/build-command-host.mjs && node scripts/stage-research-runtime.mjs",
     "start": "node dist/server.js",
     "test": "npm run build && node --test test/*.test.mjs integrations/research/test/*.test.mjs integrations/rift/test/*.test.mjs",
