@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { appendFile, lstat, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -62,8 +62,9 @@ function encode(value) {
   return bytes;
 }
 
-function artifactNames(steps) {
+function artifactNames(steps, recovered = false) {
   const names = ['input.plan.json', 'run-ledger.jsonl', 'run-manifest.json'];
+  if (recovered) names.push('recovery-claim.json');
   for (const step of steps) {
     names.push('steps/' + step.id + '/result.json');
     if (step.childKind) names.push('steps/' + step.id + '/bundle/SHA256SUMS.txt');
@@ -98,6 +99,7 @@ export async function runResearch({
   verifiers = RIFT_BUNDLE_VERIFIERS,
   preflight = preflightRiftSources,
   now = () => new Date().toISOString(),
+  onStepCommitted = null,
 } = {}) {
   if (!planFile || !outputDir)
     throw new RunError('RUN_ARGUMENTS', 'Run requires a plan and new output directory.');
@@ -110,6 +112,7 @@ export async function runResearch({
   const outcomes = new Map();
   const ledgerPath = join(directory, 'run-ledger.jsonl');
   let completionMarkerCreated = false;
+  const attemptId = randomUUID();
 
   async function ledger(type, details = {}) {
     await appendFile(
@@ -138,6 +141,8 @@ export async function runResearch({
     await ledger('run_started', {
       planId: plan.planId,
       planSha256: source.sha256,
+      attemptId,
+      ownerPid: process.pid,
       sourceSnapshotSha256: sum(Buffer.from(JSON.stringify(originalSources))),
     });
     for (const step of plan.orderedSteps) {
@@ -147,7 +152,7 @@ export async function runResearch({
       }
       const stepDirectory = join(directory, 'steps', step.id);
       await mkdir(stepDirectory);
-      await ledger('step_started', { stepId: step.id, action: step.action, needs: step.needs });
+      await ledger('step_started', { stepId: step.id, action: step.action, needs: step.needs, attemptId });
       let observed;
       try {
         observed = await execute({ plan, host, stepDirectory, outcomes, step });
@@ -199,9 +204,12 @@ export async function runResearch({
           childKind: child?.kind ?? null,
         });
         outcomes.set(step.action, observed);
-        await ledger('step_completed', { stepId: step.id, resultSha256: sum(bytes) });
+        await ledger('step_completed', { stepId: step.id, resultSha256: sum(bytes), attemptId });
+        // Injectable test checkpoint: a child process can exit here to model
+        // a hard crash with a fully committed prefix and an unstarted next step.
+        if (onStepCommitted) await onStepCommitted(step, recorded.length);
       } catch (error) {
-        await ledger('step_failed', { stepId: step.id, code: String(error.code ?? 'STEP_ERROR') });
+        await ledger('step_failed', { stepId: step.id, code: String(error.code ?? 'STEP_ERROR'), attemptId });
         throw error;
       }
     }
@@ -213,7 +221,7 @@ export async function runResearch({
     if (!snapshotEqual(originalSources, finalSources)) {
       throw new RunError('INPUT_CHANGED', 'Source evidence or archived executable changed during the run.');
     }
-    await ledger('run_completed', { stepCount: recorded.length });
+    await ledger('run_completed', { stepCount: recorded.length, attemptId });
     const manifest = {
       schema: 'workbridge.research-run.v1',
       status: 'completed',
@@ -267,7 +275,7 @@ export async function runResearch({
     }
     const code = String(error?.code ?? 'RESEARCH_RUN_FAILED');
     try {
-      await ledger('run_failed', { code });
+      await ledger('run_failed', { code, attemptId });
       await writeFile(
         join(directory, 'run-failed.json'),
         encode({
@@ -400,7 +408,41 @@ export async function verifyResearchRun(
     }
     steps.push({ id: step.id, action: step.action, childKind: recorded.childKind });
   }
-  const expected = artifactNames(steps);
+  const recovery = manifest.recovery ?? null;
+  if (recovery !== null) {
+    if (
+      typeof recovery !== 'object' ||
+      Array.isArray(recovery) ||
+      typeof recovery.originalAttemptId !== 'string' ||
+      typeof recovery.recoveryAttemptId !== 'string' ||
+      typeof recovery.checkpointLedgerSha256 !== 'string' ||
+      !SHA.test(recovery.checkpointLedgerSha256) ||
+      !Number.isSafeInteger(recovery.completedPrefixCount) ||
+      recovery.completedPrefixCount < 0 ||
+      recovery.completedPrefixCount >= steps.length
+    ) {
+      throw new RunError('RUN_RECOVERY_INVALID', 'Completed run has invalid recovery metadata.');
+    }
+    const claim = json(
+      (await file(join(directory, 'recovery-claim.json'), 16 * 1024)).bytes,
+      'recovery-claim.json',
+    );
+    if (
+      claim.schema !== 'workbridge.research-recovery-claim.v1' ||
+      claim.originalAttemptId !== recovery.originalAttemptId ||
+      claim.recoveryAttemptId !== recovery.recoveryAttemptId ||
+      claim.checkpointLedgerSha256 !== recovery.checkpointLedgerSha256 ||
+      claim.completedPrefixCount !== recovery.completedPrefixCount ||
+      claim.planSha256 !== input.sha256 ||
+      claim.sourceSnapshotSha256 !== sum(Buffer.from(JSON.stringify(manifest.sources))) ||
+      claim.replayCompletedSteps !== false ||
+      claim.uncertainOutcomeRetryAuthorized !== false ||
+      claim.oldOwnerWasNotRunning !== true
+    ) {
+      throw new RunError('RUN_RECOVERY_INVALID', 'Recovery claim contradicts the completed run.');
+    }
+  }
+  const expected = artifactNames(steps, recovery !== null);
   if (JSON.stringify(manifest.artifacts) !== JSON.stringify(expected)) {
     throw new RunError('RUN_INVENTORY_INVALID', 'Run manifest artifact order does not match the plan.');
   }
@@ -421,11 +463,12 @@ export async function verifyResearchRun(
     }
   }
   const ledger = await file(join(directory, 'run-ledger.jsonl'), MAX_LEDGER_BYTES);
-  const events = ledger.bytes
-    .toString('utf8')
-    .trim()
-    .split(/\r?\n/)
-    .map((line) => json(Buffer.from(line), 'ledger event'));
+  const ledgerText = new TextDecoder('utf-8', { fatal: true }).decode(ledger.bytes);
+  if (!ledgerText.endsWith('\n')) {
+    throw new RunError('RUN_LEDGER_INVALID', 'Run event ledger is not newline-terminated.');
+  }
+  const serialized = ledgerText.slice(0, -1).split('\n');
+  const events = serialized.map((line) => json(Buffer.from(line), 'ledger event'));
   if (
     events.length !== 2 * steps.length + 2 ||
     events[0].event !== 'run_started' ||
@@ -438,8 +481,22 @@ export async function verifyResearchRun(
   ) {
     throw new RunError('RUN_LEDGER_INVALID', 'Run event ledger has missing or unexpected transitions.');
   }
+  const originalAttempt = events[0].attemptId;
+  if (
+    recovery &&
+    (originalAttempt !== recovery.originalAttemptId ||
+      sum(Buffer.from(serialized.slice(0, 1 + 2 * recovery.completedPrefixCount).join('\n') + '\n')) !==
+        recovery.checkpointLedgerSha256)
+  ) {
+    throw new RunError('RUN_RECOVERY_INVALID', 'Recovery checkpoint ledger prefix changed.');
+  }
   for (let i = 0; i < steps.length; i++) {
+    const expectedAttempt =
+      recovery && i >= recovery.completedPrefixCount ? recovery.recoveryAttemptId : originalAttempt;
     if (
+      (originalAttempt !== undefined &&
+        (events[2 * i + 1].attemptId !== expectedAttempt ||
+          events[2 * i + 2].attemptId !== expectedAttempt)) ||
       events[2 * i + 1].event !== 'step_started' ||
       events[2 * i + 1].stepId !== steps[i].id ||
       events[2 * i + 1].action !== steps[i].action ||
@@ -450,6 +507,12 @@ export async function verifyResearchRun(
       throw new RunError('RUN_LEDGER_INVALID', 'Run event order differs from the validated DAG.');
     }
   }
+  if (
+    originalAttempt !== undefined &&
+    events.at(-1).attemptId !== (recovery ? recovery.recoveryAttemptId : originalAttempt)
+  ) {
+    throw new RunError('RUN_LEDGER_INVALID', 'Run terminal attempt is inconsistent.');
+  }
   return {
     verified: true,
     directory,
@@ -458,6 +521,8 @@ export async function verifyResearchRun(
     completedActions: steps.map((step) => step.action),
     savedEvidenceOnly: true,
     sourceSnapshotBound: typeof events[0].sourceSnapshotSha256 === 'string',
+    resumedWithClaimVerified: recovery !== null,
+    completedPrefixReplayed: false,
     currentGameStateVerified: false,
     teleportVerified: false,
   };

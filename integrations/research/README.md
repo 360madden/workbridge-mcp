@@ -1,88 +1,103 @@
 # Workbridge Research Coordinator
 
-A standalone, dependency-free **Node.js 24+** research coordination engine. The workflow graph, source validation, run ledger and verification are generic; the **RIFT adapter profile** is its first real workload.
+A standalone, dependency-free **Node.js 24+** research coordination engine. Workbridge uses RIFT as the first workload; the plan/DAG validator, source reconciliation, execution ledger, evidence packages, inspection and recovery are designed to serve other approved research adapters too.
 
-**Status November 20, 2026:** M0 roadmap saved; **M1 planner complete**; **M2 offline runner complete and tested**. M3 restart-safe recovery, M4 Workbridge MCP facade and M5 service deployment are **not** complete. The active Workbridge owner was not restarted or modified.
+**Status November 20, 2026:** **M0–M3 implemented and tested in the standalone integration**. M4 live Workbridge MCP facade and M5 staged service deployment remain pending. Nothing has restarted or modified the existing Workbridge 0.16.5-dev owner.
 
-## Commands (PowerShell 7 on AMD-DESKTOP)
+## Commands — PowerShell 7 on AMD-DESKTOP
 
-From `C:\work\workbridge-mcp\integrations\research`:
+Run in \`C:\work\workbridge-mcp\integrations\research\`:
 
-```powershell
-# M1: validate the exact plan and preview its deterministic dependency order.
+\`\`\`powershell
+
+# Validate an explicit plan; no steps or saved inputs are executed.
+
 node .\src\cli.mjs validate --plan .\examples\rift-offline-20261120.plan.json
 node .\src\cli.mjs plan --plan .\examples\rift-offline-20261120.plan.json
 
-# M2: actually execute approved OFFLINE functions. Select a NEW output path.
+# Execute reviewed OFFLINE RIFT actions in order; use a NEW output directory.
+
 node .\src\cli.mjs run --plan .\examples\rift-offline-20261120.plan.json --out 'C:\work\workbridge-mcp\.tools\wb-rift001-offline-NEW_RUN_ID'
 
-# Verify a completed saved run without rerunning the tools or contacting RIFT.
+# Independently verify completed evidence without rerunning a tool.
+
 node .\src\cli.mjs verify --bundle 'C:\work\workbridge-mcp\.tools\wb-rift001-offline-NEW_RUN_ID'
 
-# Narrow tests:
+# M3: inspect a saved run that might have been interrupted.
+
+node .\src\cli.mjs inspect --bundle 'C:\work\workbridge-mcp\.tools\EXACT_INCOMPLETE_RUN'
+
+# ONLY if inspect reports eligibleForGuardedResume: true, manually copy the
+
+# printed originalAttemptId and ledgerSha256 values into this exact command.
+
+node .\src\cli.mjs resume --bundle 'C:\work\workbridge-mcp\.tools\EXACT_INCOMPLETE_RUN' --plan .\examples\rift-offline-20261120.plan.json --expect-attempt 'EXACT_ORIGINAL_UUID_FROM_INSPECT' --expect-ledger 'EXACT_64_HEX_SHA_FROM_INSPECT'
+
+# All focused coordinator tests:
+
 node --test test\*.test.mjs
-```
+\`\`\`
 
-`validate` and `plan` only read the plan. `run` performs the registered existing offline RIFT functions in dependency order; it is intentionally not a generic command runner. `verify` reads saved artifacts only. A failed run or invalid input exits 2 with a structured error code and, if the run directory was already created, its path for inspection.
+\`validate\` and \`plan\` inspect the plan only; \`run\` performs trusted offline functions and writes an evidence package; \`verify\` and \`inspect\` read saved evidence. The \`resume\` command can execute **only work that never started** in a former attempt, and is unavailable when its source, process owner or step outcome is ambiguous. No command accepts arbitrary executable commands from JSON.
 
-## What the coordinator now does
+## Reviewed RIFT adapter actions
 
-The example profile `rift.offline.v1` contains four reviewed actions:
+| Registered action      | Existing implementation reused                               | Output                                                                   |
+| ---------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| \`rift.doctor\`        | RIFT companion AMD64 PE32+ disk image inspector              | Archived image/build SHA and analyzer identity                           |
+| \`rift.saved-session\` | Telemetry + RR2/RRE import and RPT Python saved track replay | Preserved source files, normalized results and child SHA checks          |
+| \`rift.patch-compare\` | Original RRE Python \`rift_update_analyzer.py\`              | Pinned old/new section and original-RVA anchor drift                     |
+| \`rift.compat-audit\`  | Existing physical-receipt/archive comparison                 | Explicit incompatible build/epoch findings and unqualified offset status |
 
-| Action               | Existing implementation reused                                       | Result                                                                         |
-| -------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `rift.doctor`        | RIFT companion's on-disk PE32+ build inspector                       | Archived game executable identity, full SHA-256, tool source hash              |
-| `rift.saved-session` | Telemetry + RR2/RRE source import and RPT Python position classifier | Complete child package with original bytes, normalized evidence and SHA256SUMS |
-| `rift.patch-compare` | Existing RRE Python `rift_update_analyzer.py`                        | Pinned old/new PE section and byte-anchor comparison                           |
-| `rift.compat-audit`  | Existing saved physical-epoch and archive compatibility audit        | Source build conflicts and unqualified memory/teleport findings                |
+Historical RIFT process receipts are _saved observations_, not fresh process proofs. RPT discontinuities are _candidates_, not completed teleports. This profile does not send game input, attach a debugger, inspect native game memory or use API credits.
 
-No live game PID is chosen automatically by this profile. The saved physical receipt can be used **only as historical reference**. The current build may differ from the archived RR2/RRE records, and a source-reported `live` state at capture time does not prove current freshness. A position discontinuity is never a completed arbitrary teleport.
+## Versioned plan contract
 
-### Input and plan contract
+- \`workbridge.research-plan.v1\` requires \`planId\`, explicit \`expectedHost\`, reviewed \`profile\`, typed \`inputs\`, \`steps\` and \`needs\`.
+- Windows-local absolute source paths only (no \`..\`, UNC or control characters). SHA-256 mandatory on \`client\` and \`afterClient\`. \`rre\`/ \`rreBinding\` must come as a pair.
+- Up to 12 steps; unknown actions/properties, duplicate steps, missing dependencies, cycles and wrong host fail before execution.
+- \`run\` pins all source hashes and the saved historical physical receipt, then rechecks the original plan and source hashes before publication.
 
-- Versioned `workbridge.research-plan.v1` schema with exact `planId`, `expectedHost`, `profile`, `inputs` and `steps`.
-- Known adapter IDs only; unknown properties, actions, step references and dependency cycles fail closed.
-- Local Windows absolute source paths with no traversal. Pinned SHA-256 on `client` and `afterClient`. RRE publication/binding pair must be present together.
-- Up to 12 unique named steps; mandatory action prerequisites and conditional dependency rules enforced. The topological order is deterministic, including for plans supplied out of order.
-- Up to 32 KiB UTF-8 plan file; read through a no-symlink regular-file guard with before/after metadata checks.
-- M2 preflight pins all referenced saved sources, verifies the historical physical receipt, and hashes both archived PE images. It rechecks source hashes and original plan bytes before success publication.
+## Evidence package and M3 recovery contract
 
-The generic validation and run engines accept injected trusted registries for future projects. To add a new provider, implement a typed reviewed adapter; **do not** add arbitrary shell commands to plan JSON.
+| Artifact                      | Role                                                                                                                                |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| \`input.plan.json\`           | Exact original plan bytes                                                                                                           |
+| \`run-ledger.jsonl\`          | Ordered event stream with source snapshot digest and process owner/attempt ID                                                       |
+| \`steps/STEP_ID/result.json\` | Status, exact result hash and any verified child bundle                                                                             |
+| \`steps/STEP_ID/bundle/\`     | Original RIFT child's independent evidence package (where applicable)                                                               |
+| \`run-manifest.json\`         | Completed host, source, step identities and result limitations                                                                      |
+| \`recovery-claim.json\`       | **Only on a resumed run:** unique attempt ID, original ledger SHA, completed prefix count, plan/source hashes and no-replay promise |
+| \`run-failed.json\`           | Failed run with last error code and preserved completed prefix                                                                      |
+| \`SHA256SUMS.txt\`            | Final **successful completion marker**, written only after the last step                                                            |
 
-### Durable output package
+\`verify\` checks the ledger, saved source identity, step hashes, optional recovery claim and previously verified child packages. \`sourceSnapshotBound:true\` is reported for new runs; older M2 trial packages remain readable and explicitly report weaker source binding.
 
-A new, never-overwritten run directory contains:
+**M3 guarded recovery** requires an inspectable prefix of exact \`step_started → step_completed\` event pairs, a valid matching result receipt and child verifier for **every** preserved step, unchanged original plan and source hashes, and a stopped original process. \`resume\` requires the printed original attempt UUID and exact ledger hash; it uses exclusive \`wx\` creation of \`recovery-claim.json\`. It appends a _new attempt identity_ only for the remaining, never-started steps. The preserved original prefix is neither overwritten nor re-executed.
 
-| Artifact                    | Meaning                                                                                      |
-| --------------------------- | -------------------------------------------------------------------------------------------- |
-| `input.plan.json`           | Exact original plan bytes                                                                    |
-| `steps/STEP_ID/result.json` | Each bounded action result, claim limits and child-bundle identity                           |
-| `steps/STEP_ID/bundle/`     | Original RIFT child package when that action produces one                                    |
-| `run-ledger.jsonl`          | Ordered run-start, step-start/step-complete and run-complete transitions                     |
-| `run-manifest.json`         | Host, profile, source file hashes, step results and explicit offline-only qualifications     |
-| `SHA256SUMS.txt`            | Completion marker written **last**, verifying every top-level result and child checksum list |
+**Automatic resume is refused** when a step was started but not verified complete, a failure was recorded, a completion marker or prior recovery claim exists, the old runner still appears alive, a source hash changes, the plan changes, or the next step has ambiguous filesystem artifacts. A second interruption _during recovery_ leaves the claim in place and needs a new manual investigation; there is **no automatic second resume or cleanup**. If all steps finished but finalization was interrupted, M3 conservatively reports \`finalization_uncertain\` rather than guessing whether output publication occurred. Do not manually delete a recovery claim just to bypass a refusal.
 
-`verify` checks inventory count/order and file hashes, source/plan identities, step-result/ledger hashes, and runs the existing child verifiers again. New runs bind the original source inventory hash into the starting ledger event; `sourceSnapshotBound:true` is reported only when present. Older pre-commit trial packages can still verify with `sourceSnapshotBound:false`.
+All actual gameplay archives and research runs stay under ignored \`.tools\`; Git commits contain code, tests and docs, not private raw captures. These SHA packages detect changes but are not signed provenance proofs.
 
-If a step fails, the coordinator leaves prior completed results and `run-failed.json`, but **no valid completed-run marker**. It does not silently retry or overwrite prior evidence. Crash-safe resume is deferred to M3.
+## Verified development checkpoints
 
-All example archival outputs are stored in Workbridge's ignored `.tools` area. Do not commit raw captured gameplay evidence.
+### M0–M2 (November 20, 2026)
 
-## Actual verification checkpoint
+- Master roadmap saved and committed in \`docs/wb-rift-001-unified-research-coordinator-roadmap-20261120.md\`.
+- M1 planner source/test commit \`61d2f22\`; M2 offline engine commit \`ca7beb4\`.
+- M2 4-step research package \`C:\work\workbridge-mcp\.tools\wb-rift001-offline-20261120-03\` independently verifies; original saved evidence remains unchanged.
+- Initial failed M2 trial \`…-01\` is retained; the inspector classifies its inconsistent final hashes as **manual review required**, never a resume candidate.
 
-**AMD-DESKTOP, November 20, 2026:**
+### M3 (November 20, 2026)
 
-- M1 manifest/parser suite **17/17 passed** (part of coordinator tests).
-- M2 runner/negative test additions **11/11 passed**; combined coordinator suite **28/28 passed**.
-- Existing RIFT companion regression **67/67 passed** (not modified by M2). **95/95 combined.**
-- Prettier code checks passed before final documentation updates; re-run formatting at commit gate.
-- One complete offline run from the pinned source example: `identify → replay → patch → audit`; all child bundles verified.
-- **Completed, independently verified M2 run:** `C:\work\workbridge-mcp\.tools\wb-rift001-offline-20261120-03`; `sourceSnapshotBound:true`, `gameContacted:false`, `teleportVerified:false`.
-- Earlier successful trial `…-02` remains verifiable with weaker pre-checkpoint source binding, explicitly marked false. Initial `…-01` is preserved as a **failed verification investigation artifact**, not accepted evidence.
-- No production service restart, addon deployment, game input, native-memory access, debugger attach, paid AI API call, VM interaction, or modification of sibling RIFT repositories.
+- A real separate Node subprocess was deliberately terminated with exit code **73** after the \`identify\` receipt was committed, before \`replay\` started.
+- \`inspect\` of \`C:\work\workbridge-mcp\.tools\wb-rift001-m3-recovery-20261120-01\` reported one completed step, source hashes matching, original owner no longer running and an exact resume-eligible ledger hash.
+- \`resume\` with the captured original attempt UUID and SHA continued only **three unstarted actions**, preserved \`identify\`, and independently verified the completed bundle; \`completedPrefixReplayed:false\`, \`resumedWithClaimVerified:true\`, \`sourceSnapshotBound:true\`.
+- **12/12 M3 recovery tests passed**, including two additional cases for a rewritten but semantically contradictory recovery claim and a saved input changing during resume. Final suites: **40/40 coordinator**, **67/67 RIFT**, **107/107 combined**; Prettier and Git whitespace checks passed. The local commit is recorded in Git history.
+- No Workbridge restart, live RIFT game action, memory access, VM use or paid model call was required.
 
-## Next
+## Next roadmap work
 
-**M3:** durable, restart-safe recovery of partially completed runs; unambiguous attempt identity and watched source hashes, no blind retry. **M4–M5:** optional Workbridge MCP/local-CLI integration using the existing bounded command-job system and the established WB-001 staged rollout/rollback gates. **M6+:** fresh physical-RIFT telemetry with exact process epoch binding.
+**M4:** expose only typed \`research_plan\`, \`research_run\`, \`research_status\` and \`research_verify\` operations through Workbridge's existing authenticated MCP/local CLI/job infrastructure. Follow **M5 / WB-001 staged release and rollback** before replacing any in-use executable or service. Only afterward consider fresh PID-bound RIFT telemetry (M6) and non-RIFT adapter pilots (M7).
 
-[Full WB-RIFT-001 master roadmap](../../docs/wb-rift-001-unified-research-coordinator-roadmap-20261120.md)
+[WB-RIFT-001 master roadmap](../../docs/wb-rift-001-unified-research-coordinator-roadmap-20261120.md)

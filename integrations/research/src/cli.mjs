@@ -4,6 +4,8 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { readPlanFile } from './plan-file.mjs';
 import { runResearch, verifyResearchRun } from './run.mjs';
+import { readRecoveryCheckpoint, summarizeRecoveryInspection } from './recovery.mjs';
+import { resumeResearch } from './resume.mjs';
 
 const HELP = [
   'WB-RIFT-001 — versioned offline research coordinator (read-only saved inputs).',
@@ -11,6 +13,8 @@ const HELP = [
   'node src/cli.mjs plan --plan FILE.json',
   'node src/cli.mjs run --plan FILE.json --out NEW_DIRECTORY',
   'node src/cli.mjs verify --bundle COMPLETE_RUN_DIRECTORY',
+  'node src/cli.mjs inspect --bundle INCOMPLETE_RUN_DIRECTORY',
+  'node src/cli.mjs resume --bundle INCOMPLETE_DIR --plan ORIGINAL.json --expect-attempt UUID --expect-ledger SHA256',
   'Unknown tool actions, plan fields, source paths, and dependency cycles fail closed.',
 ].join('\n');
 
@@ -30,7 +34,24 @@ function parseArgs(args) {
     return { command, file: rest[1], outputDir: rest[3] };
   }
   if (
-    command === 'verify' &&
+    command === 'resume' &&
+    rest.length === 8 &&
+    rest[0] === '--bundle' &&
+    rest[2] === '--plan' &&
+    rest[4] === '--expect-attempt' &&
+    rest[6] === '--expect-ledger' &&
+    rest.every((item) => typeof item === 'string' && !!item)
+  ) {
+    return {
+      command,
+      outputDir: rest[1],
+      file: rest[3],
+      expectedAttemptId: rest[5],
+      expectedLedgerSha256: rest[7],
+    };
+  }
+  if (
+    ['verify', 'inspect'].includes(command) &&
     rest.length === 2 &&
     rest[0] === '--bundle' &&
     rest[1] &&
@@ -51,11 +72,44 @@ function parseArgs(args) {
 }
 
 export async function main(args = process.argv.slice(2)) {
-  const { command, file, outputDir } = parseArgs(args);
+  const { command, file, outputDir, expectedAttemptId, expectedLedgerSha256 } = parseArgs(args);
   if (command === 'help') return HELP;
   if (command === 'run')
     return JSON.stringify({ ok: true, ...(await runResearch({ planFile: file, outputDir })) });
   if (command === 'verify') return JSON.stringify({ ok: true, ...(await verifyResearchRun(outputDir)) });
+  if (command === 'inspect') {
+    let verificationError = null;
+    try {
+      const verified = await verifyResearchRun(outputDir);
+      return JSON.stringify({ ok: true, status: 'completed', eligibleForGuardedResume: false, ...verified });
+    } catch (error) {
+      if (error.code !== 'RUN_INCOMPLETE') verificationError = error;
+    }
+    const inspected = summarizeRecoveryInspection(await readRecoveryCheckpoint({ directory: outputDir }));
+    return JSON.stringify({
+      ok: true,
+      ...inspected,
+      ...(verificationError
+        ? {
+            status: 'manual_review',
+            reason: 'completed_package_verification_failed',
+            eligibleForGuardedResume: false,
+            verificationErrorCode: verificationError.code,
+          }
+        : {}),
+    });
+  }
+  if (command === 'resume') {
+    return JSON.stringify({
+      ok: true,
+      ...(await resumeResearch({
+        directory: outputDir,
+        planFile: file,
+        expectedAttemptId,
+        expectedLedgerSha256,
+      })),
+    });
+  }
   const source = await readPlanFile(file);
   const plan = validatePlan(source.plan);
   const preview = describePlan(plan);
