@@ -2,14 +2,14 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, resolve } from 'node:path';
+import { riftProjectsRoot } from './workspace-path.mjs';
 import { inspectOfflineClient, readEvidence, ResearchError } from './identity.mjs';
 import { parseRecords, normalizeTelemetry, normalizeExperiment } from './records.mjs';
 import { runRPTAnalyzer } from './experiment.mjs';
 import { normalizeRR2, normalizeRRE, compareArchivedEpochs } from './archived-sources.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+const ROOT = riftProjectsRoot(import.meta.url);
 export const DEFAULT_ANALYZER = join(ROOT, 'Rift-Personal-Teleporter', 'src', 'teleport_analyzer.py');
 export const DEFAULT_PYTHON = process.platform === 'win32' ? 'C:\\Python314\\python.exe' : 'python3';
 const ARTIFACTS = [

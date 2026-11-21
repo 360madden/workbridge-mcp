@@ -9,7 +9,7 @@
   },
   "scripts": {
     "cli": "node scripts/workbridge-cli.mjs",
-    "build": "tsc && node scripts/build-command-host.mjs",
+    "build": "tsc && node scripts/build-command-host.mjs && node scripts/stage-research-runtime.mjs",
     "start": "node dist/server.js",
     "test": "npm run build && node --test test/*.test.mjs",
     "test:serial": "npm run build && node --test --test-concurrency=1 test/*.test.mjs",

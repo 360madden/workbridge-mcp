@@ -110,6 +110,18 @@ test('verify is fixed to a validated run ID; cannot read an arbitrary bundle', a
   assert.equal(f.calls[1].timeoutSeconds, 90);
 });
 
+test('default facade binds the sealed dist runtime, not mutable integrations source', async (t) => {
+  const f = await fixture(t);
+  const installed = join(f.project, 'dist', 'research-runtime', 'research');
+  await mkdir(join(installed, 'src'), { recursive: true });
+  await writeFile(join(installed, 'src', 'cli.mjs'), '// sealed fixture\n');
+  const facade = createResearchFacade({ workspace: f.workspace, jobs: f.jobs });
+  await facade.plan({ planPath: f.planPath, requestId: 'sealed-path-0001' });
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0].cwd, installed);
+  assert.equal(f.calls[0].args[0], join(installed, 'src', 'cli.mjs'));
+});
+
 test('status returns only a job scoped to the research companion', async (t) => {
   const f = await fixture(t);
   const facade = createResearchFacade(f);

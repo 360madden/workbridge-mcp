@@ -38,12 +38,12 @@ function ensureId(id: string) {
  * Research tools are a narrow facade over Workbridge's EXISTING 36-slot Jobs
  * engine. No separate listener, subprocess pool, model or file writer exists.
  * The only executable is this owner's pinned Node path, and the only target
- * script is the fixed research coordinator CLI shipped in the checkout.
+ * script is the fixed coordinator CLI sealed under dist/research-runtime.
  */
 export function createResearchFacade({
   workspace,
   jobs,
-  companionRoot = path.join(workspace.root, 'workbridge-mcp', 'integrations', 'research'),
+  companionRoot = path.join(workspace.root, 'workbridge-mcp', 'dist', 'research-runtime', 'research'),
   isClosing = () => false,
 }: ResearchFacadeDeps) {
   const evidenceBase = path.join(workspace.root, 'workbridge-mcp', '.tools', 'research-runs');

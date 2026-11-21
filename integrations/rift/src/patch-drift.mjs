@@ -3,12 +3,12 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, resolve } from 'node:path';
+import { riftProjectsRoot } from './workspace-path.mjs';
 import { inspectOfflineClient, readEvidence, ResearchError, SHA256 } from './identity.mjs';
 import { DEFAULT_PYTHON } from './bundle.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+const ROOT = riftProjectsRoot(import.meta.url);
 export const DEFAULT_RRE_ANALYZER = join(ROOT, 'rre', 'tools', 'rift_update_analyzer.py');
 const MAX_REPORT_BYTES = 12 * 1024 * 1024;
 const BASE_FILES = ['report.json', 'report.md', 'analyzer-source.py', 'patch-manifest.json'];

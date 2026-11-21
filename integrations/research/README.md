@@ -109,12 +109,24 @@ The new TypeScript module `src/research-registration.ts` registers four typed re
 
 File arguments are validated against configured Workbridge roots. Run IDs are bounded, and job admission and request-ID replay protection reuse the existing 36-slot job system. Callers can poll the returned ID with `command_status` and `command_output`. Plan JSON cannot provide an arbitrary executable.
 
-**Source-only acceptance:** TypeScript strict no-emit passed; an isolated compiled candidate under `.tools/research-m4-isolated-dist` passed without altering the live `dist`. The fake-owner suite `test/research-facade.test.mjs` passed **7/7** checks for fixed commands, invalid run IDs, scoped outputs, job ownership, shutdown and tool registration.
+**Source-only acceptance:** TypeScript strict no-emit passed; an isolated compiled candidate under `.tools/research-m4-isolated-dist` passed without altering the live `dist`. The fake-owner suite `test/research-facade.test.mjs` initially passed **7/7** checks for fixed commands, invalid run IDs, scoped outputs, job ownership, shutdown and tool registration.
 
 **Deployment HOLD:** the current `0.16.5-dev` owner has not loaded these tools. M5 requires a WB-001 staged release/rollback and independent live registration proof before announcing these tools as available. No in-use native command host was replaced and no second Workbridge server was started.
 
+## M5 sealed runtime packaging — source verified, deployment HOLD
+
+M5 fixed a deployment-closure gap: the old WB-001 source list did not include `integrations`, and the MCP facade would have loaded a mutable research CLI outside the installed runtime. The new source-only changes stage a fixed **21-file** research/RIFT module closure into `dist/research-runtime` on every build, with an independently verified SHA-256 manifest. The installed facade now targets `dist/research-runtime/research`, not `integrations/research`.
+
+The WB-001 release builder now carries `integrations` into its candidate payload; only `dist`, packages and approved runtime files are installed during Apply, so the sealed CLI travels with its TypeScript MCP facade. Release acceptance understands the complete four-tool research catalog, rejects partial tool sets, checks annotations and requires the matching staged closure; older releases with no research tools remain valid rollback candidates.
+
+**Verified without service downtime:** 12/12 staging/catalog checks, 70/70 RIFT tests, 40/40 coordinator tests, 8/8 fake MCP-owner tests (**130/130**), TypeScript strict check and isolated compile. A sealed 21-file runtime under ignored `C:\work\workbridge-mcp\.tools\m5-research-isolated\dist\research-runtime` completed a real four-step **offline archival** RIFT session and independently verified its evidence under `…\m5-research-isolated\research-run-01`. This did not execute a native memory reader against the live game.
+
+**Remaining:** the official WB-001 `New-WorkbridgeRelease` full candidate validation and its immutable release receipt, followed by an independently approved **exclusive** Apply/rollback service maintenance window. No direct copying to the running `dist`, no service restart, no new ChatGPT-side MCP tools until hosted post-deploy acceptance.
+
+[Detailed M5 release gate](../../docs/wb-rift-001-m5-sealed-release-gate-20261120.md)
+
 ## Next roadmap work
 
-**M5:** stage an isolated Workbridge release candidate and verify rollback before any live owner update. Do not treat source-only MCP registration as deployed. Fresh RIFT telemetry (M6) and the non-RIFT adapter pilot (M7) remain separate follow-up gates.
+**M5 remaining:** complete official WB-001 release validation and rollback preflight without applying or restarting the live owner. Do not treat a source/isolated stage as a deployed MCP service. Fresh RIFT telemetry (M6) and a non-RIFT adapter pilot (M7) remain separate future gates.
 
 [WB-RIFT-001 master roadmap](../../docs/wb-rift-001-unified-research-coordinator-roadmap-20261120.md)

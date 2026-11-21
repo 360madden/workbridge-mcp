@@ -3,6 +3,8 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/client/stdio';
+import { checkResearchToolCatalog } from './research-tool-catalog.mjs';
+import { verifyResearchRuntime } from './stage-research-runtime.mjs';
 
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 const expectedIndex = process.argv.indexOf('--expected-version');
@@ -51,6 +53,10 @@ try {
     'agent_verify',
   ];
   const agentToolCount = tools.filter((tool) => agentToolNames.includes(tool.name)).length;
+  const research = checkResearchToolCatalog(tools, runtimeVersion);
+  const researchRuntime = research.sealedRuntimeRequired
+    ? await verifyResearchRuntime({ repoRoot: process.cwd() })
+    : null;
   const gameWindows = tools.find((tool) => tool.name === 'game_player_list_windows');
   // The updater also probes sealed pre-discovery 0.16.5-dev releases for rollback.
   const compatibilityProbe = expectedIndex >= 0 || process.argv.includes('--observe-version');
@@ -89,7 +95,7 @@ try {
                       : runtimeVersion === '0.6.2-dev'
                         ? 34
                         : 33;
-  assert.equal(tools.length, expectedTools);
+  assert.equal(tools.length, expectedTools + research.count);
   if (['0.16.4-dev', '0.16.5-dev'].includes(runtimeVersion) && agentToolCount !== 0) {
     assert.equal(agentToolCount, agentToolNames.length, 'Incomplete coordination tool catalog');
     for (const name of agentToolNames)
@@ -119,6 +125,8 @@ try {
     version: info.version,
     packageVersion: pkg.version,
     toolCount: tools.length,
+    researchToolsVerified: research.count,
+    researchRuntimeManifestSha256: researchRuntime?.manifestSha256 ?? null,
     transport: 'local stdio',
     hostedVerified: false,
   };
