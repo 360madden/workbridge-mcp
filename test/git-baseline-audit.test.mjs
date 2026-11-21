@@ -360,3 +360,9 @@ test(
     assert.equal(JSON.stringify(corrupt).includes('PRIVATE_'), false);
   },
 );
+
+test('audit loads its system utility module even without PSModulePath discovery', windows, async () => {
+  const f = await fixture();
+  const report = await unchanged(f, { env: { PSModulePath: '' } });
+  partition(report);
+});

@@ -17,6 +17,16 @@ preexisting Build and Test workflow remains the actual CI release gate.
   committed `9313e25`, had independently passed **1,548 tests, 0 failures,
   5 skips**, with 7,509 payload files. It was not deployed.
 
+## First independent hosted result
+
+GitHub diagnostic run [44917406367](https://github.com/360madden/workbridge-mcp/actions/runs/44917406367) reproduced both differences in eight seconds on **Node 24.22.3 / Windows 2025**:
+
+- Git audit: **0 of 8 passed**; sanitized `AUDIT_DIAG_CommandNotFoundException_L169`. In the pinned source, line 169 invokes `Get-FileHash` from Windows PowerShell's built-in utility module. The explicit module import used elsewhere in Workbridge is a narrow correction to test.
+- Private archive helper: `READY` observed, zero `VERIFIED` replies, exit 1, `PRIVATE_DIRECTORY_DIAG_RuntimeException_L53`. In the pinned source, line 53 checks that the new directory owner equals the current user's SID. The code remains unchanged until the actual failure category is independently confirmed.
+- AMD-DESKTOP under Node 26.5.0: **8/8** audit passes and **2/2** archive VERIFY replies, clean exit.
+
+The second diagnostic revision names known private-owner/ACL error messages (without revealing SID/path data) and performs a separate **temporary-folder-only** ownership-repair experiment. A diagnostic repair result must not be treated as authority to relax the production ownership check.
+
 ## Running
 
 On **AMD-DESKTOP**, after verifying `hostname.exe` and from

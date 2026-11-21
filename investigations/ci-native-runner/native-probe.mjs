@@ -77,14 +77,26 @@ function gitAuditProbe() {
   };
 }
 
-async function archivePrivateHelperProbe() {
-  const directory = path.join(root, 'archive-private');
+async function archivePrivateHelperProbe(attemptOwnerRepair = false) {
+  const directory = path.join(root, attemptOwnerRepair ? 'archive-private-repair' : 'archive-private');
   const input = source('Job-Archive-Private.ps1');
   const original = "} catch { [Console]::Error.WriteLine('PRIVATE_DIRECTORY_FAILED');exit 1 }";
   const diagnostic =
-    "} catch { [Console]::Error.WriteLine('PRIVATE_DIRECTORY_DIAG_' + $_.Exception.GetType().Name + '_L' + $_.InvocationInfo.ScriptLineNumber);exit 1 }";
-  const helperPath = path.join(root, 'Job-Archive-Private.probe.ps1');
-  writeFileSync(helperPath, replaceExactlyOnce(input, original, diagnostic, 'PRIVATE_SOURCE_CHANGED'));
+    "} catch { $known=@('PRIVATE_OWNER_INVALID','PRIVATE_ACL_INVALID','PRIVATE_DIRECTORY_PIN_FAILED','INVALID_PRIVATE_ITEM');$label=if($_.Exception.Message -in $known){$_.Exception.Message}else{$_.Exception.GetType().Name};[Console]::Error.WriteLine('PRIVATE_DIRECTORY_DIAG_' + $label + '_L' + $_.InvocationInfo.ScriptLineNumber);exit 1 }";
+  const helperPath = path.join(
+    root,
+    attemptOwnerRepair ? 'Job-Archive-Private.repair.ps1' : 'Job-Archive-Private.probe.ps1',
+  );
+  let helper = replaceExactlyOnce(input, original, diagnostic, 'PRIVATE_SOURCE_CHANGED');
+  if (attemptOwnerRepair) {
+    const before =
+      "if($Mode -eq 'Create') { [ArchivePrivateDirectory]::Create($Directory,$acl.GetSecurityDescriptorBinaryForm()) }";
+    const after =
+      before +
+      "\n  if($Mode -eq 'Create') { $ownerAcl=[IO.Directory]::GetAccessControl($Directory);if($ownerAcl.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value){$ownerAcl.SetOwner($sid);[IO.Directory]::SetAccessControl($Directory,$ownerAcl)} }";
+    helper = replaceExactlyOnce(helper, before, after, 'OWNER_REPAIR_MARKER_MISSING');
+  }
+  writeFileSync(helperPath, helper);
   const powershell = path.join(
     process.env.SystemRoot || 'C:\\Windows',
     'System32',
@@ -154,6 +166,7 @@ async function archivePrivateHelperProbe() {
   });
   lines.close();
   return {
+    attemptOwnerRepair,
     ready,
     verified,
     unexpectedOutput,
@@ -180,6 +193,7 @@ async function main() {
         path.resolve(os.tmpdir()).toLowerCase() === realpathSync.native(os.tmpdir()).toLowerCase(),
       git: gitAuditProbe(),
       archive: await archivePrivateHelperProbe(),
+      archiveOwnerRepair: await archivePrivateHelperProbe(true),
     };
     console.log(JSON.stringify(result));
   } finally {

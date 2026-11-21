@@ -150,6 +150,9 @@ function Get-AuditBaseline {
 }
 
 try {
+    # Hosted Windows runners may not include PSHOME in PSModulePath. Bind the
+    # built-in implementation rather than relying on module auto-discovery.
+    Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Utility') -ErrorAction Stop
     if (-not $PSBoundParameters.ContainsKey('RepositoryPath')) {
         $RepositoryPath = Split-Path -Parent $PSScriptRoot
     }
