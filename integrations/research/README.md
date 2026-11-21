@@ -127,6 +127,8 @@ The WB-001 release builder now carries `integrations` into its candidate payload
 
 ## Next roadmap work
 
-**M5 remaining:** complete official WB-001 release validation and rollback preflight without applying or restarting the live owner. Do not treat a source/isolated stage as a deployed MCP service. Fresh RIFT telemetry (M6) and a non-RIFT adapter pilot (M7) remain separate future gates.
+**M5 official release validation passed:** Candidate `wb-rift001-m5-20261121-003` was built from committed source with every gate exit 0, **1,379/1,384 tests passed and five skipped** (zero failures). Independent WB-001 manifest verification checked **7,485 files**; the 21-file research runtime closure and **all four research MCP tool registrations** passed local candidate acceptance. Release manifest SHA-256: `67F1F4E412EF681EF8DC6DA3942708D7AAB0A9E5ED08CC1B56831C95D1E4544E`.
+
+**Deployment HOLD:** This is an immutable _candidate_, not a running Workbridge update. An exclusive Workbridge-only maintenance window, quiescence proof and rollback gate are required before WB-001 Apply, followed by hosted ChatGPT MCP catalog verification. Fresh physical RIFT telemetry M6 and a non-RIFT adapter pilot M7 remain separate future work.
 
 [WB-RIFT-001 master roadmap](../../docs/wb-rift-001-unified-research-coordinator-roadmap-20261120.md)

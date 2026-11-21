@@ -47,13 +47,26 @@ The isolated closure manifest had SHA-256 `d9b680f9215e0dce5443396e1084007ad3d49
 - Corrected the eight catalog assertions to `71`. Added an **opt-in bounded four-test-file** builder profile (`-BoundedTests` / `npm run test:bounded`), preserving every original test, gate, deadline, receipt requirement and the original default/serial profiles. The existing pure PowerShell release-profile tests passed (**2 passed, 1 optional Store-PowerShell test skipped**); full candidate retest is the next gate.
 - **Apply remains HOLD:** new candidate must be built from the next clean committed HEAD with a unique release ID, pass the entire real WB-001 suite, publish an immutable `validated.json` receipt and pass independent payload verification before any separate owner-quiescence/rollback maintenance window.
 
+## Validated candidate — November 21, 2026
+
+**Release `wb-rift001-m5-20261121-003`: PASS, receipt independently verified; Apply HOLD.**
+
+- Built from clean, committed `main` at `d5701b4bde206c6b6a5e4a4269134ade399c2dbc` using official `New-WorkbridgeRelease.ps1` with `-BoundedTests`. This changes only test-file concurrency to four; no test files or release gates were omitted.
+- Full Node/Workbridge test gate: **1,379 passed, 0 failed, 5 skipped** (1,384 total). Standard native `startup`, `updater`, `format`, `generic`, `desktop-stage`, `acceptance` and `desktop-closure` gates all passed, as did `install`, `desktop-prebuild` and `desktop-prestage`.
+- Builder exited **0**, wrote canonical `validated.json`, and explicitly reported that no service was stopped or deployed.
+- Independently ran `Get-WBRelease` against the sealed candidate, verifying the canonical receipt and SHA-256 manifest of **7,485 files**. Release manifest SHA-256: `67F1F4E412EF681EF8DC6DA3942708D7AAB0A9E5ED08CC1B56831C95D1E4544E`.
+- Independently verified the `dist/research-runtime` closure: **21 files**, SHA-256 manifest `ac363ec0b540eb212dd4fb84eb67286fa5e8e4fba810a975800d00f34dad4cef`. Stdio MCP candidate probe recorded **71 tools, four validated research tools**, and the same closure digest.
+- Host remained **AMD-DESKTOP**; active Workbridge `0.16.5-dev` owner stayed at PID `25828`, instance `27016b31-f952-45d6-b32b-a85166856f75`. Source worktree clean after commit, branch ahead of origin by 16 local commits.
+- `hostedVerified=false` by design: the ChatGPT-hosted connector still uses the older installed owner. Candidate validity is **not** proof that new MCP tools are already available to external AI clients.
+
+**Remaining gate:** a separately coordinated exclusive Workbridge-only maintenance window, updated idle/admission checks, the WB-001 updater's verified Apply and rollback readiness, and hosted post-deploy 71-tool acceptance. Do not touch the user’s running game or restart the service as part of candidate validation.
+
 ## Remaining M5 steps (no service activation yet)
 
-1. Commit exact current code/tests/docs, capture commit hash, and check a clean working tree.
-2. Run **WB-001 `New-WorkbridgeRelease.ps1` from committed source** using a unique release ID with registered tool environment and serial tests if needed. The builder must copy `integrations` into an isolated payload, execute all standard gates, create a verified manifest, pass the new 4-tool research catalog/closure probe, and issue `validated.json` **without stopping the service**.
-3. Check the release's manifest digest, exact payload content, compiled MCP tool list and rollback-capable previous state. Treat failure as a blocker; do not bypass a gate or claim readiness from an exit code alone.
-4. **Apply HOLD** until an exclusive all-client quiet window, independently verified zero active Workbridge jobs, an approved Workbridge-only service restart, and staged rollback preflight. Then use the existing WB-001 updater, _not_ direct `dist` copying.
-5. After any later Apply, reverify actual AMD-DESKTOP identity, Workbridge owner PID/start, 36-slot job limit, four `research_*` hosted MCP registrations, a fixed saved-plan preview and no-game-input read-only run. On failure use WB-001 rollback and preserve the evidence.
+1. **Completed:** M5 source/test changes committed, official WB-001 candidate `...-003` validated and canonical release receipt independently verified, including 7,485 payload files and 21 sealed research files.
+2. **Pending:** prepare the separately authorized Workbridge-only exclusive maintenance/rollback handoff, including current service admission and job quiescence verification. No candidate changes or automatic Apply.
+3. **Apply HOLD** until an exclusive all-client quiet window, independently verified zero active Workbridge jobs, an approved Workbridge-only service restart, and staged rollback preflight. Then use the existing WB-001 updater, _not_ direct `dist` copying.
+4. After any later Apply, reverify actual AMD-DESKTOP identity, Workbridge owner PID/start, 36-slot job limit, four `research_*` hosted MCP registrations, a fixed saved-plan preview and no-game-input read-only run. On failure use WB-001 rollback and preserve the evidence.
 
 **Known architectural boundary:** The staged research runtime is sealed in `dist`. Existing RRE, RR2, Telemetry and RPT project-specific binaries and data remain separately owned dependencies. A closure manifest does not validate those external source files until a research plan's preflight checks them by exact identity.
 
