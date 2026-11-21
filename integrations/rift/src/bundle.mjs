@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { inspectOfflineClient, readEvidence, ResearchError } from './identity.mjs';
 import { parseRecords, normalizeTelemetry, normalizeExperiment } from './records.mjs';
 import { runRPTAnalyzer } from './experiment.mjs';
+import { normalizeRR2, normalizeRRE, compareArchivedEpochs } from './archived-sources.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 export const DEFAULT_ANALYZER = join(ROOT, 'Rift-Personal-Teleporter', 'src', 'teleport_analyzer.py');
@@ -20,6 +21,11 @@ const ARTIFACTS = [
   'manifest.json',
 ];
 const FILE_LIMIT = 4 * 1024 * 1024;
+const OPTIONAL = [
+  ['rr2', 'rr2.source'],
+  ['rre', 'rre.source'],
+  ['rreBinding', 'rre-binding.source'],
+];
 
 function digest(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
@@ -75,6 +81,9 @@ export async function session({
   expectedSha256 = null,
   python = DEFAULT_PYTHON,
   analyzerFile = DEFAULT_ANALYZER,
+  rr2File = null,
+  rreFile = null,
+  rreBindingFile = null,
   host = hostname(),
 }) {
   if (!clientFile || !telemetryFile || !trackFile || !outputDir || !expectedHost) {
@@ -90,8 +99,17 @@ export async function session({
       'Refusing to overwrite a pre-existing evidence directory: ' + out,
     );
   }
-  if (resolve(telemetryFile) === resolve(trackFile)) {
-    throw new ResearchError('SOURCE_CONFLICT', 'Telemetry and position track must be independent files.');
+  if (Boolean(rreFile) !== Boolean(rreBindingFile)) {
+    throw new ResearchError(
+      'RRE_PAIR_REQUIRED',
+      'RRE publication requires its matching saved binding receipt.',
+    );
+  }
+  const inputPaths = [telemetryFile, trackFile, analyzerFile, rr2File, rreFile, rreBindingFile]
+    .filter(Boolean)
+    .map((item) => resolve(item).toLowerCase());
+  if (new Set(inputPaths).size !== inputPaths.length) {
+    throw new ResearchError('SOURCE_CONFLICT', 'Experiment inputs must be independent source files.');
   }
   const examined = await doctor({ clientFile, expectedHost, expectedSha256, analyzerFile, host });
   const [telemetry, track, analyzer] = await Promise.all([
@@ -99,6 +117,19 @@ export async function session({
     readEvidence(trackFile, FILE_LIMIT),
     readEvidence(analyzerFile, 128 * 1024),
   ]);
+  const [rr2, rre, rreBinding] = await Promise.all([
+    rr2File ? readEvidence(rr2File, FILE_LIMIT) : Promise.resolve(null),
+    rreFile ? readEvidence(rreFile, FILE_LIMIT) : Promise.resolve(null),
+    rreBindingFile ? readEvidence(rreBindingFile, FILE_LIMIT) : Promise.resolve(null),
+  ]);
+  const rr2Record = rr2 ? normalizeRR2(rr2, examined.client.sha256) : null;
+  const rreRecord = rre ? normalizeRRE(rre, rreBinding, examined.client.sha256) : null;
+  const archivedEpochs = compareArchivedEpochs(rr2Record, rreRecord);
+  const optionalSources = { rr2, rre, rreBinding };
+  const artifactNames = [
+    ...ARTIFACTS,
+    ...OPTIONAL.filter(([key]) => optionalSources[key]).map(([, name]) => name),
+  ];
   const telemetryRows = parseRecords(telemetry.bytes, 'Telemetry');
   const trackRows = parseRecords(track.bytes, 'RPT track');
   const observed = normalizeTelemetry(telemetryRows, telemetry.sha256, examined.client.sha256);
@@ -108,7 +139,15 @@ export async function session({
     trackPath: track.path,
   });
   const analysis = normalizeExperiment(trackRows, result.classifications, track.sha256);
-  await Promise.all([verifySameSource(telemetry), verifySameSource(track), verifySameSource(analyzer)]);
+  await Promise.all(
+    [telemetry, track, analyzer, rr2, rre, rreBinding]
+      .filter(Boolean)
+      .map((source) => verifySameSource(source)),
+  );
+  const confirmedClient = await inspectOfflineClient(clientFile, expectedHost, examined.client.sha256, host);
+  if (confirmedClient.path !== examined.client.path) {
+    throw new ResearchError('CLIENT_CHANGED', 'Selected game executable path changed during experiment.');
+  }
   if (existsSync(out)) {
     throw new ResearchError(
       'OUTPUT_EXISTS',
@@ -148,7 +187,18 @@ export async function session({
         command: 'python -B teleport_analyzer.py <saved-track>',
         exitCode: result.exitCode,
       },
+      ...Object.fromEntries(
+        OPTIONAL.filter(([key]) => optionalSources[key]).map(([key]) => [
+          key,
+          {
+            originalPath: optionalSources[key].path,
+            sha256: optionalSources[key].sha256,
+            bytes: optionalSources[key].size,
+          },
+        ]),
+      ),
     },
+    archivedEpochs,
     experiment: {
       kind: 'RPT_offline_position_classification',
       classificationCounts: countByClass(analysis),
@@ -159,24 +209,29 @@ export async function session({
     normalizedRecords: {
       telemetry: observed.length,
       position: analysis.length,
+      rr2: rr2Record ? 1 : 0,
+      rre: rreRecord ? 1 : 0,
       unavailableNumericsRemainNull: true,
     },
-    artifacts: ARTIFACTS,
+    artifacts: artifactNames,
   };
   const outputs = new Map([
     ['telemetry.source', telemetry.bytes],
     ['track.source', track.bytes],
     ['analyzer-source.py', analyzer.bytes],
     ['analysis.jsonl', jsonl(result.classifications)],
-    ['evidence.jsonl', jsonl([...observed, ...analysis])],
+    ['evidence.jsonl', jsonl([...observed, ...analysis, ...[rr2Record, rreRecord].filter(Boolean)])],
     ['manifest.json', Buffer.from(JSON.stringify(manifest, null, 2) + '\n', 'utf8')],
   ]);
+  for (const [key, name] of OPTIONAL) {
+    if (optionalSources[key]) outputs.set(name, optionalSources[key].bytes);
+  }
   // Preflight, analyzer execution and source revalidation complete before any output is created.
   await mkdir(out, { recursive: false });
   for (const [name, bytes] of outputs) {
     await writeFile(join(out, name), bytes, { flag: 'wx' });
   }
-  const sums = ARTIFACTS.map((name) => digest(outputs.get(name)) + '  ' + name).join('\n') + '\n';
+  const sums = artifactNames.map((name) => digest(outputs.get(name)) + '  ' + name).join('\n') + '\n';
   await writeFile(join(out, 'SHA256SUMS.txt'), sums, { flag: 'wx' });
   return {
     status: 'completed_offline_replay',
@@ -184,6 +239,9 @@ export async function session({
     clientSha256: examined.client.sha256,
     telemetryRecords: observed.length,
     positionRecords: analysis.length,
+    rr2Records: rr2Record ? 1 : 0,
+    rreRecords: rreRecord ? 1 : 0,
+    archivedEpochs,
     classificationCounts: manifest.experiment.classificationCounts,
     transportOrTeleportVerified: false,
     bundleVerified: (await verifyBundle(out)).verified,
@@ -192,15 +250,40 @@ export async function session({
 
 export async function verifyBundle(outputDir) {
   const dir = resolve(outputDir);
+  let manifest;
+  try {
+    manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8'));
+  } catch {
+    throw new ResearchError('BUNDLE_MANIFEST', 'Bundle manifest is not valid JSON.');
+  }
+  if (
+    manifest?.schema !== 'workbridge.rift-research-session.v1' ||
+    manifest.complete !== true ||
+    manifest.transportOrTeleportVerified !== false ||
+    manifest.currentSessionTelemetry !== false
+  ) {
+    throw new ResearchError('BUNDLE_MANIFEST', 'Bundle manifest has invalid or unsupported claims.');
+  }
+  const expectedNames = [
+    ...ARTIFACTS,
+    ...OPTIONAL.filter(([key]) => manifest.inputs?.[key]).map(([, name]) => name),
+  ];
+  if (
+    !Array.isArray(manifest.artifacts) ||
+    JSON.stringify(manifest.artifacts) !== JSON.stringify(expectedNames) ||
+    Boolean(manifest.inputs?.rre) !== Boolean(manifest.inputs?.rreBinding)
+  ) {
+    throw new ResearchError('BUNDLE_MANIFEST', 'Bundle artifact inventory is inconsistent with inputs.');
+  }
   const sums = await readEvidence(join(dir, 'SHA256SUMS.txt'), 16 * 1024);
   const lines = new TextDecoder('utf-8', { fatal: true }).decode(sums.bytes).trim().split(/\r?\n/);
-  if (lines.length !== ARTIFACTS.length) {
+  if (lines.length !== expectedNames.length) {
     throw new ResearchError('BUNDLE_INCOMPLETE', 'Bundle checksum inventory is incomplete.');
   }
   const expected = new Map();
   for (const line of lines) {
     const match = /^([0-9a-f]{64})  ([a-zA-Z0-9.-]+)$/.exec(line);
-    if (!match || !ARTIFACTS.includes(match[2]) || expected.has(match[2])) {
+    if (!match || !expectedNames.includes(match[2]) || expected.has(match[2])) {
       throw new ResearchError(
         'BUNDLE_INVENTORY',
         'Bundle checksum list contains an invalid or repeated entry.',
@@ -208,25 +291,16 @@ export async function verifyBundle(outputDir) {
     }
     expected.set(match[2], match[1]);
   }
-  for (const name of ARTIFACTS) {
+  for (const name of expectedNames) {
     const source = await readEvidence(join(dir, name), FILE_LIMIT);
     if (expected.get(name) !== source.sha256) {
       throw new ResearchError('BUNDLE_HASH_MISMATCH', 'Bundle artifact hash mismatch: ' + name);
     }
   }
-  const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8'));
-  if (
-    manifest.schema !== 'workbridge.rift-research-session.v1' ||
-    manifest.complete !== true ||
-    manifest.transportOrTeleportVerified !== false ||
-    manifest.currentSessionTelemetry !== false
-  ) {
-    throw new ResearchError('BUNDLE_MANIFEST', 'Bundle manifest has invalid or unsupported claims.');
-  }
   return {
     verified: true,
     directory: dir,
-    filesVerified: ARTIFACTS.length,
+    filesVerified: expectedNames.length,
     statement: 'Content hashes match; live process, source provenance and teleport are not verified.',
   };
 }

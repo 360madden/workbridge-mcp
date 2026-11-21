@@ -11,6 +11,9 @@ const allowed = new Set([
   '--expect-sha',
   '--python',
   '--bundle',
+  '--rr2',
+  '--rre',
+  '--rre-binding',
 ]);
 
 function parse(argv) {
@@ -33,7 +36,18 @@ function parse(argv) {
   }
   const relevant = {
     doctor: ['--client', '--expect-host', '--expect-sha'],
-    session: ['--client', '--expect-host', '--expect-sha', '--telemetry', '--track', '--out', '--python'],
+    session: [
+      '--client',
+      '--expect-host',
+      '--expect-sha',
+      '--telemetry',
+      '--track',
+      '--out',
+      '--python',
+      '--rr2',
+      '--rre',
+      '--rre-binding',
+    ],
     verify: ['--bundle'],
   };
   if (Object.keys(options).some((key) => !relevant[command].includes(key))) {
@@ -46,6 +60,7 @@ const HELP = [
   'Standalone RIFT research companion (offline only; does not contact the game).',
   'node src/cli.mjs doctor --client EXE --expect-host AMD-DESKTOP [--expect-sha SHA256]',
   'node src/cli.mjs session --client EXE --expect-host AMD-DESKTOP --telemetry JSON_OR_JSONL --track RPT_JSONL --out NEW_DIR [--python PYTHON_EXE] [--expect-sha SHA256]',
+  'Optional session archives: --rr2 RR2_NATIVE_JSON --rre RRE_PUBLICATION_JSON --rre-binding RRE_BINDING_JSON (RRE pair required)',
   'node src/cli.mjs verify --bundle SAVED_DIR',
   'Output bundles include originals, analyzer source, SHA256SUMS.txt, normalized evidence and the session manifest.',
 ].join('\n');
@@ -72,6 +87,9 @@ async function main() {
       trackFile: opts['--track'],
       outputDir: opts['--out'],
       python: opts['--python'] ?? DEFAULT_PYTHON,
+      rr2File: opts['--rr2'] ?? null,
+      rreFile: opts['--rre'] ?? null,
+      rreBindingFile: opts['--rre-binding'] ?? null,
     });
   } else {
     if (!opts['--bundle']) throw new ResearchError('MISSING_ARGUMENT', 'Verify requires --bundle.');

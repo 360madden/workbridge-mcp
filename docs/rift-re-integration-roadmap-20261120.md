@@ -107,6 +107,21 @@ A local XYZ change, native memory write acknowledgement or matching HUD location
 
 **Next recommended executable gate:** add a saved RR2 or RRE generation adapter and formal capture-epoch validation before introducing a live-process session collector.
 
+## Implementation checkpoint — November 20, 2026, 10:55 PM ET
+
+**Offline Slice B: RR2/RRE archived receipts integrated.** The standalone companion now supports optional `--rr2`, `--rre` and `--rre-binding` source files, preserving their exact bytes and adding source-specific normalized records without changing RIFT, VMware, RR2/RRE repositories, or the live Workbridge service.
+
+- Verified Windows hostname: AMD-DESKTOP via hostname.exe (exit 0). No other machine accessed.
+- RR2 adapter supports the pinned `native-current-facing-candidate-samples/1` record and preserves original 64-bit Windows process-start tick **source digits** using Node's JSON parse context; rounded double values are never used for the epoch comparison. Repeated RR2 report/observation identities must agree.
+- RRE adapter supports a historical complete saved-publication receipt paired with its `rre-lab2-publication-binding/1` receipt. It validates matching source token/sequence/addon version/part and payload count; does not decode or authenticate RREC2 wire frames.
+- A shared archive-epoch comparison distinguishes differing saved process IDs/start ticks/builds, or labels matching declared fields with host unverified. Cross-source causal inference and live freshness remain **false**.
+- Source files, normalized evidence and checksum lists preserve old bundle compatibility (six files), while the new combined session contains **nine source/derived artifacts** plus SHA256SUMS.txt. Source files are rehashed after the offline analyzer, and the selected executable is rechecked before publishing.
+- Focused regression result **24/24 passing**, Prettier formatting check passing; earlier six-file bundle independently verifies.
+- Real saved-data acceptance used archived SHA-256 `1935a05c9db6d468e34e0055014a4a99c1b5afceb1695884e24600f5c20a4be8`; historical Telemetry + RR2 native report + RRE publication/binding + RPT sample track. RR2 PID `40452` and RRE PID `9752` were correctly classified `different_declared_epoch`, despite the same executable hash. Output package: `C:\work\workbridge-mcp\.tools\rift-research-session-20261120-rr2-rre-01`.
+- This is **offline historical data**; a source's "live" status at recording time, same build, or a replay discontinuity does not establish current client presence, a shared process lifetime, arbitrary destination control, or server-confirmed relocation.
+
+**Reprioritized next step:** add a narrow offline patch-drift adapter that invokes the already maintained RRE PE section/anchor comparator, then revisit live process-epoch inventory and debugger-trace correlation.
+
 ## Sources consulted
 
 ### Local, inspected November 20
