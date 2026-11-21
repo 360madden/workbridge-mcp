@@ -34,10 +34,14 @@ try {
  $parentItem=Get-Item -LiteralPath $parent -Force
  if(-not $parentItem.PSIsContainer -or ($parentItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'INVALID_PARENT' }
  $parentPin=[ArchivePrivateDirectory]::Pin($parent)
- $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User
+ $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
+ $sid=$identity.User
+ $owner=$identity.Owner
+ if($null -eq $sid -or $null -eq $owner) { throw 'PRIVATE_IDENTITY_UNAVAILABLE' }
  $system=[Security.Principal.SecurityIdentifier]::new('S-1-5-18')
  $acl=[Security.AccessControl.DirectorySecurity]::new()
- $acl.SetOwner($sid);$acl.SetAccessRuleProtection($true,$false)
+ # Token default owner may be an elevated group, but DACL remains scoped.
+ $acl.SetOwner($owner);$acl.SetAccessRuleProtection($true,$false)
  foreach($who in @($sid,$system)) {
    $rule=[Security.AccessControl.FileSystemAccessRule]::new($who,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
    $acl.AddAccessRule($rule)
@@ -50,7 +54,7 @@ try {
    $sections=[Security.AccessControl.AccessControlSections]::Access -bor [Security.AccessControl.AccessControlSections]::Owner
    if($IsDirectory) {$current=[IO.Directory]::GetAccessControl($Path,$sections)} else {$current=[IO.File]::GetAccessControl($Path,$sections)}
    if($IsDirectory -and -not $current.AreAccessRulesProtected) { throw 'PRIVATE_ACL_INVALID' }
-   if($current.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { throw 'PRIVATE_OWNER_INVALID' }
+   if($current.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $owner.Value) { throw 'PRIVATE_OWNER_INVALID' }
    $rules=@($current.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier]))
    if($rules.Count -ne 2) { throw 'PRIVATE_ACL_INVALID' }
    $seen=@{}

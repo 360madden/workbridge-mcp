@@ -31,6 +31,20 @@ A third diagnostic run [44918138202](https://github.com/360madden/workbridge-mcp
 
 A fourth temporary-only variant separately compares the current user's SID with Windows' token default-owner SID: it retains the strictly limited **current user + SYSTEM** DACL but creates and verifies the directory with the token-owner identity. This is still just a disposable test of an OS ownership hypothesis; it neither changes production code nor makes a GitHub workflow's green diagnostic outcome into a release acceptance receipt.
 
+## Token-owner hypothesis confirmed
+
+GitHub diagnostic run [44918576629](https://github.com/360madden/workbridge-mcp/actions/runs/44918576629) independently verified the hypothesis on Windows 2025 / Node 24.22.3:
+
+- Normal helper: `PRIVATE_OWNER_INVALID` before any VERIFY reply
+- Temporary user-SID SetOwner retry: `PRIVATE_OWNER_INVALID`
+- Temporary profile-volume helper: `PRIVATE_OWNER_INVALID`
+- **Temporary token-default-owner helper: READY, two VERIFIED replies, exit 0**
+- Git audit remained green at **9/9**
+
+The concrete production correction is to use the process identity's `Owner` SID both when constructing the directory owner and when checking owners of the newly created archive directory/files. Its access rules still grant exactly two SIDs: the process's **User** and SYSTEM. The existing no-inherited-ACL, link, directory, and file checks remain enforced. The updated regression checks both directory/file ownership against the token owner and the exact current-user/SYSTEM allowlist. This fixes different Windows token-owner defaults without suppressing the existing ownership check.
+
+The validated WB-001 candidate `...-007` predates this correction. A new sealed candidate and independently green GitHub core suite are required before any activation.
+
 ## Running
 
 On **AMD-DESKTOP**, after verifying `hostname.exe` and from
