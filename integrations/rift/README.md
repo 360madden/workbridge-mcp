@@ -183,4 +183,20 @@ Actual repeatable report: `C:\work\workbridge-mcp\.tools\wb-rift001-m6b-locator-
 
 [Full M6b static locator table and operator command](../../docs/wb-rift-001-m6b-telemetry-locator-drift-20261121.md). The next work is independent cross-reference/owner verification on the changed build, particularly the three non-file-backed roots, before proposing a new exact-build Telemetry reader.
 
+## M6c — PDATA/Capstone cross-reference correlation (November 21, 2026)
+
+The repeatable helper `tools/telemetry-locator-xrefs.py` reuses RRE's pinned PE section decoder and the **existing** Capstone 5.0.7 package in `C:\work\rre\.venv`. It performs bounded x86-64 RIP-relative reference scans of PE `.pdata` function ranges in the two saved executables and checks sampled references again using typed Capstone operands and exact instruction bytes.
+
+**Result:** All nine static reference counts match the old/new images. The six selectors retain the `+0x11000` `.data` section-relative shift; the three previously unresolved roots have unique nearby equal-count reference candidates at an additional `+0x7C0`, for a **total `+0x117C0` shift**:
+
+- Manager: `0x3373C68` (595 old / 595 new RIP-relative references).
+- Player system: `0x3373BA0` (605 / 605).
+- Clock root: `0x33EDA70` (583 / 583).
+
+The decode covered over **99.89% of bytes within the selected function ranges**, but those ranges cover only about **78% of raw `.text`**. This is not a whole-binary function/call graph. The root-candidate selection requires a **unique** xref count match within ±`0x2000`; ambiguity fails closed. All nine remain **unqualified for live native reading** pending owner and pointer-chain validation.
+
+Verified final report: `C:\work\workbridge-mcp\.tools\wb-rift001-m6c-xref-audit-20261121-final.json` (SHA-256 `2c0b5cdf287b321377e1abd2a7bc373ab949932d22489c1fccc5e735292fd977`). The preserved report includes raw code-reference witnesses, tool/source SHA pins, full census counts and explicit `qualifiedNativeLocators: 0`.
+
+[Full M6c cross-reference table and reproducible command](../../docs/wb-rift-001-m6c-pdata-xrefs-20261121.md). No new live Telemetry native reader was enabled and no running RIFT process was modified.
+
 See [the full RIFT RE integration roadmap](../../docs/rift-re-integration-roadmap-20261120.md).
