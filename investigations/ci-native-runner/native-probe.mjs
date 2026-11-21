@@ -77,14 +77,14 @@ function gitAuditProbe() {
   };
 }
 
-async function archivePrivateHelperProbe(attemptOwnerRepair = false) {
-  const directory = path.join(root, attemptOwnerRepair ? 'archive-private-repair' : 'archive-private');
+async function archivePrivateHelperProbe(attemptOwnerRepair = false, fixtureRoot = root) {
+  const directory = path.join(fixtureRoot, attemptOwnerRepair ? 'archive-private-repair' : 'archive-private');
   const input = source('Job-Archive-Private.ps1');
   const original = "} catch { [Console]::Error.WriteLine('PRIVATE_DIRECTORY_FAILED');exit 1 }";
   const diagnostic =
     "} catch { $known=@('PRIVATE_OWNER_INVALID','PRIVATE_ACL_INVALID','PRIVATE_DIRECTORY_PIN_FAILED','INVALID_PRIVATE_ITEM');$label=if($_.Exception.Message -in $known){$_.Exception.Message}else{$_.Exception.GetType().Name};[Console]::Error.WriteLine('PRIVATE_DIRECTORY_DIAG_' + $label + '_L' + $_.InvocationInfo.ScriptLineNumber);exit 1 }";
   const helperPath = path.join(
-    root,
+    fixtureRoot,
     attemptOwnerRepair ? 'Job-Archive-Private.repair.ps1' : 'Job-Archive-Private.probe.ps1',
   );
   let helper = replaceExactlyOnce(input, original, diagnostic, 'PRIVATE_SOURCE_CHANGED');
@@ -117,7 +117,7 @@ async function archivePrivateHelperProbe(attemptOwnerRepair = false) {
       '-Directory',
       directory,
     ],
-    { cwd: root, env: process.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
+    { cwd: fixtureRoot, env: process.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
   );
   let ready = false;
   let verified = 0;
@@ -194,7 +194,33 @@ async function main() {
       git: gitAuditProbe(),
       archive: await archivePrivateHelperProbe(),
       archiveOwnerRepair: await archivePrivateHelperProbe(true),
+      profileVolumeArchive: { available: false },
     };
+    let profileRoot = null;
+    try {
+      const appData = process.env.LOCALAPPDATA;
+      if (appData && path.isAbsolute(appData)) {
+        const canonical = realpathSync.native(path.join(appData, 'Temp'));
+        profileRoot = mkdtempSync(path.join(canonical, 'wb-native-profile-probe-'));
+        result.profileVolumeArchive = {
+          available: true,
+          ...(await archivePrivateHelperProbe(false, profileRoot)),
+        };
+      }
+    } catch (error) {
+      result.profileVolumeArchive = {
+        available: false,
+        errorCode: typeof error.code === 'string' ? error.code : 'PROFILE_VOLUME_UNAVAILABLE',
+      };
+    } finally {
+      if (profileRoot) {
+        try {
+          rmSync(profileRoot, { recursive: true, force: true });
+        } catch {
+          result.profileVolumeArchive.cleanupFailed = true;
+        }
+      }
+    }
     console.log(JSON.stringify(result));
   } finally {
     // The tool creates only its own fresh, random disposable directory.
