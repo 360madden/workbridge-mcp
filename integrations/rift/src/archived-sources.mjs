@@ -134,6 +134,7 @@ export function normalizeRRE(publicationSource, bindingSource, clientSha256) {
     !SESSION.test(wire.session) ||
     !validInt(wire.parts, 1, 16) ||
     !validInt(wire.payloadBytes, 1, 65536) ||
+    wire.parts !== Math.ceil(wire.payloadBytes / 4096) ||
     !validInt(wire.abilities, 1, 512) ||
     !/^[0-9a-f]{8}$/.test(wire.adler32)
   ) {

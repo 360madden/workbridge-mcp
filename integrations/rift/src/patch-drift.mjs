@@ -296,11 +296,18 @@ export async function verifyPatch(outputDir) {
     throw new ResearchError('PATCH_BUNDLE_REPORT', 'Patch report is invalid JSON.');
   }
   if (
+    report.schemaVersion !== 1 ||
     report.status !== manifest.reportStatus ||
     report.before?.sha256 !== manifest.before.sha256 ||
     report.after?.sha256 !== manifest.after.sha256 ||
     report.nativeOffsetsQualified !== false ||
-    report.requiresRuntimeRequalification !== true
+    report.requiresRuntimeRequalification !== true ||
+    !Array.isArray(report.sections) ||
+    !Array.isArray(report.anchors) ||
+    manifest.changedSections !== report.sections.filter((section) => section.status !== 'identical').length ||
+    manifest.anchorCount !== report.anchors.length ||
+    manifest.analyzer?.sha256 !== verified[2].sha256 ||
+    (manifest.anchors !== null && manifest.anchors?.sha256 !== verified.at(-1).sha256)
   ) {
     throw new ResearchError('PATCH_BUNDLE_REPORT', 'Static report contradicts saved patch manifest.');
   }

@@ -172,6 +172,26 @@ test('tampered preserved analyzer source is detected independently', async (t) =
   );
 });
 
+test('rehashed but semantically contradictory patch manifest is rejected', async (t) => {
+  const f = await fixture(t);
+  await comparePatch(f);
+  const manifestPath = join(f.outputDir, 'patch-manifest.json');
+  const data = JSON.parse(await readFile(manifestPath, 'utf8'));
+  data.changedSections += 1;
+  const bytes = Buffer.from(JSON.stringify(data) + '\n');
+  await writeFile(manifestPath, bytes);
+  const sumsPath = join(f.outputDir, 'SHA256SUMS.txt');
+  const oldSums = await readFile(sumsPath, 'utf8');
+  await writeFile(
+    sumsPath,
+    oldSums.replace(/^[0-9a-f]{64}  patch-manifest\.json$/m, sha(bytes) + '  patch-manifest.json'),
+  );
+  await assert.rejects(
+    () => verifyPatch(f.outputDir),
+    (e) => e.code === 'PATCH_BUNDLE_REPORT',
+  );
+});
+
 test('tampered patch manifest qualification is rejected', async (t) => {
   const f = await fixture(t);
   await comparePatch(f);

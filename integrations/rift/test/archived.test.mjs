@@ -161,6 +161,29 @@ test('RRE binding must agree exactly with publication session, count and version
   );
 });
 
+test('RRE enforces exact 4096-byte part count, even if both saved receipts agree', () => {
+  const pub = rreSample();
+  const binding = rreBinding();
+  pub.memoryPublication.parts = 4;
+  binding.parts = 4;
+  assert.throws(
+    () => normalizeRRE(source(JSON.stringify(pub)), source(JSON.stringify(binding)), sha),
+    (error) => error.code === 'RRE_CONTRACT',
+  );
+  pub.memoryPublication.parts = 1;
+  binding.parts = 1;
+  pub.memoryPublication.payloadBytes = 4096;
+  binding.payloadBytes = 4096;
+  const validBoundary = normalizeRRE(source(JSON.stringify(pub)), source(JSON.stringify(binding)), sha);
+  assert.equal(validBoundary.partCountDeclared, 1);
+  pub.memoryPublication.payloadBytes = 4097;
+  binding.payloadBytes = 4097;
+  assert.throws(
+    () => normalizeRRE(source(JSON.stringify(pub)), source(JSON.stringify(binding)), sha),
+    (error) => error.code === 'RRE_CONTRACT',
+  );
+});
+
 test('same game build does not mean same process epoch', () => {
   const rr2 = normalizeRR2(source(rr2Sample()), sha);
   const rre = normalizeRRE(source(JSON.stringify(rreSample())), source(JSON.stringify(rreBinding())), sha);
