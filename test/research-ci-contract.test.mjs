@@ -16,7 +16,14 @@ test('GitHub Windows CI includes research changes and exercises portable two-pro
   assert.match(workflow, /node-version: '24'/);
   assert.match(workflow, /- 'integrations\/\*\*'/);
   assert.match(workflow, /npm run build/);
-  assert.match(workflow, /node --test test\/\*\.test\.mjs/);
+  // Preserve the full suite, stage dynamic desktop imports, and bound file-level concurrency.
+  assert.match(workflow, /npm run build\s+#[^\n]+\s+node scripts\/stage-desktop-runtime\.mjs/);
+  assert.match(
+    workflow,
+    /node --test --test-concurrency=1 test\/git-baseline-audit\.test\.mjs test\/job-archive-proposal\.test\.mjs test\/job-archive-write\.test\.mjs/,
+  );
+  assert.match(workflow, /node --test --test-concurrency=4 test\/\*\.test\.mjs/);
+  assert.doesNotMatch(workflow, /\n\s*node --test test\/\*\.test\.mjs/);
   assert.match(workflow, /node --test integrations\/research\/test\/\*\.test\.mjs/);
   assert.match(workflow, /stage-research-runtime\.mjs --verify --repo-root \./);
   assert.match(workflow, /WB-001 runs/);

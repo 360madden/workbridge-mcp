@@ -35,6 +35,15 @@
 - Add `.github` to `WBSourceNames` in `scripts/Workbridge-Update.ps1`. The official release builder already uses that list to copy isolated test source, while `WBRuntimeNames` excludes `.github`, so activation copies no workflow file into the live runtime.
 - Add a release-source-closure regression in `test/research-ci-contract.test.mjs`; the updated focused suite passes **3/3** locally. Rebuild and independently verify a **fresh** candidate from the eventual new committed HEAD rather than reviving failed `...-006`.
 
+## Hosted CI failure after canonical-temp preflight
+
+- The actual GitHub Actions run [44910852099](https://github.com/360madden/workbridge-mcp/actions/runs/44910852099) passed the temp canonicalization preflight but ended at **1,354 passed / 35 failed / 1 skipped** (1,390 original core tests). Research synthetic and sealed-runtime verification steps did not run because the core job failed.
+- Four desktop-admission tests failed with `ERR_MODULE_NOT_FOUND` for `dist/desktop-turn-admission.mjs`. A clean checkout's `npm run build` stages the research runtime but does not stage the six-file desktop helper closure. The official WB-001 isolated release process stages both closures, and passed 1,548 tests / zero failures / five skips from the exact source commit.
+- The hosted suite also reported failing native Git baseline and job archive fixtures, one 36-client concurrency failure, and a retention metadata timeout. Their direct cause is **not yet established**; they are separate from the missing desktop import. Hosted Node's default unbounded file scheduler differs from the official WB-001 `--test-concurrency=4` acceptance and could amplify contention.
+- Correct the disposable GitHub workflow to run the existing `scripts/stage-desktop-runtime.mjs` after the regular build, then the **entire unchanged core file set** using `node --test --test-concurrency=4 test/*.test.mjs`. Do **not** stage into an active Workbridge installation and do not weaken Git, archive, or GUI admission checks.
+- Run a focused serial preflight covering the same native Git baseline and archive suites that failed on the hosted worker, before the full core suite; this distinguishes a native host prerequisite from file-scheduler contention without skipping the original tests.
+- Add a CI-contract regression for desktop closure, the native smoke gate, and bounded full-suite scheduling. Require a new hosted GitHub job to pass independently; remaining failures, if any, must be triaged by exact test/log rather than assumed to be scheduling noise.
+
 ## Follow-up
 
 After pushing this change, inspect the new GitHub Actions job's canonical temp preflight, core test summary, synthetic research tests, and sealed runtime closure. If any remain red, capture the exact failing test/error and investigate independently.
