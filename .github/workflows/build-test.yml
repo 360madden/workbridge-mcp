@@ -28,6 +28,12 @@ jobs:
     name: Windows / Node 24
     runs-on: windows-2025
     timeout-minutes: 15
+    # GitHub Windows images can expose TEMP through an 8.3 RUNNER~1 alias.
+    # Use the runner-owned, non-aliased temp root for all test fixtures.
+    env:
+      TMPDIR: ${{ runner.temp }}
+      TMP: ${{ runner.temp }}
+      TEMP: ${{ runner.temp }}
     steps:
       - name: Check out source
         uses: actions/checkout@v6
@@ -38,6 +44,9 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Verify canonical temporary fixture root
+        shell: pwsh
+        run: node -e "const os=require('node:os'),fs=require('node:fs'),path=require('node:path');const declared=path.resolve(os.tmpdir());const canonical=fs.realpathSync.native(declared);if(declared.toLowerCase()!==canonical.toLowerCase())throw new Error('CI_TEMP_ALIAS_MISMATCH')"
       # On a hosted runner, use the complete original Workbridge core suite and
       # the portable research fixtures. The full RIFT companion tests additionally
       # require sibling RRE/RPT Python tools and real host archives; WB-001 runs

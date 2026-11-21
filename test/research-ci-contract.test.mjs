@@ -5,6 +5,12 @@ import test from 'node:test';
 test('GitHub Windows CI includes research changes and exercises portable two-provider fixtures', async () => {
   const workflow = await readFile(new URL('../.github/workflows/build-test.yml', import.meta.url), 'utf8');
   assert.match(workflow, /runs-on: windows-2025/);
+  // Windows-hosted tests require one canonical temp path; a RUNNER~1 alias
+  // otherwise differs from fs.realpath() and invalidates scoped root fixtures.
+  assert.match(workflow, /TMPDIR:\s*\$\{\{\s*runner\.temp\s*\}\}/);
+  assert.match(workflow, /TMP:\s*\$\{\{\s*runner\.temp\s*\}\}/);
+  assert.match(workflow, /TEMP:\s*\$\{\{\s*runner\.temp\s*\}\}/);
+  assert.match(workflow, /Verify canonical temporary fixture root/);
   assert.match(workflow, /node-version: '24'/);
   assert.match(workflow, /- 'integrations\/\*\*'/);
   assert.match(workflow, /npm run build/);
