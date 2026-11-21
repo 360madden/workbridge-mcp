@@ -5,6 +5,7 @@ import { comparePatch, verifyPatch } from './patch-drift.mjs';
 import { physicalRiftIdentity } from './physical-epoch.mjs';
 import { savePhysicalReceipt, verifyPhysicalReceipt } from './physical-receipt.mjs';
 import { auditArchivedCompatibility } from './compatibility.mjs';
+import { captureLiveWitness, verifyLiveWitness } from './live-witness.mjs';
 
 const allowed = new Set([
   '--client',
@@ -27,6 +28,9 @@ const allowed = new Set([
   '--physical-bundle',
   '--research-bundle',
   '--patch-bundle',
+  '--expect-start-ticks',
+  '--telemetry-exe',
+  '--expect-telemetry-sha',
 ]);
 
 function parse(argv) {
@@ -41,12 +45,14 @@ function parse(argv) {
       'physical',
       'verify-physical',
       'audit',
+      'witness',
+      'verify-witness',
       'help',
     ].includes(command)
   ) {
     throw new ResearchError(
       'COMMAND',
-      'Expected doctor, session, verify, patch, verify-patch, physical, verify-physical, audit or help.',
+      'Expected doctor, session, verify, patch, verify-patch, physical, verify-physical, audit, witness, verify-witness or help.',
     );
   }
   if (command === 'help') return { command, options: {} };
@@ -91,6 +97,16 @@ function parse(argv) {
     physical: ['--expect-host', '--expect-sha', '--pid', '--out'],
     'verify-physical': ['--bundle'],
     audit: ['--physical-bundle', '--research-bundle', '--patch-bundle'],
+    witness: [
+      '--expect-host',
+      '--pid',
+      '--expect-start-ticks',
+      '--expect-sha',
+      '--telemetry-exe',
+      '--expect-telemetry-sha',
+      '--out',
+    ],
+    'verify-witness': ['--bundle'],
   };
   if (Object.keys(options).some((key) => !relevant[command].includes(key))) {
     throw new ResearchError('ARGUMENTS', 'An option does not belong to this command.');
@@ -99,7 +115,7 @@ function parse(argv) {
 }
 
 const HELP = [
-  'Standalone RIFT research companion (offline only; does not contact the game).',
+  'Standalone RIFT companion: offline analysis or explicitly selected read-only physical identity/Telemetry witness.',
   'node src/cli.mjs doctor --client EXE --expect-host AMD-DESKTOP [--expect-sha SHA256]',
   'node src/cli.mjs session --client EXE --expect-host AMD-DESKTOP --telemetry JSON_OR_JSONL --track RPT_JSONL --out NEW_DIR [--python PYTHON_EXE] [--expect-sha SHA256]',
   'Optional session archives: --rr2 RR2_NATIVE_JSON --rre RRE_PUBLICATION_JSON --rre-binding RRE_BINDING_JSON (RRE pair required)',
@@ -108,6 +124,8 @@ const HELP = [
   'node src/cli.mjs verify-patch --bundle SAVED_PATCH_DIR',
   'node src/cli.mjs physical --expect-host AMD-DESKTOP [--pid EXACT_RIFT_PID] [--expect-sha SHA256] [--out NEW_DIR]',
   'node src/cli.mjs verify-physical --bundle SAVED_IDENTITY_DIR',
+  'node src/cli.mjs witness --expect-host HOST --pid EXACT_PID --expect-start-ticks EXACT_DECIMAL_TICKS --expect-sha CURRENT_EXE_SHA --telemetry-exe PINNED_TELEMETRY_CLI_EXE --expect-telemetry-sha SHA256 --out NEW_DIR',
+  'node src/cli.mjs verify-witness --bundle SAVED_WITNESS_DIR',
   'node src/cli.mjs audit --physical-bundle SAVED_IDENTITY_DIR --research-bundle SAVED_RESEARCH_DIR [--patch-bundle SAVED_PATCH_DIR]',
   'Output bundles include originals, analyzer source, SHA256SUMS.txt, normalized evidence and the session manifest.',
 ].join('\n');
@@ -160,6 +178,22 @@ async function main() {
       pid: rawPid === undefined ? null : Number(rawPid),
     });
     if (opts['--out']) result = { ...result, receipt: await savePhysicalReceipt(result, opts['--out']) };
+  } else if (command === 'witness') {
+    const rawPid = opts['--pid'];
+    if (!rawPid || !/^[1-9][0-9]*$/.test(rawPid)) {
+      throw new ResearchError('INVALID_PID', 'Witness requires a positive explicit decimal RIFT PID.');
+    }
+    result = await captureLiveWitness({
+      expectedHost: opts['--expect-host'],
+      pid: Number(rawPid),
+      expectedStartTicks: opts['--expect-start-ticks'],
+      expectedExeSha256: opts['--expect-sha'],
+      telemetryExecutable: opts['--telemetry-exe'],
+      telemetrySha256: opts['--expect-telemetry-sha'],
+      outputDir: opts['--out'],
+    });
+  } else if (command === 'verify-witness') {
+    result = await verifyLiveWitness(opts['--bundle']);
   } else if (command === 'audit') {
     result = await auditArchivedCompatibility({
       physicalBundleDir: opts['--physical-bundle'],

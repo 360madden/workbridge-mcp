@@ -1,10 +1,10 @@
-# RIFT Research Companion — offline research and read-only physical identity
+# RIFT Research Companion — offline research and read-only physical witness
 
 Standalone Node.js 24+ CLI inside Workbridge-MCP. It reuses the existing RIFT Personal Teleporter Python position analyzer and reads **saved** Telemetry JSON/JSONL. Optional archived RiftReader2 and RRECollector evidence can join the same research package, without building another native reader, addon, debugger or input controller.
 
 The coordinated offline research session identifies an **on-disk** AMD64 PE32+ executable, imports historical telemetry, replays an offline position track, and saves exact inputs, original analyzer results, normalized evidence, executable identity, hashes and verification artifacts.
 
-This tool never attaches to RIFT, sends input, reads live process memory, changes game files, contacts any API, or asserts that coordinate discontinuities prove teleportation.
+Offline archived-session commands never contact a running game. Explicit `physical`/`witness` commands inspect read-only Windows process identity and invoke the existing guarded, native-only Telemetry CLI. They do not send input or write game memory; a compatible Telemetry reader may open read-only process handles. No coordinate discontinuity is treated as proof of teleportation.
 
 ## Prerequisites
 
@@ -155,5 +155,20 @@ node .\src\cli.mjs audit --physical-bundle 'C:\work\workbridge-mcp\.tools\rift-p
 The focused compatibility tests cover mismatched builds, same-build/different-epoch, exact-match-without-freshness, old bundles without extra archives, genuine RRE patch reports, tampered sources and missing inputs. No game access or new runtime dependency is needed.
 
 Next gates: independently correlating **fresh** RR2/Telemetry data to a current verified physical process epoch, then screenshot/debugger receipt correlation and targeted Ghidra analysis. No input or memory writes are part of this milestone.
+
+## M6a — Live RIFT/Telemetry read-only witness (November 21, 2026)
+
+The new `witness` and `verify-witness` commands bracket one existing Telemetry v0.5.0 **native-only** snapshot with two independently checked RIFT PID/start-ticks/executable/HWND observations. Both the current game executable and Telemetry CLI executable must be SHA-pinned; each live witness uses an exact selected PID and decimal process-start ticks (never a rounded JavaScript number). No client input or game-memory writes are sent.
+
+**Actual current result:** RIFT PID `34596`, ticks `639308249563595623`, HWND `658476`, executable hash `df954b798331e18359be62a31cc74b49fc3f50b87385ebb080a5448256322c01`. Telemetry identifies the build as **unsupported**, returning source `unavailable` and null player/target details. Two completed and independently verified packages were captured under ignored `.tools`:
+
+- `wb-rift001-m6-live-witness-20261121-01` (1,480 ms capture).
+- `wb-rift001-m6-live-witness-sealed-20261121-02` (1,367 ms, executed by the **sealed** runtime).
+
+The witness package preserves raw native-only JSON and before/after saved physical receipts. `sourceEpochBound=false` and `livePlayerTelemetryVerified=false` are compulsory because Telemetry 0.5.0 provides **no exact PID/start-ticks provenance in its sample** and the native reader does not support this build.
+
+A real sealed-runtime bug was also corrected: `physical-epoch.mjs` previously imported `scripts/desktop-ui.mjs` by a relative path that did not exist under `dist`. The official desktop helper is now staged byte-for-byte as `research-runtime/support/desktop-ui.mjs`; the physical collector resolves the proper reviewed helper for source and sealed layouts. The isolated **25-file** runtime executed `physical`, `witness` and `verify-witness` successfully. **M6b still requires exact-build Telemetry native requalification** before any live numeric fields can be trusted.
+
+For the pinned example commands, evidence inventory, capture timing and test details, see [M6a live-witness report](../../docs/wb-rift-001-m6-live-witness-20261121.md). The example PID/start ticks expire after a RIFT restart; re-run `physical` before attempting a new witness.
 
 See [the full RIFT RE integration roadmap](../../docs/rift-re-integration-roadmap-20261120.md).

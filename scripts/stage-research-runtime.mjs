@@ -28,11 +28,13 @@ export const RESEARCH_RUNTIME_FILES = Object.freeze([
   'rift/src/compatibility.mjs',
   'rift/src/experiment.mjs',
   'rift/src/identity.mjs',
+  'rift/src/live-witness.mjs',
   'rift/src/patch-drift.mjs',
   'rift/src/physical-epoch.mjs',
   'rift/src/physical-receipt.mjs',
   'rift/src/records.mjs',
   'rift/src/workspace-path.mjs',
+  'support/desktop-ui.mjs',
 ]);
 export const RESEARCH_RUNTIME_MANIFEST = 'research-runtime-manifest.json';
 const MAX_SOURCE_BYTES = 1024 * 1024;
@@ -150,7 +152,12 @@ export async function stageResearchRuntime({
   const contents = [];
   for (const rel of RESEARCH_RUNTIME_FILES) {
     const split = rel.split('/');
-    const file = path.join(source, ...split);
+    // Reuse the authoritative Workbridge WinApp helper byte-for-byte.
+    // This is the only file whose source lives outside integrations/.
+    const file =
+      rel === 'support/desktop-ui.mjs'
+        ? path.join(root, 'scripts', 'desktop-ui.mjs')
+        : path.join(source, ...split);
     const data = await regular(file);
     files.push({ path: rel, sha256: data.sha256, bytes: data.bytes.length });
     contents.push(data.bytes);

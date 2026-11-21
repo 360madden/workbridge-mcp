@@ -16,3 +16,10 @@ export function riftProjectsRoot(moduleUrl, envRoot = process.env.WORKBRIDGE_ROO
   // Sealed runtime:  C:\work\workbridge-mcp\dist\research-runtime\rift\src => 5 up.
   return resolve(src, packaged ? '../../../../..' : '../../../..');
 }
+
+/** Resolve the ONE reviewed WinApp bridge from source or sealed runtime. */
+export function desktopUiHelperUrl(moduleUrl) {
+  const pathname = dirname(fileURLToPath(moduleUrl)).replaceAll('/', '\\').toLowerCase();
+  const sealed = pathname.includes('\\research-runtime\\rift\\src');
+  return new URL(sealed ? '../../support/desktop-ui.mjs' : '../../../scripts/desktop-ui.mjs', moduleUrl);
+}

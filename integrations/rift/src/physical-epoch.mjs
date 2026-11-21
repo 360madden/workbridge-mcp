@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { hostname } from 'node:os';
 import { win32 as winPath } from 'node:path';
 import { promisify } from 'node:util';
-import { runWinapp } from '../../../scripts/desktop-ui.mjs';
+import { desktopUiHelperUrl } from './workspace-path.mjs';
 import { inspectOfflineClient, ResearchError, SHA256 } from './identity.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -197,7 +197,13 @@ export async function probeRiftProcesses() {
   }
 }
 
-export async function probeRiftWindows(runner = runWinapp) {
+async function sealedWinappRunner(args) {
+  // Reuse the same reviewed helper; sealed releases bundle its exact bytes.
+  const module = await import(desktopUiHelperUrl(import.meta.url));
+  return module.runWinapp(args);
+}
+
+export async function probeRiftWindows(runner = sealedWinappRunner) {
   try {
     const version = String(await runner(['--version']))
       .trim()
