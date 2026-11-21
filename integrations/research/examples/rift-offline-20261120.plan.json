@@ -1,0 +1,59 @@
+{
+  "schema": "workbridge.research-plan.v1",
+  "planId": "rift-archive-20261120",
+  "expectedHost": "AMD-DESKTOP",
+  "profile": "rift.offline.v1",
+  "inputs": {
+    "client": {
+      "path": "C:\\work\\RIFT-Build-Baselines\\1935a05c9db6d468e34e0055014a4a99c1b5afceb1695884e24600f5c20a4be8\\rift_x64.exe",
+      "sha256": "1935a05c9db6d468e34e0055014a4a99c1b5afceb1695884e24600f5c20a4be8"
+    },
+    "telemetry": {
+      "path": "C:\\work\\Telemetry\\artifacts\\bridge-live\\cli-snapshot.json"
+    },
+    "track": {
+      "path": "C:\\work\\Rift-Personal-Teleporter\\tests\\sample_track.jsonl"
+    },
+    "rr2": {
+      "path": "C:\\work\\riftreader2\\artifacts\\beacon-baseline-after-native.json"
+    },
+    "rre": {
+      "path": "C:\\work\\rre\\artifacts\\sc628-live-context-20261107-1533\\saved-publication.json"
+    },
+    "rreBinding": {
+      "path": "C:\\work\\rre\\artifacts\\reader-checks-12580b853ce848cfb79bf83c9166fb7a\\source-set-binding.json"
+    },
+    "afterClient": {
+      "path": "C:\\work\\RIFT-Build-Baselines\\df954b798331e18359be62a31cc74b49fc3f50b87385ebb080a5448256322c01\\rift_x64.exe",
+      "sha256": "df954b798331e18359be62a31cc74b49fc3f50b87385ebb080a5448256322c01"
+    },
+    "anchors": {
+      "path": "C:\\work\\rre\\tools\\rift_update_anchors.json"
+    },
+    "physicalReceipt": {
+      "path": "C:\\work\\workbridge-mcp\\.tools\\rift-physical-epoch-20261120-01"
+    }
+  },
+  "steps": [
+    {
+      "id": "identify",
+      "action": "rift.doctor",
+      "needs": []
+    },
+    {
+      "id": "replay",
+      "action": "rift.saved-session",
+      "needs": ["identify"]
+    },
+    {
+      "id": "patch",
+      "action": "rift.patch-compare",
+      "needs": ["identify"]
+    },
+    {
+      "id": "audit",
+      "action": "rift.compat-audit",
+      "needs": ["replay", "patch"]
+    }
+  ]
+}

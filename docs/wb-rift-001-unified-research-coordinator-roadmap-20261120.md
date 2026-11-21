@@ -167,6 +167,10 @@ Report timestamped status and actual test counts, source/owner health, error/fai
 
 ## Checkpoints
 
-- **M0 (roadmap):** pending file re-read, formatting and narrow commit.
-- **M1 (planner):** pending implementation after M0.
-- **M2+ (coordinated run and integration):** pending M1 acceptance.
+- **M0 — complete:** detailed roadmap saved in `docs/wb-rift-001-unified-research-coordinator-roadmap-20261120.md`, re-read and committed as `0b90a481212fc250a8b5f1e4448336bb37c9f0ed`. Machine verified AMD-DESKTOP; existing owner unchanged.
+- **M1 — implemented, validation PASS:** created `integrations/research/src/registry.mjs`, `plan.mjs`, `plan-file.mjs`, `cli.mjs`, versioned example plan, package metadata and 17 focused tests. Planner enforces fixed action/input schema, exact host, pinned client hashes, Windows paths, RRE source pairing, prerequisites, DAG ordering and no executable commands from plan JSON.
+  - **17/17 tests passed** using Node on AMD-DESKTOP.
+  - Actual example `plan` and `validate` CLI calls both exited 0. Preview: four steps `identify → replay → patch → audit`, SHA-256 `b416a46ec7f3cc59ab0f543fb3741d5b399ed670c355b016db75f84377aa2015` and `toolsInvoked=false`.
+  - Initial test run failed two assertions with incorrect test expectations (missing dependency precedence and valid 64-character ID boundary); corrected the test expectations, not the implementation contract.
+  - Source-only M1: no live RIFT, service restart, deployment, paid API, game input or evidence acquisition. Next: format, inspect and commit this verified slice.
+- **M2 — next:** implement registered RIFT functions and an executable offline `run`, then validate one complete archived session with a checksum-verifiable coordinator receipt. M3+ remain pending.
