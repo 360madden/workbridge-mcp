@@ -1,0 +1,172 @@
+# WB-RIFT-001 — Unified Research Coordination Master Roadmap
+
+**Created:** 2026-11-20 (America/New_York)  
+**Owner:** Workbridge-MCP / 360madden  
+**Verified machine:** AMD-DESKTOP, Workbridge `hostname.exe`, exit 0  
+**Starting HEAD:** `12effe92e9f5d3a5b0539ec182ec64b6090afc3e`; clean `main`, ahead 9  
+**Active owner:** Workbridge `0.16.5-dev`, 36 command/assignment slots; do not restart or modify live owner outside WB-001 staged update  
+**Project root:** `C:\work\workbridge-mcp`  
+**Implementation:** new generic `integrations/research/`, reusing `integrations/rift/`
+
+## Mission
+
+Make Workbridge a **reusable research coordinator**, with RIFT as the first production-like workload. One command should validate an explicit plan, invoke reviewed tools in dependency order, record which inputs/identities and artifact versions were used, distinguish failure from complete success, and preserve a hash-verifiable evidence package. Extend later to other reverse-engineering projects without copying the workflow engine.
+
+**Decision:** build and test a standalone Node 24+ research-run CLI first. It must **not** launch a second Workbridge MCP owner, duplicate RIFT native readers or increase the 36-slot limit. Expose narrow MCP operations only after offline acceptance and a staged service rollout.
+
+## Starting assets and decisions
+
+| Existing capability            | Verified behavior                                                                                                               | How to reuse                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Workbridge 0.16.5-dev          | Bounded jobs, authenticated loopback CLI, file/snapshot workflows, 36 slots                                                     | Reuse server job infrastructure at M4 rather than building another server worker scheduler |
+| RIFT companion                 | `doctor`, `session`, `patch`, `physical`, `audit` plus independent `verify` commands; 67/67 focused tests at baseline           | Use existing function contracts and exact source/receipt verification                      |
+| Telemetry and RR2              | Historic JSON/JSONL player/target observations; exact native build and process-start metadata when available                    | Typed import; never silently convert missing values into zero                              |
+| RRE                            | Retained RREC2 publication receipts and `rift_update_analyzer.py`                                                               | Reuse saved-generation decoder and pinned PE comparator, not new readers                   |
+| RPT                            | Existing Python offline position experiment                                                                                     | Reuse `teleport_analyzer.py`; discontinuity is not proof of teleport                       |
+| Real offline/physical evidence | Old hash `1935a05c…`, newer hash `df954b79…`, old RRE anchors changed in newer image, historical physical receipt for PID 34596 | Recorded acceptance examples, **not** future PID or pointer-chain authority                |
+
+## Architecture
+
+```text
+     ChatGPT / Workbridge existing authenticated MCP service
+                             |          (future M4-M5)
+                       research adapter
+                             |
+            generic standalone research coordinator
+        manifest parser — DAG validator — typed registry
+               run ledger — failure receipts — hashes
+                             |
+       +---------------------+---------------------+
+       |                     |                     |
+   RIFT doctor         RIFT saved replay      RIFT patch diff
+   build identity      Telemetry/RR2/RRE      existing RRE PE tool
+                       + RPT classifier
+       |                     |                     |
+       +---------------------+---------------------+
+                             |
+                   optional historical audit
+                             |
+                 immutable run evidence package
+
+Other repositories later add reviewed adapters to the same registry.
+```
+
+The coordinator owns ordering, provenance, error states and artifact envelopes. RR2, RRE, Telemetry and RPT remain authoritative for their own collection/parsing contracts. **No** generic shell command is accepted from user-provided plan JSON.
+
+## Planned CLI v1
+
+- `node integrations/research/src/cli.mjs validate --plan FILE`: strict schema and DAG validation; no tool execution or output writing.
+- `node integrations/research/src/cli.mjs plan --plan FILE`: deterministic dependency order, declared inputs and outputs; read-only.
+- `node integrations/research/src/cli.mjs run --plan FILE --out NEW_DIR`: run only pre-registered adapter actions and write a complete or explicitly failed run package.
+- `node integrations/research/src/cli.mjs verify --bundle DIR`: independently check manifest, ledger and final hashes. No game or tool interaction.
+- Later `inspect`, `resume`, `cancel` and supervised live runs require separate recovery and concurrency tests.
+
+### Research plan v1 — intended shape
+
+```json
+{
+  "schema": "workbridge.research-plan.v1",
+  "planId": "rift-archival-demo",
+  "expectedHost": "AMD-DESKTOP",
+  "profile": "rift.offline.v1",
+  "inputs": {
+    "client": { "path": "C:\\work\\...\\rift_x64.exe", "sha256": "<64-hex>" },
+    "telemetry": { "path": "C:\\work\\Telemetry\\...\\snapshot.json" },
+    "track": { "path": "C:\\work\\Rift-Personal-Teleporter\\...\\track.jsonl" },
+    "rr2": { "path": "C:\\work\\riftreader2\\...\\native.json" },
+    "rre": { "path": "C:\\work\\rre\\...\\saved-publication.json" },
+    "rreBinding": { "path": "C:\\work\\rre\\...\\source-binding.json" },
+    "afterClient": { "path": "C:\\work\\...\\new_rift_x64.exe", "sha256": "<64-hex>" },
+    "anchors": { "path": "C:\\work\\rre\\tools\\rift_update_anchors.json" },
+    "physicalReceipt": { "path": "C:\\work\\workbridge-mcp\\.tools\\..." }
+  },
+  "steps": [
+    { "id": "identify", "action": "rift.doctor", "needs": [] },
+    { "id": "replay", "action": "rift.saved-session", "needs": ["identify"] },
+    { "id": "patch", "action": "rift.patch-compare", "needs": ["identify"] },
+    { "id": "audit", "action": "rift.compat-audit", "needs": ["replay", "patch"] }
+  ]
+}
+```
+
+This is the **target contract**, not a claim that the runner currently exists. Source requirements and action/dependency rules are validated before any run. Optional inputs require explicit step omission or a preflight refusal. Step references can resolve **only known predecessor outputs**, never arbitrary object expressions.
+
+### Run artifact contract
+
+A new ignored `.tools/research-runs/RUN_ID/` directory contains `input.plan.json` (original bytes, hash), `run-manifest.json` (schema, host, source versions, identities, outcomes), `run-ledger.jsonl` (ordered transitions), and `steps/STEP_ID/` (existing child evidence packages). `SHA256SUMS.txt` is the final success marker, written only after all prior artifacts are complete. The coordinator does not copy whole game executables. A failed or interrupted run preserves prior evidence and clear failure status without asserting completion or blindly retrying.
+
+## Development milestones and acceptance gates
+
+| Milestone | Priority | Deliverable                                                               | Acceptance                                                                                                                                                                                            |
+| --------- | -------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M0**    | P0       | This detailed roadmap under `docs/`                                       | File saved, re-read and committed with exact hash; active owner unchanged                                                                                                                             |
+| **M1**    | P0       | Generic manifest validator/planner and CLI under `integrations/research/` | Unknown schema/fields/actions, invalid IDs/paths/hashes, cycles, missing dependencies, duplicate IDs and excessive size/step counts rejected; deterministic order; tests PASS                         |
+| **M2**    | P0       | Typed RIFT registry adapters and sequential offline `run`                 | One command performs archived client identification, Telemetry/RR2/RRE/RPT replay, optional RRE patch compare and saved compatibility audit; original inputs unchanged; output independently verified |
+| **M3**    | P0       | Durable run ledger and failure recovery                                   | Pre/post step states; final marker only for complete run; injected failure preserves earlier steps; restart/uncertain operations never auto-retried; explicit guarded resume                          |
+| **M4**    | P0       | Narrow Workbridge MCP/local CLI facade                                    | Same typed contract and bounded results through existing job engine, no arbitrary shell input, isolated mock-owner acceptance                                                                         |
+| **M5**    | P1       | WB-001 staged runtime rollout                                             | Isolated build, tests and rollback; precise source/deployed inventory; exclusive maintenance window; no competing service owner or live `.local` writes                                               |
+| **M6**    | P1       | Fresh physical RIFT research run                                          | Fresh PID/start ticks/HWND/EXE SHA, source timestamps/gaps/build status, explicit multibox binding and evidence package; no source freshness inferred from archives                                   |
+| **M7**    | P1       | Reusable second-project adapter and optional GUI                          | Different offline RE project passes same plan/run/verify engine; CLI and UI share semantics                                                                                                           |
+| **M8**    | P2       | Benchmarks, CI and docs polish                                            | Deterministic bounded performance, reference fixtures, polished README, remote push only on instruction                                                                                               |
+
+### M1: exact implementation requirements
+
+1. Pin `workbridge.research-plan.v1` and `rift.offline.v1`, explicit hostname and finite run ID. Whitelist input roles and immutable action IDs; never accept shell commands or arbitrary executable paths as actions.
+2. Reject missing/unknown properties, invalid SHA-256, invalid path shape, repeated or missing steps, unknown actions, duplicate edges, self-dependency, cycles and excessive plan size. Validate RRE publication/binding pairing and patch input dependencies.
+3. Build an explicit DAG/topological sorter with stable ordering from the plan; refuse ambiguous action graph dependencies and duplicate action kinds.
+4. Provide `validate` and `plan` commands; they do not run the game, mutate any source or create evidence directories.
+5. Tests must prove valid manifests, invalid schema/fields, wrong host, invalid path/hash, unknown action, duplicate ID, missing dependency, cycles and deterministic output.
+
+### M2: functional end-to-end research run
+
+1. Execute existing RIFT companion **functions or fixed CLI actions** by explicit registry key, not new native memory readers or byte-decoding implementations.
+2. Preflight source paths, before/after expected SHA hashes, archive contracts and RRE binding pair. Dependencies must run in order; independent read-only operations may later run concurrently only with separate output ownership.
+3. Generate a no-clobber run directory with source and artifact hashes. Do not edit archive files, deploy addons or contact RIFT.
+4. Run with existing real archived RIFT builds, saved Telemetry snapshot, RR2/RRE receipts, and RPT position sample. Optional physical receipt is historical and is audited as such.
+5. Verify final package and reproduce result. Include negative fixtures for wrong host/build, missing data, malformed telemetry, partial tool failure and concurrent directory creation.
+
+### M3: reliability and recovery
+
+- Explicit states `planned → running → completed|failed|interrupted`, exact step attempt IDs, manifest/file hashes, preserved exit or exception codes and timestamps. Success marker is written last.
+- Recovery requires source hash and previous step receipt revalidation. Missing/ambiguous prior outcome refuses automated retry; do not reset or delete someone else's artifacts.
+- Test injected interruption, changed input between planning/execution, repeated run ID, output tampering, and incomplete checkpoint.
+
+### M4–M5: actual Workbridge upgrade
+
+- Expose narrow commands such as `research_plan`, `research_run`, `research_status` and `research_verify` only after source CLI acceptance, never unrestricted process-memory writes or arbitrary shell commands.
+- Reuse existing Workbridge command jobs, leases, timestamps, recovery/rollback, authenticated loopback CLI and existing 36-slot limits. Workbridge assignment records **do not spawn reasoning agents**.
+- Deploy through WB-001 isolated validation. Historical attempts to replace an in-use native command-host executable are not a reason to kill/restart the active owner. Hold rollout until an exclusive service maintenance gate is verified.
+
+## Policy, constraints and non-goals
+
+- **AMD-DESKTOP only** for this session. Verify actual Windows hostname first and again on any machine connector switch. LEGION and VMware are out of scope.
+- **No game input or native game-memory changes** in M0–M3. No movement, casting, UI reload, memory writes, debugger attachment, or game network protocol work.
+- **No paid/API/local model dependency:** No OpenAI API credits, Codex, OpenCode, Ollama or FreeBuff. Internal ChatGPT workers only if actually available; don't relabel Workbridge assignments as AI agents.
+- **No Workbridge service restart, production dist replacement or .local edits** until M5.
+- **No stale-source promotions:** matching executable bytes or archived PID never proves current frame, loaded pointer chain, causal cross-repo observation, independently completed teleport or server-accepted relocation.
+- **No destructive Git operations:** preserve unrelated user work, exact-file commits and source hash guards. Local commits do not equal GitHub push.
+
+## Risks and fallback
+
+| Risk                                     | Mitigation                                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Mixed executable builds or source epochs | Exact SHA and process-start ticks; preserve incompatible source verdicts                    |
+| Multibox / PID reuse                     | Fresh PID/start/HWND/EXE identity with explicit selection, never auto-rebind                |
+| RRE 64-bit ticks                         | Preserve original decimal strings; never JS doubles                                         |
+| Tool stalls or oversized output          | Bounded execution/output; M4 uses Workbridge's existing jobs                                |
+| Partial output / interrupted run         | Durable ledger, incomplete state, marker-last finalization and no blind retries             |
+| Concurrent jobs sharing files            | Exclusive output folders, source checks, one owner for shared GUI input                     |
+| Existing Workbridge EXE locked           | Standalone no-deployment source/test work; later WB-001 staged rollout                      |
+| Historical gameplay data in Git          | Keep captured data under ignored `.tools`; commit only source, tests, doc and safe fixtures |
+
+## Verification and commitment rhythm
+
+Run `node --test integrations/research/test/*.test.mjs` for the new coordinator and `node --test integrations/rift/test/*.test.mjs` if changing RIFT companion. Use pinned Prettier, `git diff --check`, exact SHA-256 preconditions and a narrow local commit per verified milestone. No GitHub push until separately directed.
+
+Report timestamped status and actual test counts, source/owner health, error/failure evidence and what remains. Make progress on the next useful unblocked milestone rather than expanding documents or worker slots unnecessarily.
+
+## Checkpoints
+
+- **M0 (roadmap):** pending file re-read, formatting and narrow commit.
+- **M1 (planner):** pending implementation after M0.
+- **M2+ (coordinated run and integration):** pending M1 acceptance.
