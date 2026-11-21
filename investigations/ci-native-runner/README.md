@@ -27,7 +27,9 @@ GitHub diagnostic run [44917406367](https://github.com/360madden/workbridge-mcp/
 
 The second diagnostic run [44917842813](https://github.com/360madden/workbridge-mcp/actions/runs/44917842813) verified that the explicit built-in PowerShell module import fixes the Git audit: **9/9 tests passed** on Node 24. The archive helper yielded `PRIVATE_OWNER_INVALID` on the default `D:` runner temp even after a separate temporary-only `SetOwner` attempt; no production archive check was changed.
 
-The next diagnostic variant independently creates an owner-restricted synthetic archive directory under the runner profile's canonical `LOCALAPPDATA\\Temp` path, usually on the system volume. It changes neither the active job's temporary directory nor the production helper; any difference will isolate the filesystem or runner-volume factor. A successful temporary-only repair would not authorize weaker production ownership validation.
+A third diagnostic run [44918138202](https://github.com/360madden/workbridge-mcp/actions/runs/44918138202) showed the same `PRIVATE_OWNER_INVALID` on the profile's canonical `LOCALAPPDATA\\Temp` volume, as on the default `D:` volume. The original problem is therefore not limited to the default temporary volume.
+
+A fourth temporary-only variant separately compares the current user's SID with Windows' token default-owner SID: it retains the strictly limited **current user + SYSTEM** DACL but creates and verifies the directory with the token-owner identity. This is still just a disposable test of an OS ownership hypothesis; it neither changes production code nor makes a GitHub workflow's green diagnostic outcome into a release acceptance receipt.
 
 ## Running
 

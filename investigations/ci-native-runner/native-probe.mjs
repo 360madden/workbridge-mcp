@@ -77,15 +77,30 @@ function gitAuditProbe() {
   };
 }
 
-async function archivePrivateHelperProbe(attemptOwnerRepair = false, fixtureRoot = root) {
-  const directory = path.join(fixtureRoot, attemptOwnerRepair ? 'archive-private-repair' : 'archive-private');
+async function archivePrivateHelperProbe(
+  attemptOwnerRepair = false,
+  fixtureRoot = root,
+  useTokenOwner = false,
+) {
+  const directory = path.join(
+    fixtureRoot,
+    useTokenOwner
+      ? 'archive-private-tokenowner'
+      : attemptOwnerRepair
+        ? 'archive-private-repair'
+        : 'archive-private',
+  );
   const input = source('Job-Archive-Private.ps1');
   const original = "} catch { [Console]::Error.WriteLine('PRIVATE_DIRECTORY_FAILED');exit 1 }";
   const diagnostic =
     "} catch { $known=@('PRIVATE_OWNER_INVALID','PRIVATE_ACL_INVALID','PRIVATE_DIRECTORY_PIN_FAILED','INVALID_PRIVATE_ITEM');$label=if($_.Exception.Message -in $known){$_.Exception.Message}else{$_.Exception.GetType().Name};[Console]::Error.WriteLine('PRIVATE_DIRECTORY_DIAG_' + $label + '_L' + $_.InvocationInfo.ScriptLineNumber);exit 1 }";
   const helperPath = path.join(
     fixtureRoot,
-    attemptOwnerRepair ? 'Job-Archive-Private.repair.ps1' : 'Job-Archive-Private.probe.ps1',
+    useTokenOwner
+      ? 'Job-Archive-Private.tokenowner.ps1'
+      : attemptOwnerRepair
+        ? 'Job-Archive-Private.repair.ps1'
+        : 'Job-Archive-Private.probe.ps1',
   );
   let helper = replaceExactlyOnce(input, original, diagnostic, 'PRIVATE_SOURCE_CHANGED');
   if (attemptOwnerRepair) {
@@ -95,6 +110,20 @@ async function archivePrivateHelperProbe(attemptOwnerRepair = false, fixtureRoot
       before +
       "\n  if($Mode -eq 'Create') { $ownerAcl=[IO.Directory]::GetAccessControl($Directory);if($ownerAcl.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value){$ownerAcl.SetOwner($sid);[IO.Directory]::SetAccessControl($Directory,$ownerAcl)} }";
     helper = replaceExactlyOnce(helper, before, after, 'OWNER_REPAIR_MARKER_MISSING');
+  }
+  if (useTokenOwner) {
+    const assignment = '$acl.SetOwner($sid);$acl.SetAccessRuleProtection($true,$false)';
+    const ownerAssignment =
+      "$owner=[Security.Principal.WindowsIdentity]::GetCurrent().Owner;if($null -eq $owner){throw 'TOKEN_OWNER_UNAVAILABLE'};$acl.SetOwner($owner);$acl.SetAccessRuleProtection($true,$false)";
+    helper = replaceExactlyOnce(helper, assignment, ownerAssignment, 'TOKEN_OWNER_ASSIGNMENT_MISSING');
+    const ownerCheck =
+      "if($current.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { throw 'PRIVATE_OWNER_INVALID' }";
+    helper = replaceExactlyOnce(
+      helper,
+      ownerCheck,
+      ownerCheck.replace('$sid.Value', '$owner.Value'),
+      'TOKEN_OWNER_CHECK_MISSING',
+    );
   }
   writeFileSync(helperPath, helper);
   const powershell = path.join(
@@ -167,6 +196,7 @@ async function archivePrivateHelperProbe(attemptOwnerRepair = false, fixtureRoot
   lines.close();
   return {
     attemptOwnerRepair,
+    useTokenOwner,
     ready,
     verified,
     unexpectedOutput,
@@ -194,6 +224,7 @@ async function main() {
       git: gitAuditProbe(),
       archive: await archivePrivateHelperProbe(),
       archiveOwnerRepair: await archivePrivateHelperProbe(true),
+      archiveTokenOwner: await archivePrivateHelperProbe(false, root, true),
       profileVolumeArchive: { available: false },
     };
     let profileRoot = null;
