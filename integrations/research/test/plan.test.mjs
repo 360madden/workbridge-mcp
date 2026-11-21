@@ -248,7 +248,7 @@ test('CLI reads exact plan bytes and supplies stable source SHA-256', async (t) 
 
 test('CLI help does not read source files or run jobs', async () => {
   const result = await main(['help']);
-  assert.match(result, /research-run planner/);
+  assert.match(result, /research coordinator/);
 });
 
 test('CLI refuses missing and unsupported options', async () => {
