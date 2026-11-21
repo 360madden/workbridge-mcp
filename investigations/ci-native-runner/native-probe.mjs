@@ -115,15 +115,26 @@ async function archivePrivateHelperProbe(
     const assignment = '$acl.SetOwner($sid);$acl.SetAccessRuleProtection($true,$false)';
     const ownerAssignment =
       "$owner=[Security.Principal.WindowsIdentity]::GetCurrent().Owner;if($null -eq $owner){throw 'TOKEN_OWNER_UNAVAILABLE'};$acl.SetOwner($owner);$acl.SetAccessRuleProtection($true,$false)";
-    helper = replaceExactlyOnce(helper, assignment, ownerAssignment, 'TOKEN_OWNER_ASSIGNMENT_MISSING');
     const ownerCheck =
       "if($current.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { throw 'PRIVATE_OWNER_INVALID' }";
-    helper = replaceExactlyOnce(
-      helper,
-      ownerCheck,
-      ownerCheck.replace('$sid.Value', '$owner.Value'),
-      'TOKEN_OWNER_CHECK_MISSING',
-    );
+    if (helper.includes(assignment)) {
+      helper = replaceExactlyOnce(helper, assignment, ownerAssignment, 'TOKEN_OWNER_ASSIGNMENT_MISSING');
+      helper = replaceExactlyOnce(
+        helper,
+        ownerCheck,
+        ownerCheck.replace('$sid.Value', '$owner.Value'),
+        'TOKEN_OWNER_CHECK_MISSING',
+      );
+    } else {
+      // Current production source already uses token ownership. Require the
+      // exact pairing rather than silently accepting an unrelated owner route.
+      if (
+        !helper.includes('$owner=$identity.Owner') ||
+        !helper.includes('$acl.SetOwner($owner);$acl.SetAccessRuleProtection($true,$false)') ||
+        !helper.includes(ownerCheck.replace('$sid.Value', '$owner.Value'))
+      )
+        throw new Error('TOKEN_OWNER_SOURCE_CHANGED');
+    }
   }
   writeFileSync(helperPath, helper);
   const powershell = path.join(

@@ -43,7 +43,7 @@ GitHub diagnostic run [44918576629](https://github.com/360madden/workbridge-mcp/
 
 The concrete production correction is to use the process identity's `Owner` SID both when constructing the directory owner and when checking owners of the newly created archive directory/files. Its access rules still grant exactly two SIDs: the process's **User** and SYSTEM. The existing no-inherited-ACL, link, directory, and file checks remain enforced. The updated regression checks both directory/file ownership against the token owner and the exact current-user/SYSTEM allowlist. This fixes different Windows token-owner defaults without suppressing the existing ownership check.
 
-The validated WB-001 candidate `...-007` predates this correction. A new sealed candidate and independently green GitHub core suite are required before any activation.
+The production correction was committed as `034022c`. The reusable diagnostic recognizes both the historical helper and this exact corrected owner route, refusing unknown source structures instead of silently bypassing a check. The new isolated WB-001 candidate `...-008` is undergoing validation from `034022c`; final GitHub CI acceptance and a separately authorized Workbridge-only maintenance window remain required before activation.
 
 ## Running
 
