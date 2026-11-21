@@ -79,6 +79,39 @@ Limits: <=1 GiB on-disk executable; <=4 MiB per saved telemetry/track/archive fi
 - Both archives report the same archived executable SHA-256, but RR2's PID `40452` differs from RRE's PID `9752`, and start epochs differ. The combined manifest reports `different_declared_epoch` and never fuses their XYZ values into a shared track.
 - The expanded, checksum-verified **nine-artifact** package is `C:\work\workbridge-mcp\.tools\rift-research-session-20261120-rr2-rre-01`. Its Telemetry record and RPT sample track are from other times. No live RIFT client, VMware lab, network transport, or paid model was contacted.
 
-Next gates: integrate RRE's existing static PE patch-drift analyzer, then develop a separately guarded live process identity collector and later screenshot/debugger evidence correlation.
+## Offline executable patch-drift workflow
+
+The `patch` CLI command **invokes** the existing RRE Python PE update analyzer. It does not duplicate Ghidra, disassemble an entire file, open a live game process or restore memory offsets.
+
+In **PowerShell 7**, from `C:\work\workbridge-mcp\integrations\rift`:
+
+```powershell
+$before = 'C:\work\RIFT-Build-Baselines\1935a05c9db6d468e34e0055014a4a99c1b5afceb1695884e24600f5c20a4be8\rift_x64.exe'
+$after = 'C:\work\RIFT-Build-Baselines\df954b798331e18359be62a31cc74b49fc3f50b87385ebb080a5448256322c01\rift_x64.exe'
+$out = "C:\work\workbridge-mcp\.tools\rift-patch-$(Get-Date -Format yyyyMMdd-HHmmss)"
+
+node .\src\cli.mjs patch `
+  --before $before `
+  --after $after `
+  --out $out `
+  --expect-host AMD-DESKTOP `
+  --expected-before-sha 1935a05c9db6d468e34e0055014a4a99c1b5afceb1695884e24600f5c20a4be8 `
+  --expected-after-sha df954b798331e18359be62a31cc74b49fc3f50b87385ebb080a5448256322c01 `
+  --anchors 'C:\work\rre\tools\rift_update_anchors.json'
+
+node .\src\cli.mjs verify-patch --bundle $out
+```
+
+The companion pins the selected old and new on-disk PE hashes and archives a reproducible, self-checking comparison package. RRE's comparator independently checks the original bytes and declared anchor signatures; it reports exit code `2` for a **CHANGED** executable. The wrapper accepts that as a successful _analysis result_; unrelated errors fail. It then preserves `report.json`, `report.md`, `analyzer-source.py`, optional `anchors.source`, `patch-manifest.json` and `SHA256SUMS.txt` under a never-overwritten directory. A separately invoked `verify-patch` validates the stored bytes and report/manifest consistency.
+
+A `MATCH` means the compared files have matching bytes; it does not prove the current process or any pointer chain. `CHANGED` invalidates old-build conclusions until individually requalified; a different byte sequence at the same RVA does not locate the moved function.
+
+### Saved executable acceptance — November 20, 2026
+
+Two genuine **archived** `rift_x64.exe` files (SHA-256 prefixes `1935a05c` and `df954b79`) were compared without contacting the running game. RRE reported `CHANGED`: seven PE sections changed by bytes/layout, including 608 changed 64-KiB comparison blocks in `.text` and 152 in `.rdata`. Four SHA-bound ROOT-001 byte anchors **all differed at their historical RVAs**. No relocated-function identity or native pointer was qualified.
+
+The archive is `C:\work\workbridge-mcp\.tools\rift-pe-drift-20261120-01`; its five saved artifacts independently verified. After this implementation, the companion's three suites passed **34/34 focused tests** (baseline offline sessions, RR2/RRE archived evidence and patch drift). No new dependencies, Workbridge restart, physical RIFT action or VMware access was needed.
+
+Next gates: a separately guarded live process identity collector, then screenshot/debugger receipt correlation and targeted Ghidra analysis.
 
 See [the full RIFT RE integration roadmap](../../docs/rift-re-integration-roadmap-20261120.md).

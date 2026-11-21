@@ -122,6 +122,17 @@ A local XYZ change, native memory write acknowledgement or matching HUD location
 
 **Reprioritized next step:** add a narrow offline patch-drift adapter that invokes the already maintained RRE PE section/anchor comparator, then revisit live process-epoch inventory and debugger-trace correlation.
 
+## Implementation checkpoint — November 20, 2026, 10:59 PM ET
+
+**Offline Slice C: pinned executable patch-drift orchestration implemented.** The companion's `patch`/`verify-patch` commands reuse the unchanged RRE `tools/rift_update_analyzer.py` comparator and optional `rift_update_anchors.json`, adding strict preflight, input revalidation, a saved RRE source copy, source-hashed report manifest, and checksum verification.
+
+- Preserved two archived AMD64 PE32+ RIFT images, SHA-256 `1935a05c9db6d468e34e0055014a4a99c1b5afceb1695884e24600f5c20a4be8` and `df954b798331e18359be62a31cc74b49fc3f50b87385ebb080a5448256322c01`. Comparison ran entirely offline; no process inspection, memory write, game input, network datastream handling, VMware activity or Workbridge service deployment.
+- RRE verdict: `CHANGED`. All seven sections had changed bytes or changed metadata/layout. Main changes: `.text` 608, `.rdata` 152, `.data` 66, `.pdata` 57, `.reloc` 35 and `.rsrc` 1 changed comparison blocks; `_RDATA` retained raw bytes but differed in layout. Four RRE ROOT-001 anchors all had different bytes at their historical RVAs. This does **not** locate moved functions; `nativeOffsetsQualified=false` remains mandatory.
+- Output archive `C:\work\workbridge-mcp\.tools\rift-pe-drift-20261120-01`: original RRE report JSON/Markdown, source analyzer, anchor manifest, patch provenance, SHA256SUMS; five archive artifacts verified.
+- Synthetic MATCH/CHANGED tests, baseline SHA mismatch, bad anchor manifest, output-no-clobber, wrong hostname and checksum tampering are covered. Total focused suite **34/34 passed** before final documentation/formatting gate; earlier offline-session bundles remain compatible.
+
+**Next work:** exact on-host physical RIFT process epoch observation, with PID, start tick, executable/module hash and HWND binding. This must be a distinct read-only data source; archived-file identity is never upgraded automatically to a live session claim.
+
 ## Sources consulted
 
 ### Local, inspected November 20

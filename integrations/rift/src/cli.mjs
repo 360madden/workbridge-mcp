@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { doctor, session, verifyBundle, DEFAULT_PYTHON } from './bundle.mjs';
 import { ResearchError } from './identity.mjs';
+import { comparePatch, verifyPatch } from './patch-drift.mjs';
 
 const allowed = new Set([
   '--client',
@@ -14,12 +15,17 @@ const allowed = new Set([
   '--rr2',
   '--rre',
   '--rre-binding',
+  '--before',
+  '--after',
+  '--expected-before-sha',
+  '--expected-after-sha',
+  '--anchors',
 ]);
 
 function parse(argv) {
   const [command, ...rest] = argv;
-  if (!['doctor', 'session', 'verify', 'help'].includes(command)) {
-    throw new ResearchError('COMMAND', 'Expected doctor, session, verify or help.');
+  if (!['doctor', 'session', 'verify', 'patch', 'verify-patch', 'help'].includes(command)) {
+    throw new ResearchError('COMMAND', 'Expected doctor, session, verify, patch, verify-patch or help.');
   }
   if (command === 'help') return { command, options: {} };
   const options = {};
@@ -49,6 +55,17 @@ function parse(argv) {
       '--rre-binding',
     ],
     verify: ['--bundle'],
+    patch: [
+      '--before',
+      '--after',
+      '--out',
+      '--expect-host',
+      '--expected-before-sha',
+      '--expected-after-sha',
+      '--python',
+      '--anchors',
+    ],
+    'verify-patch': ['--bundle'],
   };
   if (Object.keys(options).some((key) => !relevant[command].includes(key))) {
     throw new ResearchError('ARGUMENTS', 'An option does not belong to this command.');
@@ -62,6 +79,8 @@ const HELP = [
   'node src/cli.mjs session --client EXE --expect-host AMD-DESKTOP --telemetry JSON_OR_JSONL --track RPT_JSONL --out NEW_DIR [--python PYTHON_EXE] [--expect-sha SHA256]',
   'Optional session archives: --rr2 RR2_NATIVE_JSON --rre RRE_PUBLICATION_JSON --rre-binding RRE_BINDING_JSON (RRE pair required)',
   'node src/cli.mjs verify --bundle SAVED_DIR',
+  'node src/cli.mjs patch --before OLD_EXE --after NEW_EXE --out NEW_DIR --expect-host HOST --expected-before-sha SHA256 [--expected-after-sha SHA256] [--anchors RRE_JSON]',
+  'node src/cli.mjs verify-patch --bundle SAVED_PATCH_DIR',
   'Output bundles include originals, analyzer source, SHA256SUMS.txt, normalized evidence and the session manifest.',
 ].join('\n');
 
@@ -91,6 +110,21 @@ async function main() {
       rreFile: opts['--rre'] ?? null,
       rreBindingFile: opts['--rre-binding'] ?? null,
     });
+  } else if (command === 'patch') {
+    result = await comparePatch({
+      beforeFile: opts['--before'],
+      afterFile: opts['--after'],
+      outputDir: opts['--out'],
+      expectedHost: opts['--expect-host'],
+      expectedBeforeSha256: opts['--expected-before-sha'],
+      expectedAfterSha256: opts['--expected-after-sha'] ?? null,
+      anchorsFile: opts['--anchors'] ?? null,
+      python: opts['--python'] ?? DEFAULT_PYTHON,
+    });
+  } else if (command === 'verify-patch') {
+    if (!opts['--bundle'])
+      throw new ResearchError('MISSING_ARGUMENT', 'Patch verification requires --bundle.');
+    result = await verifyPatch(opts['--bundle']);
   } else {
     if (!opts['--bundle']) throw new ResearchError('MISSING_ARGUMENT', 'Verify requires --bundle.');
     result = await verifyBundle(opts['--bundle']);
