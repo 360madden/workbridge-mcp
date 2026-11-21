@@ -30,6 +30,7 @@ import { snapshotManifest } from './snapshot-manifest.js';
 import { readRoots } from './roots-config.js';
 import { startLocalService } from './local-service.js';
 import { registerDesktopTools } from './desktop-registration.js';
+import { registerResearchTools } from './research-registration.js';
 import { gamePlayerListWindows } from './game-player.js';
 
 const version = '0.16.5-dev';
@@ -883,6 +884,9 @@ async function main() {
     // Explicit opt-in GUI-006 MCP surface. It uses the existing guarded scripts;
     // live owners and VMware guests are not started or modified during registration.
     registerDesktopTools(server);
+    // WB-RIFT-001 M4 source-only facade. All research commands reuse Jobs;
+    // deployment is gated separately by WB-001 staged acceptance/rollback.
+    registerResearchTools(server, { workspace, jobs, isClosing: () => shuttingDown });
     return server;
   }
   const server = createServer();

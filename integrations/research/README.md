@@ -96,8 +96,25 @@ All actual gameplay archives and research runs stay under ignored \`.tools\`; Gi
 - **12/12 M3 recovery tests passed**, including two additional cases for a rewritten but semantically contradictory recovery claim and a saved input changing during resume. Final suites: **40/40 coordinator**, **67/67 RIFT**, **107/107 combined**; Prettier and Git whitespace checks passed. The local commit is recorded in Git history.
 - No Workbridge restart, live RIFT game action, memory access, VM use or paid model call was required.
 
+## M4 source-only MCP facade (not deployed)
+
+The new TypeScript module `src/research-registration.ts` registers four typed research MCP operations using Workbridge's **existing Jobs.terminal** engine.
+
+| MCP operation     | Function                                                                     |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `research_plan`   | Launch a bounded job for the reviewed planner                                |
+| `research_run`    | Launch the fixed offline runner, restricted to `.tools/research-runs/RUN_ID` |
+| `research_status` | Check a scoped existing Workbridge job, without retry                        |
+| `research_verify` | Launch a bounded job to verify saved artifacts without executing research    |
+
+File arguments are validated against configured Workbridge roots. Run IDs are bounded, and job admission and request-ID replay protection reuse the existing 36-slot job system. Callers can poll the returned ID with `command_status` and `command_output`. Plan JSON cannot provide an arbitrary executable.
+
+**Source-only acceptance:** TypeScript strict no-emit passed; an isolated compiled candidate under `.tools/research-m4-isolated-dist` passed without altering the live `dist`. The fake-owner suite `test/research-facade.test.mjs` passed **7/7** checks for fixed commands, invalid run IDs, scoped outputs, job ownership, shutdown and tool registration.
+
+**Deployment HOLD:** the current `0.16.5-dev` owner has not loaded these tools. M5 requires a WB-001 staged release/rollback and independent live registration proof before announcing these tools as available. No in-use native command host was replaced and no second Workbridge server was started.
+
 ## Next roadmap work
 
-**M4:** expose only typed \`research_plan\`, \`research_run\`, \`research_status\` and \`research_verify\` operations through Workbridge's existing authenticated MCP/local CLI/job infrastructure. Follow **M5 / WB-001 staged release and rollback** before replacing any in-use executable or service. Only afterward consider fresh PID-bound RIFT telemetry (M6) and non-RIFT adapter pilots (M7).
+**M5:** stage an isolated Workbridge release candidate and verify rollback before any live owner update. Do not treat source-only MCP registration as deployed. Fresh RIFT telemetry (M6) and the non-RIFT adapter pilot (M7) remain separate follow-up gates.
 
 [WB-RIFT-001 master roadmap](../../docs/wb-rift-001-unified-research-coordinator-roadmap-20261120.md)
