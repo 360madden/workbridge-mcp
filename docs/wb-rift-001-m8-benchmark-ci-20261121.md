@@ -72,3 +72,13 @@ The validated M5 candidate `wb-rift001-m5-20261121-003` remains immutable, seale
 - For the next practical research step, capture a fresh, pinned build and evidence package for RIFT or Star Wrath, keeping historical comparisons separate from live behavior.
 
 [Master roadmap](wb-rift-001-unified-research-coordinator-roadmap-20261120.md) · [Star Wrath M7](wb-rift-001-m7-starwrath-20261121.md) · [M5 validated candidate](wb-rift-001-m5-sealed-release-gate-20261120.md)
+
+## Hosted CI portability correction — November 21, 2026
+
+The real GitHub Windows/Node 24 run [44919036056](https://github.com/360madden/workbridge-mcp/actions/runs/44919036056) passed the complete **core** suite (1,390 passed, zero failures, one skip), but exposed one unintended host dependency in the purportedly portable research suite: 62 research tests passed and one real RIFT doctor test failed because the clean checkout did not contain sibling `Rift-Personal-Teleporter/src/teleport_analyzer.py`.
+
+This was a **test ownership/placement defect**, not an excuse to disable or mock away the real RIFT integration. The original real-doctor case was relocated from `integrations/research/test/run.test.mjs` into `integrations/rift/test/research-doctor.test.mjs`, retaining the same synthetic PE witness, real `rift.doctor` adapter, SHA-256 assertion, read-only result and offline verification. It remains included in all full WB-001 `npm test`, `test:bounded`, and `test:serial` routes that run on AMD-DESKTOP with existing sibling projects. The hosted `integrations/research/test/*.test.mjs` glob no longer needs that external project.
+
+Focused AMD validation after relocation: **62/62 portable research tests**, **1/1 real RIFT doctor host test**, and **4/4 CI-contract tests**. The CI contract now explicitly checks that the real test is not in the portable glob and is still present in the full host suite. No implementation, addon, game client, or running Workbridge service was modified by this test reorganization.
+
+A new GitHub Actions run must independently verify the updated portable suite and sealed closure; this local correction is not a remote CI pass.

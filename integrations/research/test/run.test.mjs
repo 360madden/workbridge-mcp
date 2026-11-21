@@ -314,35 +314,3 @@ test('late verifier rejection removes only its own success marker, retaining evi
   );
   assert.equal(verificationCalls, 2);
 });
-
-test('a minimal real RIFT doctor workflow reuses existing native file identity code', async (t) => {
-  const f = await fixture(t, false);
-  const pe = Buffer.alloc(1024);
-  pe.write('MZ', 0, 'ascii');
-  pe.writeUInt32LE(0x80, 0x3c);
-  pe.write('PE\0\0', 0x80, 'ascii');
-  pe.writeUInt16LE(0x8664, 0x84);
-  pe.writeUInt16LE(1, 0x86);
-  pe.writeUInt16LE(0xf0, 0x94);
-  pe.writeUInt16LE(0x20b, 0x98);
-  const client = join(f.root, 'rift_x64.exe');
-  await writeFile(client, pe);
-  await writeFile(
-    f.planFile,
-    JSON.stringify({
-      schema: 'workbridge.research-plan.v1',
-      planId: 'rift-doctor-fixture',
-      expectedHost: HOST,
-      profile: 'rift.offline.v1',
-      inputs: { client: { path: client, sha256: sum(pe) } },
-      steps: [{ id: 'identify', action: 'rift.doctor', needs: [] }],
-    }),
-  );
-  const result = await runResearch({ planFile: f.planFile, outputDir: f.outputDir, host: HOST });
-  assert.equal(result.bundleVerified, true);
-  assert.deepEqual(result.actions, ['rift.doctor']);
-  assert.equal((await verifyResearchRun(f.outputDir)).verified, true);
-  const observed = JSON.parse(await readFile(join(f.outputDir, 'steps', 'identify', 'result.json')));
-  assert.equal(observed.result.client.sha256, sum(pe));
-  assert.equal(observed.result.gameContacted, false);
-});

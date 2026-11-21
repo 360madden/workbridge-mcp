@@ -54,3 +54,20 @@ test('benchmark and synthetic adapter tests are covered by the research CI glob'
   assert.match(star, /starwrath\.snapshot-audit/);
   assert.match(rift, /generic coordinator executes validated DAG/);
 });
+
+test('the real RIFT doctor remains in full host tests, never portable research fixtures', async () => {
+  const portable = await readFile(
+    new URL('../integrations/research/test/run.test.mjs', import.meta.url),
+    'utf8',
+  );
+  const host = await readFile(
+    new URL('../integrations/rift/test/research-doctor.test.mjs', import.meta.url),
+    'utf8',
+  );
+  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.doesNotMatch(portable, /a minimal real RIFT doctor workflow/);
+  assert.match(host, /a minimal real RIFT doctor workflow/);
+  assert.match(host, /'rift\.doctor'/);
+  for (const name of ['test', 'test:bounded', 'test:serial'])
+    assert.match(pkg.scripts[name], /integrations\/rift\/test\/\*\.test\.mjs/, name);
+});
