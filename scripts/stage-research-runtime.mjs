@@ -118,7 +118,11 @@ export async function verifyResearchRuntime({
     manifest.files.length !== RESEARCH_RUNTIME_FILES.length ||
     manifest.files.some(
       (entry, index) =>
+        entry === null ||
+        typeof entry !== 'object' ||
+        Array.isArray(entry) ||
         entry.path !== RESEARCH_RUNTIME_FILES[index] ||
+        typeof entry.sha256 !== 'string' ||
         !/^[a-f0-9]{64}$/.test(entry.sha256) ||
         !Number.isSafeInteger(entry.bytes) ||
         entry.bytes < 1 ||
