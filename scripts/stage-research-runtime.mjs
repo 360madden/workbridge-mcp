@@ -206,20 +206,35 @@ export async function stageResearchRuntime({
   return { status: 'staged', ...verified };
 }
 
-const rootArg = process.argv.indexOf('--repo-root');
-const check = process.argv.includes('--verify');
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (rootArg >= 0 && (!process.argv[rootArg + 1] || rootArg + 2 !== process.argv.length)) {
-    process.stderr.write('{"code":"RESEARCH_STAGE_ARGUMENTS"}\n');
-    process.exitCode = 2;
-  } else {
-    const root = rootArg >= 0 ? process.argv[rootArg + 1] : undefined;
-    const opts = root ? { repoRoot: root } : {};
-    (check ? verifyResearchRuntime(opts) : stageResearchRuntime(opts))
-      .then((value) => process.stdout.write(JSON.stringify(value) + '\n'))
-      .catch((error) => {
-        process.stderr.write(JSON.stringify({ code: error.code || 'RESEARCH_STAGE_FAILED' }) + '\n');
-        process.exitCode = 2;
-      });
+// Parse before touching the runtime: a misspelled verification flag must not
+// silently select the default staging operation and overwrite staged files.
+function parseCliArgs(args) {
+  let verify = false;
+  let repoRoot;
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === '--verify' && !verify) {
+      verify = true;
+    } else if (arg === '--repo-root' && repoRoot === undefined) {
+      const value = args[++index];
+      if (!value || value.startsWith('-')) reject('RESEARCH_STAGE_ARGUMENTS');
+      repoRoot = value;
+    } else {
+      reject('RESEARCH_STAGE_ARGUMENTS');
+    }
   }
+  return { verify, opts: repoRoot === undefined ? {} : { repoRoot } };
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  Promise.resolve()
+    .then(() => {
+      const { verify, opts } = parseCliArgs(process.argv.slice(2));
+      return verify ? verifyResearchRuntime(opts) : stageResearchRuntime(opts);
+    })
+    .then((value) => process.stdout.write(JSON.stringify(value) + '\n'))
+    .catch((error) => {
+      process.stderr.write(JSON.stringify({ code: error.code || 'RESEARCH_STAGE_FAILED' }) + '\n');
+      process.exitCode = 2;
+    });
 }
