@@ -4,8 +4,7 @@
 // NOT from mutable integrations source after the release is applied.
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
-import { existsSync } from 'node:fs';
-import { lstat, mkdir, open, readFile, unlink, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, open, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -99,6 +98,41 @@ function directoryIn(root, input) {
   return resolved;
 }
 
+// Check existing destination entries without creating directories or removing the
+// old manifest. Missing entries are expected during first builds and recovery.
+async function statIfPresent(file) {
+  return lstat(file).catch((error) => {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  });
+}
+
+async function destinationFile(file) {
+  const info = await statIfPresent(file);
+  if (info && (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1))
+    reject('RESEARCH_STAGE_UNSAFE_DESTINATION');
+  return info;
+}
+
+async function preflightDestination(root, target) {
+  // Check directories below the caller-selected repository root, including
+  // intermediate junctions. A valid leaf alone does not establish containment.
+  const checked = new Set();
+  for (const rel of [RESEARCH_RUNTIME_MANIFEST, ...RESEARCH_RUNTIME_FILES]) {
+    const file = path.join(target, ...rel.split('/'));
+    let current = root;
+    for (const segment of path.relative(root, path.dirname(file)).split(path.sep)) {
+      current = path.join(current, segment);
+      if (checked.has(current)) continue;
+      const info = await statIfPresent(current);
+      if (info && (!info.isDirectory() || info.isSymbolicLink()))
+        reject('RESEARCH_STAGE_UNSAFE_DESTINATION');
+      checked.add(current);
+    }
+    await destinationFile(file);
+  }
+}
+
 export async function verifyResearchRuntime({
   repoRoot = fileURLToPath(new URL('..', import.meta.url)),
   destination = path.join(repoRoot, 'dist', 'research-runtime'),
@@ -167,7 +201,8 @@ export async function stageResearchRuntime({
     contents.push(data.bytes);
   }
   const manifestBytes = Buffer.from(JSON.stringify({ schemaVersion: 1, files }, null, 2) + '\n');
-  if (existsSync(path.join(target, RESEARCH_RUNTIME_MANIFEST))) {
+  await preflightDestination(root, target);
+  if (await statIfPresent(path.join(target, RESEARCH_RUNTIME_MANIFEST))) {
     try {
       const existing = await verifyResearchRuntime({ repoRoot: root, destination: target });
       if (existing.manifestSha256 === hash(manifestBytes)) {
@@ -187,12 +222,12 @@ export async function stageResearchRuntime({
   for (let index = 0; index < RESEARCH_RUNTIME_FILES.length; index++) {
     const file = path.join(target, ...RESEARCH_RUNTIME_FILES[index].split('/'));
     await mkdir(path.dirname(file), { recursive: true });
-    const old = await lstat(file).catch((error) => {
-      if (error?.code === 'ENOENT') return null;
-      throw error;
-    });
-    if (old && (!old.isFile() || old.isSymbolicLink() || old.nlink !== 1)) {
-      reject('RESEARCH_STAGE_UNSAFE_DESTINATION');
+    const old = await destinationFile(file);
+    // Recovery is idempotent: retain already-correct files after an interrupted
+    // build, but never trust file length alone or skip final manifest verification.
+    if (old?.size === files[index].bytes) {
+      const saved = await regular(file);
+      if (saved.sha256 === files[index].sha256) continue;
     }
     await writeFile(file, contents[index], { flag: old ? 'w' : 'wx' });
     const check = await regular(file);
