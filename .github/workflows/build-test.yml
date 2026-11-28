@@ -2,7 +2,8 @@ name: Build and Test
 
 on:
   push:
-    branches: [main]
+    # Explicit CI branches can validate a checkpoint before a PR is available.
+    branches: [main, 'ci/**']
     paths:
       - 'src/**'
       - 'test/**'
