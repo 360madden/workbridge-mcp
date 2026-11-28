@@ -31,7 +31,7 @@ test('GitHub Windows CI includes research changes and exercises portable two-pro
   assert.doesNotMatch(workflow, /node --test(?: --test-concurrency=\d+)? test\/\*\.test\.mjs/);
   assert.match(workflow, /node --test integrations\/research\/test\/\*\.test\.mjs/);
   assert.match(workflow, /stage-research-runtime\.mjs --verify --repo-root \./);
-  assert.match(workflow, /WB-001 runs/);
+  // Verify executable CI configuration, not a prose comment.
   // Hosted CI cannot substitute for the full host-specific release gate.
   assert.doesNotMatch(workflow, /run: npm test\b/);
 });
@@ -75,4 +75,19 @@ test('the real RIFT doctor remains in full host tests, never portable research f
   assert.match(host, /'rift\.doctor'/);
   for (const name of ['test', 'test:bounded', 'test:serial'])
     assert.match(pkg.scripts[name], /integrations\/rift\/test\/\*\.test\.mjs/, name);
+});
+
+test('RIFT synthetic CI is independent of core builds and uses an explicit hosted partition', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/build-test.yml', import.meta.url), 'utf8');
+  // Inspect the top-level job block only, so a similarly named step in another
+  // job cannot accidentally satisfy this contract.
+  const job = /^  rift-offline:\s*\r?\n([\s\S]*?)(?=^  [\w-]+:\s*\r?$|(?![\s\S]))/m.exec(workflow)?.[1];
+  assert.ok(job, 'dedicated RIFT offline job is missing');
+  assert.match(job, /^    runs-on: windows-2025\s*$/m);
+  assert.match(job, /node-version: '24'/);
+  assert.match(job, /run: node --test test\/ci-rift-test-runner\.test\.mjs/);
+  assert.match(job, /run: node scripts\/ci-rift-test-runner\.mjs hosted/);
+  assert.doesNotMatch(job, /^    (?:needs|if):/m);
+  assert.doesNotMatch(job, /run: (?:npm ci|npm run build|npm test)\b/);
+  assert.doesNotMatch(job, /integrations\/rift\/test\/\*\.test\.mjs/);
 });

@@ -54,8 +54,8 @@ jobs:
         shell: pwsh
         run: node -e "const os=require('node:os'),fs=require('node:fs'),path=require('node:path');const declared=path.resolve(os.tmpdir());const canonical=fs.realpathSync.native(declared);if(declared.toLowerCase()!==canonical.toLowerCase())throw new Error('CI_TEMP_ALIAS_MISMATCH')"
       # The two runner partitions cover every test/*.test.mjs file exactly once.
-      # Host-dependent RIFT tests remain unchanged under WB-001. The hosted
-      # partition below runs only explicitly classified synthetic suites.
+      # WB-001 retains the complete host-specific suite. The separate RIFT job
+      # validates only explicitly classified, independent synthetic fixtures.
       - name: Build Workbridge and stage desktop runtime
         run: |
           npm run build
@@ -70,9 +70,29 @@ jobs:
       - name: Test both research providers with synthetic offline fixtures
         if: matrix.partition == 'parallel'
         run: node --test integrations/research/test/*.test.mjs
-      - name: Verify RIFT suite classification and run offline synthetic tests
-        if: matrix.partition == 'parallel'
-        run: node scripts/ci-rift-test-runner.mjs hosted
       - name: Verify the sealed research runtime closure
         if: matrix.partition == 'parallel'
         run: node scripts/stage-research-runtime.mjs --verify --repo-root .
+
+  rift-offline:
+    name: RIFT offline / Windows / Node 24
+    runs-on: windows-2025
+    timeout-minutes: 5
+    steps:
+      # Independent job: no npm dependencies, RIFT install, native build or core-test prerequisite.
+      - name: Set canonical Windows fixture temp
+        shell: pwsh
+        run: |
+          "TMPDIR=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Check RIFT inventory regressions
+        run: node --test test/ci-rift-test-runner.test.mjs
+      - name: Run offline RIFT synthetic suites
+        run: node scripts/ci-rift-test-runner.mjs hosted
