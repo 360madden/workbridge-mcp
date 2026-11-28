@@ -53,8 +53,8 @@ jobs:
         shell: pwsh
         run: node -e "const os=require('node:os'),fs=require('node:fs'),path=require('node:path');const declared=path.resolve(os.tmpdir());const canonical=fs.realpathSync.native(declared);if(declared.toLowerCase()!==canonical.toLowerCase())throw new Error('CI_TEMP_ALIAS_MISMATCH')"
       # The two runner partitions cover every test/*.test.mjs file exactly once.
-      # Full RIFT companion tests need local RRE/RPT tools; WB-001 runs
-      # those unchanged on the verified physical development machine.
+      # Host-dependent RIFT tests remain unchanged under WB-001. The hosted
+      # partition below runs only explicitly classified synthetic suites.
       - name: Build Workbridge and stage desktop runtime
         run: |
           npm run build
@@ -69,6 +69,9 @@ jobs:
       - name: Test both research providers with synthetic offline fixtures
         if: matrix.partition == 'parallel'
         run: node --test integrations/research/test/*.test.mjs
+      - name: Verify RIFT suite classification and run offline synthetic tests
+        if: matrix.partition == 'parallel'
+        run: node scripts/ci-rift-test-runner.mjs hosted
       - name: Verify the sealed research runtime closure
         if: matrix.partition == 'parallel'
         run: node scripts/stage-research-runtime.mjs --verify --repo-root .
